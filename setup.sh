@@ -6,7 +6,6 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MCP_DIST="$SCRIPT_DIR/dist/index.js"
-SETTINGS_FILE="$HOME/.claude/settings.json"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 RULES_FILE="$SCRIPT_DIR/docs/CLAUDE-WORKFLOW-RULES.md"
 
@@ -30,40 +29,28 @@ echo ""
 read -p "[2/4] WorkFlow Pro URL (default: http://localhost:6011): " WFP_URL
 WFP_URL="${WFP_URL:-http://localhost:6011}"
 
-# 3. Claude Code Settings konfigurieren
+# 3. Claude Code MCP-Server konfigurieren (global, user scope)
 echo ""
-echo "[3/4] Configuring Claude Code..."
+echo "[3/4] Configuring Claude Code MCP server..."
 
-mkdir -p "$HOME/.claude"
-
-if [ ! -f "$SETTINGS_FILE" ]; then
-  echo '{}' > "$SETTINGS_FILE"
+# Prüfen ob claude CLI verfügbar ist
+if ! command -v claude &> /dev/null; then
+  echo "ERROR: 'claude' CLI not found. Please install Claude Code first."
+  exit 1
 fi
 
-# MCP-Server Eintrag mit node hinzufügen
-node -e "
-const fs = require('fs');
-const settings = JSON.parse(fs.readFileSync('$SETTINGS_FILE', 'utf-8'));
+# Bestehenden Eintrag entfernen (falls vorhanden)
+claude mcp remove workflow-pro 2>/dev/null || true
 
-if (!settings.mcpServers) {
-  settings.mcpServers = {};
-}
-
-settings.mcpServers['workflow-pro'] = {
-  command: 'node',
-  args: ['$MCP_DIST'],
-  env: {
-    WORKFLOW_PRO_URL: '$WFP_URL'
-  }
-};
-
-fs.writeFileSync('$SETTINGS_FILE', JSON.stringify(settings, null, 2));
-console.log('      MCP server added to Claude Code settings.');
-"
+# MCP-Server global hinzufügen
+claude mcp add --scope user workflow-pro --transport stdio -e WORKFLOW_PRO_URL="$WFP_URL" -- node "$MCP_DIST"
+echo "      MCP server added globally (user scope)."
 
 # 4. Symlink für CLAUDE.md erstellen
 echo ""
 echo "[4/4] Linking workflow rules..."
+
+mkdir -p "$HOME/.claude"
 
 if [ -f "$CLAUDE_MD" ] && [ ! -L "$CLAUDE_MD" ]; then
   BACKUP="$CLAUDE_MD.bak.$(date +%Y%m%d%H%M%S)"
