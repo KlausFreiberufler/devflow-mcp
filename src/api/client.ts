@@ -325,6 +325,25 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
     return result as ApiResponse<Workflow[]>;
   }
 
+  async createWorkflow(workflow: WorkflowCreate): Promise<ApiResponse<Workflow>> {
+    // Map to backend field names
+    const apiWorkflow: Record<string, unknown> = {
+      projectId: workflow.projectId,
+      ticketSummary: workflow.summary,
+      ticketDescription: workflow.description,
+      workflowType: workflow.workflowType || 'feature',
+    };
+    if (workflow.acceptanceCriteria) {
+      apiWorkflow.acceptanceCriteria = JSON.stringify(workflow.acceptanceCriteria);
+    }
+
+    const result = await this.request<unknown>('POST', '/api/workflows', apiWorkflow);
+    if (result.success && result.data) {
+      return { success: true, data: transformWorkflow(result.data) };
+    }
+    return result as ApiResponse<Workflow>;
+  }
+
   async getWorkflow(workflowId: string): Promise<ApiResponse<Workflow>> {
     const result = await this.request<unknown>('GET', `/api/workflows/${workflowId}`);
     if (result.success && result.data) {
@@ -426,6 +445,14 @@ export interface Workflow {
   approvedBy?: string;
   approvedAt?: string;
   approvedComment?: string;
+}
+
+export interface WorkflowCreate {
+  projectId: string;
+  summary: string;
+  description?: string;
+  workflowType?: string;
+  acceptanceCriteria?: string[];
 }
 
 export interface WorkflowUpdate {

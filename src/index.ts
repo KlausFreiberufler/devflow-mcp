@@ -19,10 +19,12 @@ import { workflowProClient } from './api/client.js';
 import {
   workflowListTool,
   workflowGetTool,
+  workflowCreateTool,
   workflowUpdateTool,
   workflowGetFeedbackTool,
   handleWorkflowList,
   handleWorkflowGet,
+  handleWorkflowCreate,
   handleWorkflowUpdate,
   handleWorkflowGetFeedback
 } from './tools/workflow.js';
@@ -62,6 +64,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       projectGetTool,
       workflowListTool,
       workflowGetTool,
+      workflowCreateTool,
       workflowUpdateTool,
       workflowGetFeedbackTool,
       taskListTool,
@@ -93,6 +96,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case 'workflow_get':
         result = await handleWorkflowGet(args as { workflowId: string });
+        break;
+      case 'workflow_create':
+        result = await handleWorkflowCreate(args as {
+          projectId: string;
+          summary: string;
+          description?: string;
+          workflowType?: string;
+          acceptanceCriteria?: string[];
+        });
         break;
       case 'workflow_update':
         result = await handleWorkflowUpdate(args as {

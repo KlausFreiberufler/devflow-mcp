@@ -101,6 +101,43 @@ The agentStatus and agentMessage are visible in the WorkFlow Pro UI.`,
   }
 };
 
+export const workflowCreateTool = {
+  name: 'workflow_create',
+  description: `Create a new workflow in a project.
+Use this to create new feature requests, bug reports, or tasks.
+The workflow starts in 'idea' state by default.
+
+Requires a projectId (use project_list to find it) and a summary.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      projectId: {
+        type: 'string',
+        description: 'The project ID this workflow belongs to'
+      },
+      summary: {
+        type: 'string',
+        description: 'Brief summary/title of the workflow'
+      },
+      description: {
+        type: 'string',
+        description: 'Detailed description of what needs to be done'
+      },
+      workflowType: {
+        type: 'string',
+        enum: ['feature', 'bug', 'chore'],
+        description: 'Type of workflow (default: feature)'
+      },
+      acceptanceCriteria: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'List of acceptance criteria'
+      }
+    },
+    required: ['projectId', 'summary']
+  }
+};
+
 export const workflowGetFeedbackTool = {
   name: 'workflow_get_feedback',
   description: `Get user feedback for a workflow.
@@ -217,6 +254,28 @@ export async function handleWorkflowUpdate(args: {
   }
 
   return `Workflow updated successfully.\n\n${formatWorkflowDetail(result.data)}`;
+}
+
+export async function handleWorkflowCreate(args: {
+  projectId: string;
+  summary: string;
+  description?: string;
+  workflowType?: string;
+  acceptanceCriteria?: string[];
+}): Promise<string> {
+  const result = await workflowProClient.createWorkflow({
+    projectId: args.projectId,
+    summary: args.summary,
+    description: args.description,
+    workflowType: args.workflowType || 'feature',
+    acceptanceCriteria: args.acceptanceCriteria,
+  });
+
+  if (!result.success || !result.data) {
+    return `Error: ${result.error || 'Failed to create workflow'}`;
+  }
+
+  return `Workflow created successfully.\n\n${formatWorkflowDetail(result.data)}`;
 }
 
 export async function handleWorkflowGetFeedback(args: {
