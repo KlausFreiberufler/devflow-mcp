@@ -1,0 +1,573 @@
+/**
+ * WorkFlow Pro API Client
+ * Handles authentication and API communication with the WorkFlow Pro backend
+ */
+
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { homedir } from 'os';
+import { join } from 'path';
+import { getToken, loadProjectConfig } from '../auth/browser-auth.js';
+
+interface Credentials {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+interface ProjectConfig {
+  projectId: string;
+  projectName: string;
+  linkedAt: string;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export class WorkFlowProClient {
+  private baseUrl: string;
+  private credentials: Credentials | null = null;
+  private credentialsPath: string;
+  private projectConfig: ProjectConfig | null = null;
+  private workingDir: string;
+
+  constructor(baseUrl?: string, workingDir?: string) {
+    this.baseUrl = baseUrl || process.env.WORKFLOW_PRO_URL || 'http://localhost:6011';
+    this.credentialsPath = join(homedir(), '.workflow-pro', 'credentials.json');
+    this.workingDir = workingDir || process.cwd();
+  }
+
+  /**
+   * Initialize the client - load credentials, project config, or authenticate via browser
+   */
+  async init(): Promise<void> {
+    // Load project configuration if available
+    this.projectConfig = await loadProjectConfig(this.workingDir);
+
+    if (this.projectConfig) {
+      console.error(`Linked to project: ${this.projectConfig.projectName}`);
+    }
+
+    // First check for environment variable
+    const envToken = process.env.WORKFLOW_PRO_TOKEN;
+    if (envToken) {
+      this.setToken(envToken);
+      return;
+    }
+
+    // Try to load saved credentials
+    try {
+      const data = await readFile(this.credentialsPath, 'utf-8');
+      this.credentials = JSON.parse(data);
+
+      // Check if token is expired
+      if (this.credentials && this.credentials.expiresAt < Date.now()) {
+        // Token expired - need to re-authenticate
+        this.credentials = null;
+      }
+    } catch {
+      // No credentials file
+      this.credentials = null;
+    }
+
+    // If no valid credentials, authenticate via browser
+    if (!this.credentials) {
+      try {
+        const token = await getToken(this.baseUrl, this.workingDir);
+        this.setToken(token);
+        // Reload project config after auth (in case user just linked a project)
+        this.projectConfig = await loadProjectConfig(this.workingDir);
+      } catch (error) {
+        console.error('Authentication failed:', error);
+        // Will show error when tools are called
+      }
+    }
+  }
+
+  /**
+   * Check if client is authenticated
+   */
+  isAuthenticated(): boolean {
+    return this.credentials !== null && this.credentials.expiresAt > Date.now();
+  }
+
+  /**
+   * Get linked project ID (if any)
+   */
+  getLinkedProjectId(): string | null {
+    return this.projectConfig?.projectId || null;
+  }
+
+  /**
+   * Get linked project name (if any)
+   */
+  getLinkedProjectName(): string | null {
+    return this.projectConfig?.projectName || null;
+  }
+
+  /**
+   * Check if a project is linked
+   */
+  hasLinkedProject(): boolean {
+    return this.projectConfig !== null;
+  }
+
+  /**
+   * Get authentication instructions for the user
+   */
+  getAuthInstructions(): string {
+    return `
+Authentication required. The browser should open automatically.
+If it doesn't, please:
+
+1. Open WorkFlow Pro: ${this.baseUrl.replace(':6011', ':6010')}
+2. Log in with your credentials
+3. The connection will be established automatically
+
+Or set: export WORKFLOW_PRO_TOKEN="your-token"
+`;
+  }
+
+  /**
+   * Set credentials directly (from environment variable)
+   */
+  setToken(token: string): void {
+    this.credentials = {
+      accessToken: token,
+      refreshToken: '',
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    };
+  }
+
+  /**
+   * Save credentials to file
+   */
+  private async saveCredentials(): Promise<void> {
+    if (!this.credentials) return;
+
+    const dir = join(homedir(), '.workflow-pro');
+    await mkdir(dir, { recursive: true });
+    await writeFile(this.credentialsPath, JSON.stringify(this.credentials, null, 2));
+  }
+
+  /**
+   * Refresh access token using refresh token
+   */
+  private async refreshTokens(): Promise<void> {
+    if (!this.credentials?.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: this.credentials.refreshToken })
+    });
+
+    if (!response.ok) {
+      this.credentials = null;
+      throw new Error('Token refresh failed - please re-authenticate');
+    }
+
+    const data = await response.json() as ApiResponse<{ accessToken: string; refreshToken: string }>;
+    if (data.success && data.data) {
+      this.credentials = {
+        accessToken: data.data.accessToken,
+        refreshToken: data.data.refreshToken,
+        expiresAt: Date.now() + 15 * 60 * 1000 // 15 minutes
+      };
+      await this.saveCredentials();
+    }
+  }
+
+  /**
+   * Parse response and handle non-JSON responses gracefully
+   */
+  private async parseResponse<T>(response: Response, path: string): Promise<ApiResponse<T>> {
+    const contentType = response.headers.get('content-type') || '';
+
+    // Check if response is JSON
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      // Check if we got HTML (likely a redirect to login page or 404 page)
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        return {
+          success: false,
+          error: `Endpoint ${path} returned HTML instead of JSON (status: ${response.status}). Check if the endpoint exists and authentication is valid.`
+        };
+      }
+      return {
+        success: false,
+        error: `Unexpected response type: ${contentType} (status: ${response.status})`
+      };
+    }
+
+    // Handle HTTP error status codes
+    if (!response.ok) {
+      try {
+        const errorData = await response.json() as { error?: string; message?: string };
+        return {
+          success: false,
+          error: errorData.error || errorData.message || `HTTP ${response.status}`
+        };
+      } catch {
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
+        };
+      }
+    }
+
+    return await response.json() as ApiResponse<T>;
+  }
+
+  /**
+   * Make authenticated API request
+   */
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown
+  ): Promise<ApiResponse<T>> {
+    // Check for token from environment first
+    const envToken = process.env.WORKFLOW_PRO_TOKEN;
+    if (envToken && !this.credentials) {
+      this.setToken(envToken);
+    }
+
+    if (!this.credentials) {
+      return {
+        success: false,
+        error: `Not authenticated. ${this.getAuthInstructions()}`
+      };
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.credentials.accessToken}`
+    };
+
+    const options: RequestInit = { method, headers };
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, options);
+
+      // Handle 401 - try to refresh token
+      if (response.status === 401 && this.credentials.refreshToken) {
+        await this.refreshTokens();
+        headers['Authorization'] = `Bearer ${this.credentials.accessToken}`;
+        const retryResponse = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
+        return await this.parseResponse<T>(retryResponse, path);
+      }
+
+      return await this.parseResponse<T>(response, path);
+    } catch (error) {
+      return {
+        success: false,
+        error: `API request failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  // ============ Project Methods ============
+
+  async listProjects(): Promise<ApiResponse<Project[]>> {
+    const result = await this.request<unknown[]>('GET', '/api/projects');
+    if (result.success && result.data) {
+      return { success: true, data: result.data.map(transformProject) };
+    }
+    return result as ApiResponse<Project[]>;
+  }
+
+  async getProject(projectId: string): Promise<ApiResponse<Project>> {
+    const result = await this.request<unknown>('GET', `/api/projects/${projectId}`);
+    if (result.success && result.data) {
+      return { success: true, data: transformProject(result.data) };
+    }
+    return result as ApiResponse<Project>;
+  }
+
+  /**
+   * Get the current linked project (convenience method)
+   */
+  async getCurrentProject(): Promise<ApiResponse<Project>> {
+    const projectId = this.getLinkedProjectId();
+    if (!projectId) {
+      return {
+        success: false,
+        error: 'No project linked. Run workflow_list to see all workflows, or re-authenticate to link a project.'
+      };
+    }
+    return this.getProject(projectId);
+  }
+
+  // ============ Workflow Methods ============
+
+  /**
+   * List workflows - automatically filtered by linked project if available
+   */
+  async listWorkflows(projectId?: string): Promise<ApiResponse<Workflow[]>> {
+    // Use linked project if no projectId provided and project is linked
+    const effectiveProjectId = projectId || this.getLinkedProjectId();
+
+    const path = effectiveProjectId
+      ? `/api/workflows?projectId=${effectiveProjectId}`
+      : '/api/workflows';
+    const result = await this.request<unknown[]>('GET', path);
+    if (result.success && result.data) {
+      return { success: true, data: result.data.map(transformWorkflow) };
+    }
+    return result as ApiResponse<Workflow[]>;
+  }
+
+  async getWorkflow(workflowId: string): Promise<ApiResponse<Workflow>> {
+    const result = await this.request<unknown>('GET', `/api/workflows/${workflowId}`);
+    if (result.success && result.data) {
+      return { success: true, data: transformWorkflow(result.data) };
+    }
+    return result as ApiResponse<Workflow>;
+  }
+
+  async updateWorkflow(
+    workflowId: string,
+    update: WorkflowUpdate
+  ): Promise<ApiResponse<Workflow>> {
+    const result = await this.request<unknown>('PATCH', `/api/workflows/${workflowId}`, update);
+    if (result.success && result.data) {
+      return { success: true, data: transformWorkflow(result.data) };
+    }
+    return result as ApiResponse<Workflow>;
+  }
+
+  async getWorkflowFeedback(workflowId: string): Promise<ApiResponse<WorkflowFeedback>> {
+    return this.request<WorkflowFeedback>('GET', `/api/workflows/${workflowId}/feedback`);
+  }
+
+  // ============ Task/Todo Methods ============
+
+  async listTasks(workflowId: string): Promise<ApiResponse<Task[]>> {
+    const result = await this.request<unknown[]>('GET', `/api/workflows/${workflowId}/todos`);
+    if (result.success && result.data) {
+      return { success: true, data: result.data.map(transformTask) };
+    }
+    return result as ApiResponse<Task[]>;
+  }
+
+  async createTask(task: TaskCreate): Promise<ApiResponse<Task>> {
+    // API expects 'text' instead of 'summary'
+    const apiTask = {
+      workflowId: task.workflowId,
+      parentId: task.parentId,
+      text: task.summary,  // Map summary -> text
+      description: task.description,
+      acceptanceCriteria: task.acceptanceCriteria
+    };
+    const result = await this.request<unknown>('POST', '/api/todos', apiTask);
+    if (result.success && result.data) {
+      return { success: true, data: transformTask(result.data) };
+    }
+    return result as ApiResponse<Task>;
+  }
+
+  async updateTask(taskId: string, update: TaskUpdate): Promise<ApiResponse<Task>> {
+    // Map MCP field names to backend field names
+    const apiUpdate: Record<string, unknown> = {};
+    if (update.isCompleted !== undefined) apiUpdate.checked = update.isCompleted;
+    if (update.summary !== undefined) apiUpdate.text = update.summary;
+    if (update.description !== undefined) apiUpdate.description = update.description;
+    if (update.status !== undefined) apiUpdate.status = update.status;
+    if (update.acceptanceCriteria !== undefined) apiUpdate.acceptanceCriteria = update.acceptanceCriteria;
+
+    const result = await this.request<unknown>('PATCH', `/api/todos/${taskId}`, apiUpdate);
+    if (result.success && result.data) {
+      return { success: true, data: transformTask(result.data) };
+    }
+    return result as ApiResponse<Task>;
+  }
+}
+
+// ============ Type Definitions ============
+
+export interface Project {
+  id: string;
+  name: string;
+  jiraKey?: string;
+  description?: string;
+  techStack?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface Workflow {
+  id: string;
+  projectId: string;
+  ticketKey?: string;
+  summary: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  currentState: 'idea' | 'planning' | 'plan_review' | 'progress' | 'code_review' | 'testing' | 'done';
+  agentStatus?: string;
+  agentMessage?: string;
+  implementationPlan?: string;
+  planFeedback?: string;
+  codeFeedback?: string;
+  agentSummary?: string;
+  testingInstructions?: string;
+  planUpdatedAt?: string;
+  createdAt: string;
+  completedAt?: string;
+  displayId?: string;
+  testingNotes?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  approvedComment?: string;
+}
+
+export interface WorkflowUpdate {
+  currentState?: 'idea' | 'planning' | 'plan_review' | 'progress' | 'code_review' | 'testing' | 'done';
+  agentStatus?: string;
+  agentMessage?: string;
+  acceptanceCriteria?: string[];
+  implementationPlan?: string;
+  agentSummary?: string;
+  testingInstructions?: string;
+}
+
+export interface WorkflowFeedback {
+  planFeedback: string | null;
+  codeFeedback: string | null;
+  feedbackAt: string | null;
+}
+
+export interface Task {
+  id: string;
+  workflowId: string;
+  parentId?: string;
+  summary: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  isCompleted: boolean;
+  sortOrder: number;
+  createdAt: string;
+  status?: 'todo' | 'doing' | 'done';
+}
+
+export interface TaskCreate {
+  workflowId: string;
+  parentId?: string;
+  summary: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+}
+
+export interface TaskUpdate {
+  summary?: string;
+  description?: string;
+  isCompleted?: boolean;
+  acceptanceCriteria?: string[];
+  status?: 'todo' | 'doing' | 'done';
+}
+
+// ============ Response Transformers ============
+
+/**
+ * Transform snake_case API response to camelCase
+ */
+function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+function transformKeys<T>(obj: unknown): T {
+  if (obj === null || obj === undefined) {
+    return obj as T;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => transformKeys(item)) as T;
+  }
+
+  if (typeof obj === 'object') {
+    const transformed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      const camelKey = snakeToCamel(key);
+      transformed[camelKey] = transformKeys(value);
+    }
+    return transformed as T;
+  }
+
+  return obj as T;
+}
+
+/**
+ * Transform API project response to typed Project
+ */
+export function transformProject(raw: unknown): Project {
+  const p = transformKeys<Record<string, unknown>>(raw);
+  return {
+    id: p.id as string,
+    name: p.name as string,
+    jiraKey: p.jiraProjectKey as string | undefined,
+    description: p.description as string | undefined,
+    techStack: p.techStack as string | undefined,
+    isActive: Boolean(p.isActive),
+    createdAt: p.createdAt as string,
+  };
+}
+
+/**
+ * Transform API workflow response to typed Workflow
+ */
+export function transformWorkflow(raw: unknown): Workflow {
+  const w = transformKeys<Record<string, unknown>>(raw);
+  return {
+    id: w.id as string,
+    projectId: w.projectId as string,
+    ticketKey: w.ticketKey as string | undefined,
+    summary: w.ticketSummary as string,
+    description: w.ticketDescription as string | undefined,
+    acceptanceCriteria: w.acceptanceCriteria as string[] | undefined,
+    currentState: w.currentState as Workflow['currentState'],
+    agentStatus: w.agentStatus as string | undefined,
+    agentMessage: w.agentMessage as string | undefined,
+    implementationPlan: w.implementationPlan as string | undefined,
+    planFeedback: w.planFeedback as string | undefined,
+    codeFeedback: w.codeFeedback as string | undefined,
+    agentSummary: w.agentSummary as string | undefined,
+    testingInstructions: w.testingInstructions as string | undefined,
+    planUpdatedAt: w.planUpdatedAt as string | undefined,
+    createdAt: w.createdAt as string,
+    completedAt: w.completedAt as string | undefined,
+    displayId: w.displayId as string | undefined,
+    testingNotes: w.testingNotes as string | undefined,
+    approvedBy: w.approvedBy as string | undefined,
+    approvedAt: w.approvedAt as string | undefined,
+    approvedComment: w.approvedComment as string | undefined,
+  };
+}
+
+/**
+ * Transform API task response to typed Task
+ */
+export function transformTask(raw: unknown): Task {
+  const t = transformKeys<Record<string, unknown>>(raw);
+  return {
+    id: t.id as string,
+    workflowId: t.workflowId as string,
+    parentId: t.parentId as string | undefined,
+    summary: (t.text || t.summary) as string,  // API returns 'text', we use 'summary'
+    description: t.description as string | undefined,
+    acceptanceCriteria: t.acceptanceCriteria as string[] | undefined,
+    isCompleted: Boolean(t.isCompleted),
+    sortOrder: t.sortOrder as number,
+    createdAt: t.createdAt as string,
+    status: t.status as 'todo' | 'doing' | 'done' | undefined,
+  };
+}
+
+// Export singleton instance
+export const workflowProClient = new WorkFlowProClient();

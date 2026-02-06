@@ -1,0 +1,26 @@
+{
+  "name": "workflow-pro-mcp",
+  "version": "1.0.0",
+  "description": "MCP Server for WorkFlow Pro - Claude Code Integration",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "workflow-pro-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "setup": "bash setup.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
