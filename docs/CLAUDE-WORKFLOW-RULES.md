@@ -2,19 +2,63 @@
 
 Dieses Projekt ist mit WorkFlow Pro verbunden. Du hast MCP-Tools um Workflows zu bearbeiten.
 
-## Verfügbare MCP-Tools
+## Verfügbare MCP-Tools (21 Tools)
+
+### Projekte & Workflows
 
 | Tool | Beschreibung |
 |------|--------------|
 | `project_list` | Listet alle Projekte |
-| `project_get` | Holt Projekt-Details mit Tech-Stack |
+| `project_get` | Holt Projekt-Details inkl. Tech-Stack |
 | `workflow_list` | Listet Workflows, optional gefiltert |
-| `workflow_get` | Holt Workflow-Details inkl. Akzeptanzkriterien |
-| `workflow_update` | Updated Status und Agent-Nachrichten |
+| `workflow_get` | Holt Workflow-Details inkl. vollem Plan und Audit-Trail |
+| `workflow_update` | Updated Status, Plan, Agent-Nachrichten (mit Pflichtfeld-Guardrails) |
 | `workflow_get_feedback` | Holt User-Feedback zu Plan oder Code |
+
+### Tasks
+
+| Tool | Beschreibung |
+|------|--------------|
 | `task_list` | Listet Tasks eines Workflows |
 | `task_create` | Erstellt neuen Task |
 | `task_update` | Updated Task oder markiert als erledigt |
+
+### Agent Sessions
+
+| Tool | Beschreibung |
+|------|--------------|
+| `agent_session_create` | Erstellt neue Agent-Session (Tracking) |
+| `agent_session_log` | Loggt Fortschritt in eine Session |
+| `agent_session_complete` | Schließt eine Agent-Session ab |
+| `agent_session_list` | Listet Sessions eines Workflows |
+
+### Knowledge & Releases
+
+| Tool | Beschreibung |
+|------|--------------|
+| `project_knowledge_get` | Holt Projekt-Wissensbasis |
+| `project_knowledge_update` | Aktualisiert Projekt-Dokumentation |
+| `release_list` | Listet Releases eines Projekts |
+| `release_get` | Holt Release-Details |
+| `release_create` | Erstellt neues Release |
+| `release_update` | Updated Release-Status/Details |
+
+### Suche
+
+| Tool | Beschreibung |
+|------|--------------|
+| `search` | Sucht Workflows, Tasks und Projekte nach Stichwort |
+
+## Pflichtfeld-Guardrails
+
+Der MCP Server erzwingt bestimmte Felder bei State-Transitions:
+
+| Transition | Pflichtfelder |
+|------------|--------------|
+| → `plan_review` | `implementationPlan` muss gesetzt sein |
+| → `code_review` | `agentSummary` und `testingInstructions` müssen gesetzt sein |
+
+Ohne diese Felder wird die Transition abgelehnt.
 
 ## Workflow States
 
@@ -111,8 +155,10 @@ npm run build                        → Prüfen ob alles kompiliert
 ```
 workflow_update                      → currentState: "code_review"
                                      → agentSummary: "Was wurde implementiert..."
+                                     → testingInstructions: "Wie man testet..."
                                      → agentStatus: "idle"
 ```
+**WICHTIG:** `agentSummary` UND `testingInstructions` sind Pflichtfelder für `code_review`!
 
 **Phase 6: User Review**
 
