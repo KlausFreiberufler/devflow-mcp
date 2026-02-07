@@ -331,13 +331,14 @@ async function handleWorkflowUpdate(args: Record<string, unknown>): Promise<stri
   }
 
   // Build clean update object
+  // Markdown fields: convert escaped \n to real newlines (MCP protocol may escape them)
   const cleanUpdate: Record<string, unknown> = {};
   if (currentState) cleanUpdate.currentState = currentState;
   if (agentStatus) cleanUpdate.agentStatus = agentStatus;
   if (agentMessage) cleanUpdate.agentMessage = agentMessage;
-  if (implementationPlan) cleanUpdate.implementationPlan = implementationPlan;
-  if (agentSummary) cleanUpdate.agentSummary = agentSummary;
-  if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions;
+  if (implementationPlan) cleanUpdate.implementationPlan = implementationPlan.replace(/\\n/g, '\n');
+  if (agentSummary) cleanUpdate.agentSummary = agentSummary.replace(/\\n/g, '\n');
+  if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions.replace(/\\n/g, '\n');
 
   const result = await workflowProClient.updateWorkflow(resolvedId, cleanUpdate);
 
