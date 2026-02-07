@@ -9,6 +9,7 @@ import { exec } from 'child_process';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
+import { setupClaudeMd, fetchProjectTechStack } from '../setup/claude-md-generator.js';
 
 interface AuthResult {
   token: string;
@@ -208,6 +209,14 @@ export async function authenticateViaBrowser(baseUrl: string, workingDir?: strin
   // Save project configuration if project was selected
   if (result.projectId && result.projectName) {
     await saveProjectConfig(dir, result.projectId, result.projectName);
+
+    // Setup CLAUDE.md with workflow rules
+    try {
+      const techStack = await fetchProjectTechStack(baseUrl, result.token, result.projectId);
+      await setupClaudeMd(dir, result.projectName, techStack);
+    } catch (error) {
+      console.error('Warning: Could not setup CLAUDE.md:', error instanceof Error ? error.message : error);
+    }
   }
 
   console.error('Authentication successful! Token saved.');

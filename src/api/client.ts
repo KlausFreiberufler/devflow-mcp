@@ -505,7 +505,12 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
   async search(query: string, type?: string): Promise<ApiResponse<SearchResult[]>> {
     const params = new URLSearchParams({ q: query });
     if (type && type !== 'all') params.set('type', type);
-    return this.request<SearchResult[]>('GET', `/api/search?${params.toString()}`);
+    const response = await this.request<{ results: SearchResult[] }>('GET', `/api/search?${params.toString()}`);
+    // Backend wraps results in { results: [...] }, unwrap for consumers
+    if (response.success && response.data) {
+      return { success: true, data: response.data.results || [] };
+    }
+    return { success: false, error: response.error || 'Search failed' };
   }
 }
 
