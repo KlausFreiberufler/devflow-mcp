@@ -4,10 +4,12 @@
  */
 
 import { workflowProClient, type Project } from '../api/client.js';
+import type { ToolModule } from '../tools/registry.js';
+import { withErrorHandling } from '../utils/errors.js';
 
 // ============ Tool Definitions ============
 
-export const projectListTool = {
+const projectListTool = {
   name: 'project_list',
   description: `List all projects in WorkFlow Pro.
 Returns active projects with their names and Jira keys.
@@ -23,7 +25,7 @@ Use this to find the project you want to work with.`,
   }
 };
 
-export const projectGetTool = {
+const projectGetTool = {
   name: 'project_get',
   description: `Get detailed information about a specific project.
 Returns the full project including:
@@ -47,9 +49,8 @@ Use this to understand the project context before working on workflows.`,
 
 // ============ Tool Handlers ============
 
-export async function handleProjectList(args: {
-  includeInactive?: boolean;
-}): Promise<string> {
+async function handleProjectList(args: Record<string, unknown>): Promise<string> {
+  const includeInactive = args.includeInactive as boolean | undefined;
   const result = await workflowProClient.listProjects();
 
   if (!result.success || !result.data) {
@@ -59,7 +60,7 @@ export async function handleProjectList(args: {
   let projects = result.data;
 
   // Filter inactive unless requested
-  if (!args.includeInactive) {
+  if (!includeInactive) {
     projects = projects.filter(p => p.isActive);
   }
 
@@ -70,10 +71,9 @@ export async function handleProjectList(args: {
   return formatProjectList(projects);
 }
 
-export async function handleProjectGet(args: {
-  projectId: string;
-}): Promise<string> {
-  const result = await workflowProClient.getProject(args.projectId);
+async function handleProjectGet(args: Record<string, unknown>): Promise<string> {
+  const projectId = args.projectId as string;
+  const result = await workflowProClient.getProject(projectId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Project not found'}`;
@@ -130,3 +130,16 @@ function formatProjectDetail(project: Project): string {
 
   return lines.join('\n');
 }
+
+// ============ Tool Module Export ============
+
+export const tools: ToolModule = {
+  project_list: {
+    definition: projectListTool,
+    handler: withErrorHandling('project_list', handleProjectList),
+  },
+  project_get: {
+    definition: projectGetTool,
+    handler: withErrorHandling('project_get', handleProjectGet),
+  },
+};

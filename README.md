@@ -39,25 +39,77 @@ npm run build
 
 Die Workflow-Regeln (`CLAUDE-WORKFLOW-RULES.md`) werden automatisch aktualisiert - sie sind per Symlink verknüpft.
 
-## Verfügbare MCP-Tools
+## Verfügbare MCP-Tools (20 Tools)
+
+### Projekte & Workflows
 
 | Tool | Beschreibung |
 |------|--------------|
 | `project_list` | Listet alle Projekte |
-| `project_get` | Holt Projekt-Details |
+| `project_get` | Holt Projekt-Details inkl. Tech-Stack |
 | `workflow_list` | Listet Workflows (automatisch nach Projekt gefiltert) |
-| `workflow_get` | Holt Workflow-Details inkl. Plan und Akzeptanzkriterien |
-| `workflow_update` | Updated Status, Plan, Agent-Nachrichten |
-| `workflow_get_feedback` | Holt User-Feedback |
+| `workflow_get` | Holt Workflow-Details inkl. vollem Plan und Audit-Trail |
+| `workflow_update` | Updated Status, Plan, Agent-Nachrichten (mit Pflichtfeld-Guardrails) |
+| `workflow_get_feedback` | Holt User-Feedback zu Plan oder Code |
+
+### Tasks
+
+| Tool | Beschreibung |
+|------|--------------|
 | `task_list` | Listet Tasks eines Workflows |
 | `task_create` | Erstellt neuen Task |
 | `task_update` | Updated Task oder markiert als erledigt |
+
+### Agent Sessions
+
+| Tool | Beschreibung |
+|------|--------------|
+| `agent_session_create` | Erstellt neue Agent-Session (Tracking) |
+| `agent_session_log` | Loggt Fortschritt in eine Session |
+| `agent_session_complete` | Schließt eine Agent-Session ab |
+| `agent_session_list` | Listet Sessions eines Workflows |
+
+### Knowledge & Releases
+
+| Tool | Beschreibung |
+|------|--------------|
+| `project_knowledge_get` | Holt Projekt-Wissensbasis |
+| `project_knowledge_update` | Aktualisiert Projekt-Dokumentation |
+| `release_list` | Listet Releases eines Projekts |
+| `release_get` | Holt Release-Details |
+| `release_create` | Erstellt neues Release |
+| `release_update` | Updated Release-Status/Details |
+
+### Suche
+
+| Tool | Beschreibung |
+|------|--------------|
+| `search` | Sucht Workflows, Tasks und Projekte nach Stichwort |
 
 ## Workflow-Prozess
 
 ```
 idea → planning → plan_review → progress → code_review → testing → done
 ```
+
+### Pflichtfeld-Guardrails
+
+Der MCP Server erzwingt bestimmte Felder bei State-Transitions:
+
+| Transition | Pflichtfelder |
+|------------|--------------|
+| → `plan_review` | `implementationPlan` |
+| → `code_review` | `agentSummary`, `testingInstructions` |
+
+### Audit-Trail
+
+Alle wichtigen Aktionen werden automatisch getrackt:
+
+- **Plan erstellt von** (Agent/User) + Zeitstempel
+- **Plan genehmigt von** (User) + Zeitstempel
+- **Code genehmigt von** (User) + Zeitstempel
+
+Diese Felder werden in `workflow_get` angezeigt.
 
 Der vollständige Prozess ist in [`docs/CLAUDE-WORKFLOW-RULES.md`](docs/CLAUDE-WORKFLOW-RULES.md) dokumentiert.
 
@@ -67,7 +119,7 @@ Falls du das Setup-Script nicht verwenden möchtest:
 
 ### 1. MCP-Server in Claude Code eintragen
 
-In `~/.claude/settings.json`:
+In `~/.claude/settings.json` (global) oder `.claude/settings.json` (pro Projekt):
 
 ```json
 {
@@ -76,12 +128,17 @@ In `~/.claude/settings.json`:
       "command": "node",
       "args": ["/pfad/zu/workflow-pro-mcp/dist/index.js"],
       "env": {
-        "WORKFLOW_PRO_URL": "http://localhost:6011"
+        "WORKFLOW_PRO_URL": "http://localhost:6011",
+        "WORKFLOW_PRO_PROJECT_ID": "<optional-projekt-id>"
       }
     }
   }
 }
 ```
+
+### Projekt-Scoping
+
+Über `WORKFLOW_PRO_PROJECT_ID` kann der MCP Server auf ein bestimmtes Projekt eingeschränkt werden. Das ist nützlich, wenn man pro Repo eine eigene `.claude/settings.json` hat. Ohne diese Variable wird das verlinkte Projekt aus `.workflow-pro.json` verwendet.
 
 ### 2. Workflow-Regeln verlinken
 

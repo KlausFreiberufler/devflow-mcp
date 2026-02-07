@@ -32,11 +32,14 @@ export class WorkFlowProClient {
   private credentialsPath: string;
   private projectConfig: ProjectConfig | null = null;
   private workingDir: string;
+  private scopedProjectId: string | null = null;
 
   constructor(baseUrl?: string, workingDir?: string) {
     this.baseUrl = baseUrl || process.env.WORKFLOW_PRO_URL || 'http://localhost:6011';
     this.credentialsPath = join(homedir(), '.workflow-pro', 'credentials.json');
     this.workingDir = workingDir || process.cwd();
+    // Project scoping via environment variable
+    this.scopedProjectId = process.env.WORKFLOW_PRO_PROJECT_ID || null;
   }
 
   /**
@@ -97,7 +100,7 @@ export class WorkFlowProClient {
    * Get linked project ID (if any)
    */
   getLinkedProjectId(): string | null {
-    return this.projectConfig?.projectId || null;
+    return this.scopedProjectId || this.projectConfig?.projectId || null;
   }
 
   /**
@@ -254,24 +257,46 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
       options.body = JSON.stringify(body);
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}${path}`, options);
+    const maxRetries = 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(`${this.baseUrl}${path}`, options);
 
-      // Handle 401 - try to refresh token
-      if (response.status === 401 && this.credentials.refreshToken) {
-        await this.refreshTokens();
-        headers['Authorization'] = `Bearer ${this.credentials.accessToken}`;
-        const retryResponse = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
-        return await this.parseResponse<T>(retryResponse, path);
+        // Handle 401 - try to refresh token
+        if (response.status === 401 && this.credentials.refreshToken) {
+          await this.refreshTokens();
+          headers['Authorization'] = `Bearer ${this.credentials.accessToken}`;
+          const retryResponse = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
+          return await this.parseResponse<T>(retryResponse, path);
+        }
+
+        // Retry on 5xx server errors
+        if (response.status >= 500 && attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+
+        return await this.parseResponse<T>(response, path);
+      } catch (error) {
+        // Retry on network errors
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        if (msg.includes('ECONNREFUSED') || msg.includes('fetch failed')) {
+          return {
+            success: false,
+            error: `Server nicht erreichbar (${this.baseUrl}). Läuft der Backend-Server? Versuche: docker-compose up`
+          };
+        }
+        return {
+          success: false,
+          error: `API request failed: ${msg}`
+        };
       }
-
-      return await this.parseResponse<T>(response, path);
-    } catch (error) {
-      return {
-        success: false,
-        error: `API request failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
     }
+    return { success: false, error: 'Max retries exceeded' };
   }
 
   // ============ Project Methods ============
@@ -408,6 +433,80 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
     }
     return result as ApiResponse<Task>;
   }
+
+  // ============ Agent Session Methods ============
+
+  async listAgentSessions(workflowId?: string): Promise<ApiResponse<AgentSession[]>> {
+    const path = workflowId
+      ? `/api/agent-sessions/workflow/${workflowId}`
+      : '/api/agent-sessions';
+    return this.request<AgentSession[]>('GET', path);
+  }
+
+  async createAgentSession(data: { workflowId: string; type?: string }): Promise<ApiResponse<AgentSession>> {
+    return this.request<AgentSession>('POST', '/api/agent-sessions', data);
+  }
+
+  async logAgentSession(sessionId: string, data: { message: string; level?: string }): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('POST', `/api/agent-sessions/${sessionId}/log`, data);
+  }
+
+  async completeAgentSession(sessionId: string, data?: { summary?: string }): Promise<ApiResponse<unknown>> {
+    return this.request<unknown>('POST', `/api/agent-sessions/${sessionId}/complete`, data || {});
+  }
+
+  // ============ Knowledge Methods ============
+
+  async getProjectKnowledge(projectId?: string): Promise<ApiResponse<ProjectKnowledge>> {
+    const id = projectId || this.getLinkedProjectId();
+    if (!id) {
+      return { success: false, error: 'No project ID. Use project_list or set WORKFLOW_PRO_PROJECT_ID.' };
+    }
+    return this.request<ProjectKnowledge>('GET', `/api/projects/${id}/knowledge`);
+  }
+
+  async updateProjectKnowledge(knowledge: string, projectId?: string): Promise<ApiResponse<ProjectKnowledge>> {
+    const id = projectId || this.getLinkedProjectId();
+    if (!id) {
+      return { success: false, error: 'No project ID. Use project_list or set WORKFLOW_PRO_PROJECT_ID.' };
+    }
+    return this.request<ProjectKnowledge>('PATCH', `/api/projects/${id}/knowledge`, { knowledge });
+  }
+
+  // ============ Release Methods ============
+
+  async listReleases(projectId?: string): Promise<ApiResponse<Release[]>> {
+    const id = projectId || this.getLinkedProjectId();
+    const path = id ? `/api/releases?projectId=${id}` : '/api/releases';
+    return this.request<Release[]>('GET', path);
+  }
+
+  async getRelease(releaseId: string): Promise<ApiResponse<Release>> {
+    return this.request<Release>('GET', `/api/releases/${releaseId}`);
+  }
+
+  async createRelease(data: { projectId?: string; name: string; description?: string; targetDate?: string }): Promise<ApiResponse<Release>> {
+    const body = {
+      ...data,
+      projectId: data.projectId || this.getLinkedProjectId(),
+    };
+    if (!body.projectId) {
+      return { success: false, error: 'No project ID. Use project_list or set WORKFLOW_PRO_PROJECT_ID.' };
+    }
+    return this.request<Release>('POST', '/api/releases', body);
+  }
+
+  async updateRelease(releaseId: string, data: Record<string, unknown>): Promise<ApiResponse<Release>> {
+    return this.request<Release>('PATCH', `/api/releases/${releaseId}`, data);
+  }
+
+  // ============ Search Methods ============
+
+  async search(query: string, type?: string): Promise<ApiResponse<SearchResult[]>> {
+    const params = new URLSearchParams({ q: query });
+    if (type && type !== 'all') params.set('type', type);
+    return this.request<SearchResult[]>('GET', `/api/search?${params.toString()}`);
+  }
 }
 
 // ============ Type Definitions ============
@@ -445,6 +544,13 @@ export interface Workflow {
   approvedBy?: string;
   approvedAt?: string;
   approvedComment?: string;
+  // Audit fields
+  planCreatedBy?: string;
+  planCreatedAt?: string;
+  planApprovedBy?: string;
+  planApprovedAt?: string;
+  codeApprovedBy?: string;
+  codeApprovedAt?: string;
 }
 
 export interface WorkflowCreate {
@@ -498,6 +604,41 @@ export interface TaskUpdate {
   isCompleted?: boolean;
   acceptanceCriteria?: string[];
   status?: 'todo' | 'doing' | 'done';
+}
+
+// ============ New Feature Types ============
+
+export interface AgentSession {
+  id: string;
+  workflowId: string;
+  type?: string;
+  status?: string;
+  summary?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface ProjectKnowledge {
+  knowledge: string;
+  updatedAt?: string;
+}
+
+export interface Release {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  status?: string;
+  targetDate?: string;
+  createdAt: string;
+}
+
+export interface SearchResult {
+  type: string;
+  id: string;
+  title: string;
+  description?: string;
+  state?: string;
 }
 
 // ============ Response Transformers ============
@@ -574,6 +715,12 @@ export function transformWorkflow(raw: unknown): Workflow {
     approvedBy: w.approvedBy as string | undefined,
     approvedAt: w.approvedAt as string | undefined,
     approvedComment: w.approvedComment as string | undefined,
+    planCreatedBy: w.planCreatedBy as string | undefined,
+    planCreatedAt: w.planCreatedAt as string | undefined,
+    planApprovedBy: w.planApprovedBy as string | undefined,
+    planApprovedAt: w.planApprovedAt as string | undefined,
+    codeApprovedBy: w.codeApprovedBy as string | undefined,
+    codeApprovedAt: w.codeApprovedAt as string | undefined,
   };
 }
 

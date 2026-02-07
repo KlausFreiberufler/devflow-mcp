@@ -1,14 +1,15 @@
 /**
  * Workflow MCP Tools
- * Tools for listing, getting, and updating workflows in WorkFlow Pro
+ * Tools for listing, getting, creating, and updating workflows in WorkFlow Pro
  */
 
-import { z } from 'zod';
 import { workflowProClient, type Workflow } from '../api/client.js';
+import type { ToolModule } from '../tools/registry.js';
+import { withErrorHandling } from '../utils/errors.js';
 
 // ============ Tool Definitions ============
 
-export const workflowListTool = {
+const workflowListDef = {
   name: 'workflow_list',
   description: `List all workflows, optionally filtered by project.
 Returns workflows with their current state (idea, planning, plan_review, progress, code_review, testing, done).
@@ -29,7 +30,7 @@ Use this to find workflows to work on.`,
   }
 };
 
-export const workflowGetTool = {
+const workflowGetDef = {
   name: 'workflow_get',
   description: `Get detailed information about a specific workflow.
 Returns the full workflow including:
@@ -37,7 +38,8 @@ Returns the full workflow including:
 - Acceptance criteria
 - Current state
 - Agent status (if being worked on)
-- Associated tasks
+- Implementation plan (full content)
+- Audit info (who created/approved)
 
 Use this before starting work on a workflow to understand requirements.`,
   inputSchema: {
@@ -52,56 +54,7 @@ Use this before starting work on a workflow to understand requirements.`,
   }
 };
 
-export const workflowUpdateTool = {
-  name: 'workflow_update',
-  description: `Update a workflow's status or progress.
-Use this to:
-- Change workflow state (idea -> planning -> plan_review -> progress -> code_review -> testing -> done)
-- Report agent status (what you're currently doing)
-- Send progress messages to the user
-- Submit implementation plan for review
-- Submit agent summary after implementation
-
-The agentStatus and agentMessage are visible in the WorkFlow Pro UI.`,
-  inputSchema: {
-    type: 'object' as const,
-    properties: {
-      workflowId: {
-        type: 'string',
-        description: 'The workflow ID to update'
-      },
-      currentState: {
-        type: 'string',
-        enum: ['idea', 'planning', 'plan_review', 'progress', 'code_review', 'testing', 'done'],
-        description: 'New state for the workflow'
-      },
-      agentStatus: {
-        type: 'string',
-        enum: ['idle', 'analyzing', 'planning', 'implementing', 'testing', 'reviewing'],
-        description: 'Current agent activity status'
-      },
-      agentMessage: {
-        type: 'string',
-        description: 'Human-readable message about what the agent is doing'
-      },
-      implementationPlan: {
-        type: 'string',
-        description: 'Markdown content of the implementation plan (for plan_review state)'
-      },
-      agentSummary: {
-        type: 'string',
-        description: 'Agent summary after implementation (for code_review state)'
-      },
-      testingInstructions: {
-        type: 'string',
-        description: 'Instructions for user testing (shown in testing state). Include what to test, expected behavior, and edge cases.'
-      }
-    },
-    required: ['workflowId']
-  }
-};
-
-export const workflowCreateTool = {
+const workflowCreateDef = {
   name: 'workflow_create',
   description: `Create a new workflow in a project.
 Use this to create new feature requests, bug reports, or tasks.
@@ -134,11 +87,64 @@ Requires a projectId (use project_list to find it) and a summary.`,
         description: 'List of acceptance criteria'
       }
     },
-    required: ['projectId', 'summary']
+    required: ['summary']
   }
 };
 
-export const workflowGetFeedbackTool = {
+const workflowUpdateDef = {
+  name: 'workflow_update',
+  description: `Update a workflow's status or progress.
+Use this to:
+- Change workflow state (idea -> planning -> plan_review -> progress -> code_review -> testing -> done)
+- Report agent status (what you're currently doing)
+- Send progress messages to the user
+- Submit implementation plan for review
+- Submit agent summary after implementation
+
+IMPORTANT: Some state transitions require mandatory fields:
+- plan_review requires: implementationPlan
+- code_review requires: agentSummary AND testingInstructions
+
+The agentStatus and agentMessage are visible in the WorkFlow Pro UI.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      workflowId: {
+        type: 'string',
+        description: 'The workflow ID to update'
+      },
+      currentState: {
+        type: 'string',
+        enum: ['idea', 'planning', 'plan_review', 'progress', 'code_review', 'testing', 'done'],
+        description: 'New state for the workflow'
+      },
+      agentStatus: {
+        type: 'string',
+        enum: ['idle', 'analyzing', 'planning', 'implementing', 'testing', 'reviewing'],
+        description: 'Current agent activity status'
+      },
+      agentMessage: {
+        type: 'string',
+        description: 'Human-readable message about what the agent is doing'
+      },
+      implementationPlan: {
+        type: 'string',
+        description: 'Markdown content of the implementation plan (required for plan_review state)'
+      },
+      agentSummary: {
+        type: 'string',
+        description: 'Agent summary after implementation (required for code_review state)'
+      },
+      testingInstructions: {
+        type: 'string',
+        description: 'Instructions for user testing (required for code_review state). Include what to test, expected behavior, and edge cases.'
+      }
+    },
+    required: ['workflowId']
+  }
+};
+
+const workflowGetFeedbackDef = {
   name: 'workflow_get_feedback',
   description: `Get user feedback for a workflow.
 Use this at the start of a session to check if the user has provided feedback on:
@@ -158,13 +164,67 @@ If feedback exists, you should address it before continuing work.`,
   }
 };
 
+// ============ Helpers ============
+
+/**
+ * Resolve a partial workflow ID to a full ID by prefix matching.
+ */
+async function resolveWorkflowId(partialId: string): Promise<string | null> {
+  // Try exact match first
+  const exact = await workflowProClient.getWorkflow(partialId);
+  if (exact.success && exact.data) {
+    return partialId;
+  }
+
+  // Fallback: list all workflows and find by prefix
+  const list = await workflowProClient.listWorkflows();
+  if (!list.success || !list.data) {
+    return null;
+  }
+
+  const matches = list.data.filter(w => w.id.startsWith(partialId));
+  if (matches.length === 1) {
+    return matches[0].id;
+  }
+
+  return null;
+}
+
+// ============ State Transition Guardrails ============
+
+/** Transitions that can only be triggered by the user via UI */
+const BLOCKED_TRANSITIONS: Record<string, { target: string; reason: string }[]> = {
+  'plan_review': [
+    { target: 'progress', reason: 'Der User muss den Plan zuerst in der UI freigeben. Warte auf Freigabe in plan_review.' }
+  ],
+  'code_review': [
+    { target: 'testing', reason: 'Der User muss den Code zuerst in der UI freigeben. Warte auf Freigabe in code_review.' },
+    { target: 'done', reason: 'Der User muss den Code zuerst in der UI freigeben. Warte auf Freigabe in code_review.' }
+  ],
+  'testing': [
+    { target: 'done', reason: 'Der User muss das Testing zuerst in der UI abschließen. Warte auf Freigabe in testing.' }
+  ]
+};
+
+/** Required fields for state transitions */
+const REQUIRED_FIELDS: Record<string, { fields: string[]; message: string }> = {
+  'plan_review': {
+    fields: ['implementationPlan'],
+    message: 'implementationPlan ist Pflicht beim Übergang zu plan_review. Schreibe einen Plan bevor du den State wechselst.'
+  },
+  'code_review': {
+    fields: ['agentSummary', 'testingInstructions'],
+    message: 'agentSummary und testingInstructions sind Pflicht beim Übergang zu code_review. Beschreibe was implementiert wurde und was der User testen soll.'
+  }
+};
+
 // ============ Tool Handlers ============
 
-export async function handleWorkflowList(args: {
-  projectId?: string;
-  state?: string;
-}): Promise<string> {
-  const result = await workflowProClient.listWorkflows(args.projectId);
+async function handleWorkflowList(args: Record<string, unknown>): Promise<string> {
+  const projectId = args.projectId as string | undefined;
+  const state = args.state as string | undefined;
+
+  const result = await workflowProClient.listWorkflows(projectId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to list workflows'}`;
@@ -172,12 +232,10 @@ export async function handleWorkflowList(args: {
 
   let workflows = result.data;
 
-  // Filter by state if specified
-  if (args.state) {
-    workflows = workflows.filter(w => w.currentState === args.state);
+  if (state) {
+    workflows = workflows.filter(w => w.currentState === state);
   }
 
-  // Add project context info
   const linkedProject = workflowProClient.getLinkedProjectName();
   const contextInfo = linkedProject
     ? `*Showing workflows for project: ${linkedProject}*\n\n`
@@ -190,11 +248,15 @@ export async function handleWorkflowList(args: {
   return contextInfo + formatWorkflowList(workflows);
 }
 
-export async function handleWorkflowGet(args: {
-  workflowId: string;
-}): Promise<string> {
-  const result = await workflowProClient.getWorkflow(args.workflowId);
+async function handleWorkflowGet(args: Record<string, unknown>): Promise<string> {
+  const workflowId = args.workflowId as string;
 
+  const resolvedId = await resolveWorkflowId(workflowId);
+  if (!resolvedId) {
+    return `Error: Workflow not found (tried exact and prefix match for "${workflowId}")`;
+  }
+
+  const result = await workflowProClient.getWorkflow(resolvedId);
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Workflow not found'}`;
   }
@@ -202,73 +264,25 @@ export async function handleWorkflowGet(args: {
   return formatWorkflowDetail(result.data);
 }
 
-export async function handleWorkflowUpdate(args: {
-  workflowId: string;
-  currentState?: 'idea' | 'planning' | 'plan_review' | 'progress' | 'code_review' | 'testing' | 'done';
-  agentStatus?: string;
-  agentMessage?: string;
-  implementationPlan?: string;
-  agentSummary?: string;
-  testingInstructions?: string;
-}): Promise<string> {
-  const { workflowId, ...update } = args;
+async function handleWorkflowCreate(args: Record<string, unknown>): Promise<string> {
+  const projectId = args.projectId as string | undefined;
+  const summary = args.summary as string;
+  const description = args.description as string | undefined;
+  const workflowType = args.workflowType as string | undefined;
+  const acceptanceCriteria = args.acceptanceCriteria as string[] | undefined;
 
-  // Guardrail: State transitions that require user approval via UI
-  if (update.currentState) {
-    const currentWorkflow = await workflowProClient.getWorkflow(workflowId);
-    if (currentWorkflow.success && currentWorkflow.data) {
-      const currentState = currentWorkflow.data.currentState;
-      const BLOCKED_TRANSITIONS: Record<string, { target: string; reason: string }[]> = {
-        'plan_review': [
-          { target: 'progress', reason: 'Der User muss den Plan zuerst in der UI freigeben. Warte auf Freigabe in plan_review.' }
-        ],
-        'code_review': [
-          { target: 'testing', reason: 'Der User muss den Code zuerst in der UI freigeben. Warte auf Freigabe in code_review.' },
-          { target: 'done', reason: 'Der User muss den Code zuerst in der UI freigeben. Warte auf Freigabe in code_review.' }
-        ],
-        'testing': [
-          { target: 'done', reason: 'Der User muss das Testing zuerst in der UI abschließen. Warte auf Freigabe in testing.' }
-        ]
-      };
-
-      const blocked = BLOCKED_TRANSITIONS[currentState]?.find(b => b.target === update.currentState);
-      if (blocked) {
-        return `⛔ Blockiert: ${blocked.reason}\n\nAktueller State: ${currentState} → Gewünschter State: ${update.currentState}\n\nDiese Transition kann nur vom User über die WorkFlow Pro UI ausgelöst werden.`;
-      }
-    }
+  // Use linked project if no projectId provided
+  const effectiveProjectId = projectId || workflowProClient.getLinkedProjectId();
+  if (!effectiveProjectId) {
+    return 'Error: projectId ist erforderlich. Nutze project_list um die verfügbaren Projekte zu sehen, oder verknüpfe ein Projekt.';
   }
 
-  // Only include non-undefined values
-  const cleanUpdate: Record<string, unknown> = {};
-  if (update.currentState) cleanUpdate.currentState = update.currentState;
-  if (update.agentStatus) cleanUpdate.agentStatus = update.agentStatus;
-  if (update.agentMessage) cleanUpdate.agentMessage = update.agentMessage;
-  if (update.implementationPlan) cleanUpdate.implementationPlan = update.implementationPlan;
-  if (update.agentSummary) cleanUpdate.agentSummary = update.agentSummary;
-  if (update.testingInstructions) cleanUpdate.testingInstructions = update.testingInstructions;
-
-  const result = await workflowProClient.updateWorkflow(workflowId, cleanUpdate);
-
-  if (!result.success || !result.data) {
-    return `Error: ${result.error || 'Failed to update workflow'}`;
-  }
-
-  return `Workflow updated successfully.\n\n${formatWorkflowDetail(result.data)}`;
-}
-
-export async function handleWorkflowCreate(args: {
-  projectId: string;
-  summary: string;
-  description?: string;
-  workflowType?: string;
-  acceptanceCriteria?: string[];
-}): Promise<string> {
   const result = await workflowProClient.createWorkflow({
-    projectId: args.projectId,
-    summary: args.summary,
-    description: args.description,
-    workflowType: args.workflowType || 'feature',
-    acceptanceCriteria: args.acceptanceCriteria,
+    projectId: effectiveProjectId,
+    summary,
+    description,
+    workflowType: workflowType || 'feature',
+    acceptanceCriteria,
   });
 
   if (!result.success || !result.data) {
@@ -278,10 +292,71 @@ export async function handleWorkflowCreate(args: {
   return `Workflow created successfully.\n\n${formatWorkflowDetail(result.data)}`;
 }
 
-export async function handleWorkflowGetFeedback(args: {
-  workflowId: string;
-}): Promise<string> {
-  const result = await workflowProClient.getWorkflowFeedback(args.workflowId);
+async function handleWorkflowUpdate(args: Record<string, unknown>): Promise<string> {
+  const workflowId = args.workflowId as string;
+  const currentState = args.currentState as Workflow['currentState'] | undefined;
+  const agentStatus = args.agentStatus as string | undefined;
+  const agentMessage = args.agentMessage as string | undefined;
+  const implementationPlan = args.implementationPlan as string | undefined;
+  const agentSummary = args.agentSummary as string | undefined;
+  const testingInstructions = args.testingInstructions as string | undefined;
+
+  const resolvedId = await resolveWorkflowId(workflowId);
+  if (!resolvedId) {
+    return `Error: Workflow not found (tried exact and prefix match for "${workflowId}")`;
+  }
+
+  // Guardrail: Check state transitions
+  if (currentState) {
+    const currentWorkflow = await workflowProClient.getWorkflow(resolvedId);
+    if (currentWorkflow.success && currentWorkflow.data) {
+      const fromState = currentWorkflow.data.currentState;
+
+      // Check blocked transitions (user-only)
+      const blocked = BLOCKED_TRANSITIONS[fromState]?.find(b => b.target === currentState);
+      if (blocked) {
+        return `⛔ Blockiert: ${blocked.reason}\n\nAktueller State: ${fromState} → Gewünschter State: ${currentState}\n\nDiese Transition kann nur vom User über die WorkFlow Pro UI ausgelöst werden.`;
+      }
+    }
+
+    // Check required fields for target state
+    const required = REQUIRED_FIELDS[currentState];
+    if (required) {
+      const allArgs = { implementationPlan, agentSummary, testingInstructions };
+      const missing = required.fields.filter(f => !allArgs[f as keyof typeof allArgs]);
+      if (missing.length > 0) {
+        return `⛔ Pflichtfelder fehlen: ${missing.join(', ')}\n\n${required.message}`;
+      }
+    }
+  }
+
+  // Build clean update object
+  const cleanUpdate: Record<string, unknown> = {};
+  if (currentState) cleanUpdate.currentState = currentState;
+  if (agentStatus) cleanUpdate.agentStatus = agentStatus;
+  if (agentMessage) cleanUpdate.agentMessage = agentMessage;
+  if (implementationPlan) cleanUpdate.implementationPlan = implementationPlan;
+  if (agentSummary) cleanUpdate.agentSummary = agentSummary;
+  if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions;
+
+  const result = await workflowProClient.updateWorkflow(resolvedId, cleanUpdate);
+
+  if (!result.success || !result.data) {
+    return `Error: ${result.error || 'Failed to update workflow'}`;
+  }
+
+  return `Workflow updated successfully.\n\n${formatWorkflowDetail(result.data)}`;
+}
+
+async function handleWorkflowGetFeedback(args: Record<string, unknown>): Promise<string> {
+  const workflowId = args.workflowId as string;
+
+  const resolvedId = await resolveWorkflowId(workflowId);
+  if (!resolvedId) {
+    return `Error: Workflow not found (tried exact and prefix match for "${workflowId}")`;
+  }
+
+  const result = await workflowProClient.getWorkflowFeedback(resolvedId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to get feedback'}`;
@@ -321,15 +396,9 @@ export async function handleWorkflowGetFeedback(args: {
 function formatWorkflowList(workflows: Workflow[]): string {
   const lines = ['# Workflows\n'];
 
-  // Group by state
   const byState: Record<string, Workflow[]> = {
-    idea: [],
-    planning: [],
-    plan_review: [],
-    progress: [],
-    code_review: [],
-    testing: [],
-    done: []
+    idea: [], planning: [], plan_review: [], progress: [],
+    code_review: [], testing: [], done: []
   };
 
   for (const w of workflows) {
@@ -339,26 +408,20 @@ function formatWorkflowList(workflows: Workflow[]): string {
   for (const [state, wfs] of Object.entries(byState)) {
     if (wfs.length === 0) continue;
 
-    const emoji = {
-      idea: '💡',
-      planning: '📋',
-      plan_review: '📝',
-      progress: '🔨',
-      code_review: '👀',
-      testing: '🧪',
-      done: '✅'
-    }[state] || '📌';
+    const emoji: Record<string, string> = {
+      idea: '💡', planning: '📋', plan_review: '📝', progress: '🔨',
+      code_review: '👀', testing: '🧪', done: '✅'
+    };
 
     const label = state === 'plan_review' ? 'Plan Review'
-                : state === 'code_review' ? 'Code Review'
-                : state.charAt(0).toUpperCase() + state.slice(1);
+               : state === 'code_review' ? 'Code Review'
+               : state.charAt(0).toUpperCase() + state.slice(1);
 
-    lines.push(`## ${emoji} ${label} (${wfs.length})\n`);
+    lines.push(`## ${emoji[state] || '📌'} ${label} (${wfs.length})\n`);
 
     for (const w of wfs) {
-      const id = w.id.substring(0, 8);
       const ticket = w.ticketKey ? `[${w.ticketKey}] ` : '';
-      lines.push(`- **${id}**: ${ticket}${w.summary}`);
+      lines.push(`- **${w.id}**: ${ticket}${w.summary}`);
       if (w.agentStatus) {
         lines.push(`  └─ Agent: ${w.agentStatus}${w.agentMessage ? ` - ${w.agentMessage}` : ''}`);
       }
@@ -404,7 +467,7 @@ function formatWorkflowDetail(workflow: Workflow): string {
     lines.push('');
   }
 
-  // Show feedback if any (for review states)
+  // Show feedback if any
   if (workflow.planFeedback) {
     lines.push('## Plan Feedback (from user)\n');
     lines.push(workflow.planFeedback);
@@ -417,28 +480,44 @@ function formatWorkflowDetail(workflow: Workflow): string {
     lines.push('');
   }
 
-  // Show implementation plan summary if present
+  // Show full implementation plan (not truncated!)
   if (workflow.implementationPlan) {
     lines.push('## Implementation Plan\n');
-    // Show first 500 chars as preview
-    const preview = workflow.implementationPlan.length > 500
-      ? workflow.implementationPlan.substring(0, 500) + '...'
-      : workflow.implementationPlan;
-    lines.push(preview);
+    lines.push(workflow.implementationPlan);
     lines.push('');
   }
 
-  // Show agent summary if present
+  // Show agent summary
   if (workflow.agentSummary) {
     lines.push('## Agent Summary\n');
     lines.push(workflow.agentSummary);
     lines.push('');
   }
 
-  // Show testing instructions if present
+  // Show testing instructions
   if (workflow.testingInstructions) {
     lines.push('## Testing Instructions\n');
     lines.push(workflow.testingInstructions);
+    lines.push('');
+  }
+
+  // Audit trail
+  const auditLines: string[] = [];
+  if (workflow.planCreatedBy) {
+    const at = workflow.planCreatedAt ? ` (${new Date(workflow.planCreatedAt).toLocaleString()})` : '';
+    auditLines.push(`- **Plan erstellt von:** ${workflow.planCreatedBy}${at}`);
+  }
+  if (workflow.planApprovedBy) {
+    const at = workflow.planApprovedAt ? ` (${new Date(workflow.planApprovedAt).toLocaleString()})` : '';
+    auditLines.push(`- **Plan genehmigt von:** ${workflow.planApprovedBy}${at}`);
+  }
+  if (workflow.codeApprovedBy) {
+    const at = workflow.codeApprovedAt ? ` (${new Date(workflow.codeApprovedAt).toLocaleString()})` : '';
+    auditLines.push(`- **Code genehmigt von:** ${workflow.codeApprovedBy}${at}`);
+  }
+  if (auditLines.length > 0) {
+    lines.push('## Audit\n');
+    lines.push(...auditLines);
     lines.push('');
   }
 
@@ -449,3 +528,28 @@ function formatWorkflowDetail(workflow: Workflow): string {
 
   return lines.join('\n');
 }
+
+// ============ Tool Registry Export ============
+
+export const tools: ToolModule = {
+  workflow_list: {
+    definition: workflowListDef,
+    handler: withErrorHandling('workflow_list', handleWorkflowList),
+  },
+  workflow_get: {
+    definition: workflowGetDef,
+    handler: withErrorHandling('workflow_get', handleWorkflowGet),
+  },
+  workflow_create: {
+    definition: workflowCreateDef,
+    handler: withErrorHandling('workflow_create', handleWorkflowCreate),
+  },
+  workflow_update: {
+    definition: workflowUpdateDef,
+    handler: withErrorHandling('workflow_update', handleWorkflowUpdate),
+  },
+  workflow_get_feedback: {
+    definition: workflowGetFeedbackDef,
+    handler: withErrorHandling('workflow_get_feedback', handleWorkflowGetFeedback),
+  },
+};

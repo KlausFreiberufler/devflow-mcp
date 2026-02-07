@@ -4,10 +4,12 @@
  */
 
 import { workflowProClient, type Task } from '../api/client.js';
+import type { ToolModule } from '../tools/registry.js';
+import { withErrorHandling } from '../utils/errors.js';
 
 // ============ Tool Definitions ============
 
-export const taskListTool = {
+const taskListDef = {
   name: 'task_list',
   description: `List all tasks for a workflow.
 Tasks are sub-items of a workflow that track implementation progress.
@@ -24,7 +26,7 @@ Returns tasks with their completion status and hierarchy.`,
   }
 };
 
-export const taskCreateTool = {
+const taskCreateDef = {
   name: 'task_create',
   description: `Create a new task under a workflow.
 Use this to break down a workflow into smaller, trackable steps.
@@ -64,7 +66,7 @@ Best practice: Create tasks for each logical step before starting implementation
   }
 };
 
-export const taskUpdateTool = {
+const taskUpdateDef = {
   name: 'task_update',
   description: `Update a task's status or details.
 Use this to:
@@ -110,10 +112,10 @@ Always mark tasks complete when you finish them to track progress.`,
 
 // ============ Tool Handlers ============
 
-export async function handleTaskList(args: {
-  workflowId: string;
-}): Promise<string> {
-  const result = await workflowProClient.listTasks(args.workflowId);
+async function handleTaskList(args: Record<string, unknown>): Promise<string> {
+  const workflowId = args.workflowId as string;
+
+  const result = await workflowProClient.listTasks(workflowId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to list tasks'}`;
@@ -126,19 +128,19 @@ export async function handleTaskList(args: {
   return formatTaskList(result.data);
 }
 
-export async function handleTaskCreate(args: {
-  workflowId: string;
-  parentId?: string;
-  summary: string;
-  description?: string;
-  acceptanceCriteria?: string[];
-}): Promise<string> {
+async function handleTaskCreate(args: Record<string, unknown>): Promise<string> {
+  const workflowId = args.workflowId as string;
+  const parentId = args.parentId as string | undefined;
+  const summary = args.summary as string;
+  const description = args.description as string | undefined;
+  const acceptanceCriteria = args.acceptanceCriteria as string[] | undefined;
+
   const result = await workflowProClient.createTask({
-    workflowId: args.workflowId,
-    parentId: args.parentId,
-    summary: args.summary,
-    description: args.description,
-    acceptanceCriteria: args.acceptanceCriteria
+    workflowId,
+    parentId,
+    summary,
+    description,
+    acceptanceCriteria
   });
 
   if (!result.success || !result.data) {
@@ -148,23 +150,21 @@ export async function handleTaskCreate(args: {
   return `Task created successfully!\n\n${formatTaskDetail(result.data)}`;
 }
 
-export async function handleTaskUpdate(args: {
-  taskId: string;
-  summary?: string;
-  description?: string;
-  isCompleted?: boolean;
-  acceptanceCriteria?: string[];
-  status?: 'todo' | 'doing' | 'done';
-}): Promise<string> {
-  const { taskId, ...update } = args;
+async function handleTaskUpdate(args: Record<string, unknown>): Promise<string> {
+  const taskId = args.taskId as string;
+  const summary = args.summary as string | undefined;
+  const description = args.description as string | undefined;
+  const isCompleted = args.isCompleted as boolean | undefined;
+  const acceptanceCriteria = args.acceptanceCriteria as string[] | undefined;
+  const status = args.status as 'todo' | 'doing' | 'done' | undefined;
 
   // Only include non-undefined values
   const cleanUpdate: Record<string, unknown> = {};
-  if (update.summary !== undefined) cleanUpdate.summary = update.summary;
-  if (update.description !== undefined) cleanUpdate.description = update.description;
-  if (update.isCompleted !== undefined) cleanUpdate.isCompleted = update.isCompleted;
-  if (update.acceptanceCriteria !== undefined) cleanUpdate.acceptanceCriteria = update.acceptanceCriteria;
-  if (update.status !== undefined) cleanUpdate.status = update.status;
+  if (summary !== undefined) cleanUpdate.summary = summary;
+  if (description !== undefined) cleanUpdate.description = description;
+  if (isCompleted !== undefined) cleanUpdate.isCompleted = isCompleted;
+  if (acceptanceCriteria !== undefined) cleanUpdate.acceptanceCriteria = acceptanceCriteria;
+  if (status !== undefined) cleanUpdate.status = status;
 
   const result = await workflowProClient.updateTask(taskId, cleanUpdate);
 
@@ -172,7 +172,7 @@ export async function handleTaskUpdate(args: {
     return `Error: ${result.error || 'Failed to update task'}`;
   }
 
-  const action = args.isCompleted ? 'completed' : 'updated';
+  const action = isCompleted ? 'completed' : 'updated';
   return `Task ${action} successfully!\n\n${formatTaskDetail(result.data)}`;
 }
 
@@ -216,8 +216,7 @@ function formatTaskList(tasks: Task[]): string {
 function formatTaskLine(task: Task, indent: number): string {
   const prefix = '  '.repeat(indent);
   const checkbox = task.isCompleted ? '✅' : '⬜';
-  const id = task.id.substring(0, 8);
-  return `${prefix}${checkbox} **${id}**: ${task.summary}`;
+  return `${prefix}${checkbox} **${task.id}**: ${task.summary}`;
 }
 
 function formatTaskDetail(task: Task): string {
@@ -252,3 +251,20 @@ function formatTaskDetail(task: Task): string {
 
   return lines.join('\n');
 }
+
+// ============ Tool Registry Export ============
+
+export const tools: ToolModule = {
+  task_list: {
+    definition: taskListDef,
+    handler: withErrorHandling('task_list', handleTaskList),
+  },
+  task_create: {
+    definition: taskCreateDef,
+    handler: withErrorHandling('task_create', handleTaskCreate),
+  },
+  task_update: {
+    definition: taskUpdateDef,
+    handler: withErrorHandling('task_update', handleTaskUpdate),
+  },
+};
