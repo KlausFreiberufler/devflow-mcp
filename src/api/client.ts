@@ -574,6 +574,7 @@ export interface WorkflowUpdate {
   implementationPlan?: string;
   agentSummary?: string;
   testingInstructions?: string;
+  commits?: { hash: string; message: string }[];
 }
 
 export interface WorkflowFeedback {

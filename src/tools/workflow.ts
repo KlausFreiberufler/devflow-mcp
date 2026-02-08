@@ -138,6 +138,18 @@ The agentStatus and agentMessage are visible in the WorkFlow Pro UI.`,
       testingInstructions: {
         type: 'string',
         description: 'Instructions for user testing (required for code_review state). Include what to test, expected behavior, and edge cases.'
+      },
+      commits: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            hash: { type: 'string', description: 'Git commit hash' },
+            message: { type: 'string', description: 'Commit message' }
+          },
+          required: ['hash', 'message']
+        },
+        description: 'List of git commits to add to this workflow. New commits are appended to existing ones.'
       }
     },
     required: ['workflowId']
@@ -300,6 +312,7 @@ async function handleWorkflowUpdate(args: Record<string, unknown>): Promise<stri
   const implementationPlan = args.implementationPlan as string | undefined;
   const agentSummary = args.agentSummary as string | undefined;
   const testingInstructions = args.testingInstructions as string | undefined;
+  const commits = args.commits as { hash: string; message: string }[] | undefined;
 
   const resolvedId = await resolveWorkflowId(workflowId);
   if (!resolvedId) {
@@ -339,6 +352,7 @@ async function handleWorkflowUpdate(args: Record<string, unknown>): Promise<stri
   if (implementationPlan) cleanUpdate.implementationPlan = implementationPlan.replace(/\\n/g, '\n');
   if (agentSummary) cleanUpdate.agentSummary = agentSummary.replace(/\\n/g, '\n');
   if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions.replace(/\\n/g, '\n');
+  if (commits) cleanUpdate.commits = commits;
 
   const result = await workflowProClient.updateWorkflow(resolvedId, cleanUpdate);
 
