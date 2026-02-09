@@ -1,9 +1,9 @@
 /**
  * Project MCP Tools
- * Tools for getting project details in WorkFlow Pro
+ * Tools for getting project details in DevFlow
  */
 
-import { workflowProClient, type Project } from '../api/client.js';
+import { devFlowClient, type Project } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 
@@ -33,13 +33,13 @@ Use this to understand the project context before working on workflows.`,
 // ============ Tool Handlers ============
 
 async function handleProjectGet(args: Record<string, unknown>): Promise<string> {
-  const projectId = (args.projectId as string) || workflowProClient.getLinkedProjectId();
+  const projectId = (args.projectId as string) || devFlowClient.getLinkedProjectId();
 
   if (!projectId) {
-    return 'Error: No project ID provided and no linked project configured. Set WORKFLOW_PRO_PROJECT_ID in .mcp.json.';
+    return 'Error: No project ID provided and no linked project configured. Set DEVFLOW_PROJECT_ID in .mcp.json.';
   }
 
-  const result = await workflowProClient.getProject(projectId);
+  const result = await devFlowClient.getProject(projectId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Project not found'}`;

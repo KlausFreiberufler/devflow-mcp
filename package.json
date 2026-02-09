@@ -1,11 +1,11 @@
 {
-  "name": "workflow-pro-mcp",
+  "name": "devflow-mcp",
   "version": "1.0.0",
-  "description": "MCP Server for WorkFlow Pro - Claude Code Integration",
+  "description": "MCP Server for DevFlow - Claude Code Integration",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "workflow-pro-mcp": "dist/index.js"
+    "devflow-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",

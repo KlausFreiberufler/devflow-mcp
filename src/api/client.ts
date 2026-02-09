@@ -1,6 +1,6 @@
 /**
- * WorkFlow Pro API Client
- * Handles authentication and API communication with the WorkFlow Pro backend
+ * DevFlow API Client
+ * Handles authentication and API communication with the DevFlow backend
  */
 
 import { readFile, writeFile, mkdir } from 'fs/promises';
@@ -26,7 +26,7 @@ interface ApiResponse<T> {
   error?: string;
 }
 
-export class WorkFlowProClient {
+export class DevFlowClient {
   private baseUrl: string;
   private credentials: Credentials | null = null;
   private credentialsPath: string;
@@ -35,11 +35,11 @@ export class WorkFlowProClient {
   private scopedProjectId: string | null = null;
 
   constructor(baseUrl?: string, workingDir?: string) {
-    this.baseUrl = baseUrl || process.env.WORKFLOW_PRO_URL || 'http://localhost:6011';
-    this.credentialsPath = join(homedir(), '.workflow-pro', 'credentials.json');
+    this.baseUrl = baseUrl || process.env.DEVFLOW_URL || 'http://localhost:6011';
+    this.credentialsPath = join(homedir(), '.devflow', 'credentials.json');
     this.workingDir = workingDir || process.cwd();
     // Project scoping via environment variable
-    this.scopedProjectId = process.env.WORKFLOW_PRO_PROJECT_ID || null;
+    this.scopedProjectId = process.env.DEVFLOW_PROJECT_ID || null;
   }
 
   /**
@@ -54,7 +54,7 @@ export class WorkFlowProClient {
     }
 
     // First check for environment variable
-    const envToken = process.env.WORKFLOW_PRO_TOKEN;
+    const envToken = process.env.DEVFLOW_TOKEN;
     if (envToken) {
       this.setToken(envToken);
       return;
@@ -125,11 +125,11 @@ export class WorkFlowProClient {
 Authentication required. The browser should open automatically.
 If it doesn't, please:
 
-1. Open WorkFlow Pro: ${this.baseUrl.replace(':6011', ':6010')}
+1. Open DevFlow: ${this.baseUrl.replace(':6011', ':6010')}
 2. Log in with your credentials
 3. The connection will be established automatically
 
-Or set: export WORKFLOW_PRO_TOKEN="your-token"
+Or set: export DEVFLOW_TOKEN="your-token"
 `;
   }
 
@@ -150,7 +150,7 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
   private async saveCredentials(): Promise<void> {
     if (!this.credentials) return;
 
-    const dir = join(homedir(), '.workflow-pro');
+    const dir = join(homedir(), '.devflow');
     await mkdir(dir, { recursive: true });
     await writeFile(this.credentialsPath, JSON.stringify(this.credentials, null, 2));
   }
@@ -235,7 +235,7 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
     body?: unknown
   ): Promise<ApiResponse<T>> {
     // Check for token from environment first
-    const envToken = process.env.WORKFLOW_PRO_TOKEN;
+    const envToken = process.env.DEVFLOW_TOKEN;
     if (envToken && !this.credentials) {
       this.setToken(envToken);
     }
@@ -325,7 +325,7 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
     if (!projectId) {
       return {
         success: false,
-        error: 'No project linked. Run workflow_list to see all workflows, or re-authenticate to link a project.'
+        error: 'No project linked. Run flow_list to see all flows, or re-authenticate to link a project.'
       };
     }
     return this.getProject(projectId);
@@ -460,7 +460,7 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
   async getProjectKnowledge(projectId?: string): Promise<ApiResponse<ProjectKnowledge>> {
     const id = projectId || this.getLinkedProjectId();
     if (!id) {
-      return { success: false, error: 'No project ID. Use project_list or set WORKFLOW_PRO_PROJECT_ID.' };
+      return { success: false, error: 'No project ID. Use project_list or set DEVFLOW_PROJECT_ID.' };
     }
     return this.request<ProjectKnowledge>('GET', `/api/projects/${id}/knowledge`);
   }
@@ -468,7 +468,7 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
   async updateProjectKnowledge(knowledge: string, projectId?: string): Promise<ApiResponse<ProjectKnowledge>> {
     const id = projectId || this.getLinkedProjectId();
     if (!id) {
-      return { success: false, error: 'No project ID. Use project_list or set WORKFLOW_PRO_PROJECT_ID.' };
+      return { success: false, error: 'No project ID. Use project_list or set DEVFLOW_PROJECT_ID.' };
     }
     return this.request<ProjectKnowledge>('PATCH', `/api/projects/${id}/knowledge`, { knowledge });
   }
@@ -491,7 +491,7 @@ Or set: export WORKFLOW_PRO_TOKEN="your-token"
       projectId: data.projectId || this.getLinkedProjectId(),
     };
     if (!body.projectId) {
-      return { success: false, error: 'No project ID. Use project_list or set WORKFLOW_PRO_PROJECT_ID.' };
+      return { success: false, error: 'No project ID. Use project_list or set DEVFLOW_PROJECT_ID.' };
     }
     return this.request<Release>('POST', '/api/releases', body);
   }
@@ -750,4 +750,4 @@ export function transformTask(raw: unknown): Task {
 }
 
 // Export singleton instance
-export const workflowProClient = new WorkFlowProClient();
+export const devFlowClient = new DevFlowClient();

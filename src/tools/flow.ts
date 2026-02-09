@@ -1,16 +1,16 @@
 /**
- * Workflow MCP Tools
- * Tools for listing, getting, creating, and updating workflows in WorkFlow Pro
+ * Flow MCP Tools
+ * Tools for listing, getting, creating, and updating flows in DevFlow
  */
 
-import { workflowProClient, type Workflow } from '../api/client.js';
+import { devFlowClient, type Workflow } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 
 // ============ Tool Definitions ============
 
-const workflowListDef = {
-  name: 'workflow_list',
+const flowListDef = {
+  name: 'flow_list',
   description: `List all workflows, optionally filtered by project.
 Returns workflows with their current state (idea, planning, plan_review, progress, code_review, testing, done).
 Use this to find workflows to work on.`,
@@ -30,8 +30,8 @@ Use this to find workflows to work on.`,
   }
 };
 
-const workflowGetDef = {
-  name: 'workflow_get',
+const flowGetDef = {
+  name: 'flow_get',
   description: `Get detailed information about a specific workflow.
 Returns the full workflow including:
 - Summary and description
@@ -45,17 +45,17 @@ Use this before starting work on a workflow to understand requirements.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
-      workflowId: {
+      flowId: {
         type: 'string',
         description: 'The workflow ID (e.g., "abc123" or full ID)'
       }
     },
-    required: ['workflowId']
+    required: ['flowId']
   }
 };
 
-const workflowCreateDef = {
-  name: 'workflow_create',
+const flowCreateDef = {
+  name: 'flow_create',
   description: `Create a new workflow in a project.
 Use this to create new feature requests, bug reports, or tasks.
 The workflow starts in 'idea' state by default.
@@ -76,7 +76,7 @@ Requires a projectId (use project_list to find it) and a summary.`,
         type: 'string',
         description: 'Detailed description of what needs to be done'
       },
-      workflowType: {
+      flowType: {
         type: 'string',
         enum: ['feature', 'bug', 'chore'],
         description: 'Type of workflow (default: feature)'
@@ -91,8 +91,8 @@ Requires a projectId (use project_list to find it) and a summary.`,
   }
 };
 
-const workflowUpdateDef = {
-  name: 'workflow_update',
+const flowUpdateDef = {
+  name: 'flow_update',
   description: `Update a workflow's status or progress.
 Use this to:
 - Change workflow state (idea -> planning -> plan_review -> progress -> code_review -> testing -> done)
@@ -105,11 +105,11 @@ IMPORTANT: Some state transitions require mandatory fields:
 - plan_review requires: implementationPlan
 - code_review requires: agentSummary AND testingInstructions
 
-The agentStatus and agentMessage are visible in the WorkFlow Pro UI.`,
+The agentStatus and agentMessage are visible in the DevFlow UI.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
-      workflowId: {
+      flowId: {
         type: 'string',
         description: 'The workflow ID to update'
       },
@@ -152,12 +152,12 @@ The agentStatus and agentMessage are visible in the WorkFlow Pro UI.`,
         description: 'List of git commits to add to this workflow. New commits are appended to existing ones.'
       }
     },
-    required: ['workflowId']
+    required: ['flowId']
   }
 };
 
-const workflowGetFeedbackDef = {
-  name: 'workflow_get_feedback',
+const flowGetFeedbackDef = {
+  name: 'flow_get_feedback',
   description: `Get user feedback for a workflow.
 Use this at the start of a session to check if the user has provided feedback on:
 - The implementation plan (plan_review phase)
@@ -167,12 +167,12 @@ If feedback exists, you should address it before continuing work.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
-      workflowId: {
+      flowId: {
         type: 'string',
         description: 'The workflow ID to get feedback for'
       }
     },
-    required: ['workflowId']
+    required: ['flowId']
   }
 };
 
@@ -183,13 +183,13 @@ If feedback exists, you should address it before continuing work.`,
  */
 async function resolveWorkflowId(partialId: string): Promise<string | null> {
   // Try exact match first
-  const exact = await workflowProClient.getWorkflow(partialId);
+  const exact = await devFlowClient.getWorkflow(partialId);
   if (exact.success && exact.data) {
     return partialId;
   }
 
   // Fallback: list all workflows and find by prefix
-  const list = await workflowProClient.listWorkflows();
+  const list = await devFlowClient.listWorkflows();
   if (!list.success || !list.data) {
     return null;
   }
@@ -232,11 +232,11 @@ const REQUIRED_FIELDS: Record<string, { fields: string[]; message: string }> = {
 
 // ============ Tool Handlers ============
 
-async function handleWorkflowList(args: Record<string, unknown>): Promise<string> {
+async function handleFlowList(args: Record<string, unknown>): Promise<string> {
   const projectId = args.projectId as string | undefined;
   const state = args.state as string | undefined;
 
-  const result = await workflowProClient.listWorkflows(projectId);
+  const result = await devFlowClient.listWorkflows(projectId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to list workflows'}`;
@@ -248,7 +248,7 @@ async function handleWorkflowList(args: Record<string, unknown>): Promise<string
     workflows = workflows.filter(w => w.currentState === state);
   }
 
-  const linkedProject = workflowProClient.getLinkedProjectName();
+  const linkedProject = devFlowClient.getLinkedProjectName();
   const contextInfo = linkedProject
     ? `*Showing workflows for project: ${linkedProject}*\n\n`
     : '';
@@ -260,15 +260,15 @@ async function handleWorkflowList(args: Record<string, unknown>): Promise<string
   return contextInfo + formatWorkflowList(workflows);
 }
 
-async function handleWorkflowGet(args: Record<string, unknown>): Promise<string> {
-  const workflowId = args.workflowId as string;
+async function handleFlowGet(args: Record<string, unknown>): Promise<string> {
+  const flowId = args.flowId as string;
 
-  const resolvedId = await resolveWorkflowId(workflowId);
+  const resolvedId = await resolveWorkflowId(flowId);
   if (!resolvedId) {
-    return `Error: Workflow not found (tried exact and prefix match for "${workflowId}")`;
+    return `Error: Workflow not found (tried exact and prefix match for "${flowId}")`;
   }
 
-  const result = await workflowProClient.getWorkflow(resolvedId);
+  const result = await devFlowClient.getWorkflow(resolvedId);
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Workflow not found'}`;
   }
@@ -276,24 +276,24 @@ async function handleWorkflowGet(args: Record<string, unknown>): Promise<string>
   return formatWorkflowDetail(result.data);
 }
 
-async function handleWorkflowCreate(args: Record<string, unknown>): Promise<string> {
+async function handleFlowCreate(args: Record<string, unknown>): Promise<string> {
   const projectId = args.projectId as string | undefined;
   const summary = args.summary as string;
   const description = args.description as string | undefined;
-  const workflowType = args.workflowType as string | undefined;
+  const flowType = args.flowType as string | undefined;
   const acceptanceCriteria = args.acceptanceCriteria as string[] | undefined;
 
   // Use linked project if no projectId provided
-  const effectiveProjectId = projectId || workflowProClient.getLinkedProjectId();
+  const effectiveProjectId = projectId || devFlowClient.getLinkedProjectId();
   if (!effectiveProjectId) {
     return 'Error: projectId ist erforderlich. Nutze project_list um die verfügbaren Projekte zu sehen, oder verknüpfe ein Projekt.';
   }
 
-  const result = await workflowProClient.createWorkflow({
+  const result = await devFlowClient.createWorkflow({
     projectId: effectiveProjectId,
     summary,
     description,
-    workflowType: workflowType || 'feature',
+    workflowType: flowType || 'feature',
     acceptanceCriteria,
   });
 
@@ -304,8 +304,8 @@ async function handleWorkflowCreate(args: Record<string, unknown>): Promise<stri
   return `Workflow created successfully.\n\n${formatWorkflowDetail(result.data)}`;
 }
 
-async function handleWorkflowUpdate(args: Record<string, unknown>): Promise<string> {
-  const workflowId = args.workflowId as string;
+async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> {
+  const flowId = args.flowId as string;
   const currentState = args.currentState as Workflow['currentState'] | undefined;
   const agentStatus = args.agentStatus as string | undefined;
   const agentMessage = args.agentMessage as string | undefined;
@@ -314,21 +314,21 @@ async function handleWorkflowUpdate(args: Record<string, unknown>): Promise<stri
   const testingInstructions = args.testingInstructions as string | undefined;
   const commits = args.commits as { hash: string; message: string }[] | undefined;
 
-  const resolvedId = await resolveWorkflowId(workflowId);
+  const resolvedId = await resolveWorkflowId(flowId);
   if (!resolvedId) {
-    return `Error: Workflow not found (tried exact and prefix match for "${workflowId}")`;
+    return `Error: Workflow not found (tried exact and prefix match for "${flowId}")`;
   }
 
   // Guardrail: Check state transitions
   if (currentState) {
-    const currentWorkflow = await workflowProClient.getWorkflow(resolvedId);
+    const currentWorkflow = await devFlowClient.getWorkflow(resolvedId);
     if (currentWorkflow.success && currentWorkflow.data) {
       const fromState = currentWorkflow.data.currentState;
 
       // Check blocked transitions (user-only)
       const blocked = BLOCKED_TRANSITIONS[fromState]?.find(b => b.target === currentState);
       if (blocked) {
-        return `⛔ Blockiert: ${blocked.reason}\n\nAktueller State: ${fromState} → Gewünschter State: ${currentState}\n\nDiese Transition kann nur vom User über die WorkFlow Pro UI ausgelöst werden.`;
+        return `⛔ Blockiert: ${blocked.reason}\n\nAktueller State: ${fromState} → Gewünschter State: ${currentState}\n\nDiese Transition kann nur vom User über die DevFlow UI ausgelöst werden.`;
       }
     }
 
@@ -354,7 +354,7 @@ async function handleWorkflowUpdate(args: Record<string, unknown>): Promise<stri
   if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions.replace(/\\n/g, '\n');
   if (commits) cleanUpdate.commits = commits;
 
-  const result = await workflowProClient.updateWorkflow(resolvedId, cleanUpdate);
+  const result = await devFlowClient.updateWorkflow(resolvedId, cleanUpdate);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to update workflow'}`;
@@ -363,15 +363,15 @@ async function handleWorkflowUpdate(args: Record<string, unknown>): Promise<stri
   return `Workflow updated successfully.\n\n${formatWorkflowDetail(result.data)}`;
 }
 
-async function handleWorkflowGetFeedback(args: Record<string, unknown>): Promise<string> {
-  const workflowId = args.workflowId as string;
+async function handleFlowGetFeedback(args: Record<string, unknown>): Promise<string> {
+  const flowId = args.flowId as string;
 
-  const resolvedId = await resolveWorkflowId(workflowId);
+  const resolvedId = await resolveWorkflowId(flowId);
   if (!resolvedId) {
-    return `Error: Workflow not found (tried exact and prefix match for "${workflowId}")`;
+    return `Error: Workflow not found (tried exact and prefix match for "${flowId}")`;
   }
 
-  const result = await workflowProClient.getWorkflowFeedback(resolvedId);
+  const result = await devFlowClient.getWorkflowFeedback(resolvedId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to get feedback'}`;
@@ -547,24 +547,24 @@ function formatWorkflowDetail(workflow: Workflow): string {
 // ============ Tool Registry Export ============
 
 export const tools: ToolModule = {
-  workflow_list: {
-    definition: workflowListDef,
-    handler: withErrorHandling('workflow_list', handleWorkflowList),
+  flow_list: {
+    definition: flowListDef,
+    handler: withErrorHandling('flow_list', handleFlowList),
   },
-  workflow_get: {
-    definition: workflowGetDef,
-    handler: withErrorHandling('workflow_get', handleWorkflowGet),
+  flow_get: {
+    definition: flowGetDef,
+    handler: withErrorHandling('flow_get', handleFlowGet),
   },
-  workflow_create: {
-    definition: workflowCreateDef,
-    handler: withErrorHandling('workflow_create', handleWorkflowCreate),
+  flow_create: {
+    definition: flowCreateDef,
+    handler: withErrorHandling('flow_create', handleFlowCreate),
   },
-  workflow_update: {
-    definition: workflowUpdateDef,
-    handler: withErrorHandling('workflow_update', handleWorkflowUpdate),
+  flow_update: {
+    definition: flowUpdateDef,
+    handler: withErrorHandling('flow_update', handleFlowUpdate),
   },
-  workflow_get_feedback: {
-    definition: workflowGetFeedbackDef,
-    handler: withErrorHandling('workflow_get_feedback', handleWorkflowGetFeedback),
+  flow_get_feedback: {
+    definition: flowGetFeedbackDef,
+    handler: withErrorHandling('flow_get_feedback', handleFlowGetFeedback),
   },
 };

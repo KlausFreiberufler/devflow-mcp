@@ -1,9 +1,9 @@
 /**
  * Agent Session MCP Tools
- * Tools for creating, logging, completing, and listing agent sessions in WorkFlow Pro
+ * Tools for creating, logging, completing, and listing agent sessions in DevFlow
  */
 
-import { workflowProClient } from '../api/client.js';
+import { devFlowClient } from '../api/client.js';
 import type { AgentSession } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
@@ -20,16 +20,16 @@ Returns the created session with its ID for subsequent log and complete calls.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
-      workflowId: {
+      flowId: {
         type: 'string',
-        description: 'The workflow ID this session belongs to'
+        description: 'The flow ID this session belongs to'
       },
       type: {
         type: 'string',
         description: 'Type of session (e.g., "planning", "implementing", "reviewing"). Optional.'
       }
     },
-    required: ['workflowId']
+    required: ['flowId']
   }
 };
 
@@ -92,22 +92,22 @@ Use this to review past work sessions on a workflow.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
-      workflowId: {
+      flowId: {
         type: 'string',
-        description: 'The workflow ID to list sessions for'
+        description: 'The flow ID to list sessions for'
       }
     },
-    required: ['workflowId']
+    required: ['flowId']
   }
 };
 
 // ============ Tool Handlers ============
 
 async function handleAgentSessionCreate(args: Record<string, unknown>): Promise<string> {
-  const workflowId = args.workflowId as string;
+  const flowId = args.flowId as string;
   const type = args.type as string | undefined;
 
-  const result = await workflowProClient.createAgentSession({ workflowId, type });
+  const result = await devFlowClient.createAgentSession({ workflowId: flowId, type });
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to create agent session'}`;
@@ -121,7 +121,7 @@ async function handleAgentSessionLog(args: Record<string, unknown>): Promise<str
   const message = args.message as string;
   const level = (args.level as string) || 'info';
 
-  const result = await workflowProClient.logAgentSession(id, { message, level });
+  const result = await devFlowClient.logAgentSession(id, { message, level });
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to log to agent session'}`;
@@ -135,7 +135,7 @@ async function handleAgentSessionComplete(args: Record<string, unknown>): Promis
   const id = args.id as string;
   const summary = args.summary as string | undefined;
 
-  const result = await workflowProClient.completeAgentSession(id, summary ? { summary } : undefined);
+  const result = await devFlowClient.completeAgentSession(id, summary ? { summary } : undefined);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to complete agent session'}`;
@@ -145,9 +145,9 @@ async function handleAgentSessionComplete(args: Record<string, unknown>): Promis
 }
 
 async function handleAgentSessionList(args: Record<string, unknown>): Promise<string> {
-  const workflowId = args.workflowId as string;
+  const flowId = args.flowId as string;
 
-  const result = await workflowProClient.listAgentSessions(workflowId);
+  const result = await devFlowClient.listAgentSessions(flowId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to list agent sessions'}`;

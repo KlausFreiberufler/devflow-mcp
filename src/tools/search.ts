@@ -1,9 +1,9 @@
 /**
  * Search MCP Tools
- * Tools for searching across workflows, tasks, and projects in WorkFlow Pro
+ * Tools for searching across workflows, tasks, and projects in DevFlow
  */
 
-import { workflowProClient } from '../api/client.js';
+import { devFlowClient } from '../api/client.js';
 import type { SearchResult } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
@@ -12,7 +12,7 @@ import { withErrorHandling } from '../utils/errors.js';
 
 const searchDef = {
   name: 'search',
-  description: `Search across workflows, tasks, and projects in WorkFlow Pro.
+  description: `Search across workflows, tasks, and projects in DevFlow.
 Use this to find items by keyword, title, or content.
 Supports filtering by type (workflow, task, project).
 
@@ -40,7 +40,7 @@ async function handleSearch(args: Record<string, unknown>): Promise<string> {
   const q = args.q as string;
   const type = args.type as string | undefined;
 
-  const result = await workflowProClient.search(q, type);
+  const result = await devFlowClient.search(q, type);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Search failed'}`;

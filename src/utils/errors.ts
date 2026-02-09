@@ -17,7 +17,7 @@ export function withErrorHandling(
 
       // Connection errors
       if (message.includes('ECONNREFUSED') || message.includes('fetch failed')) {
-        const url = process.env.WORKFLOW_PRO_URL || 'http://localhost:6011';
+        const url = process.env.DEVFLOW_URL || 'http://localhost:6011';
         return `Fehler: Server nicht erreichbar (${url}). Läuft der Backend-Server? Versuche: docker-compose up`;
       }
 
@@ -28,7 +28,7 @@ export function withErrorHandling(
 
       // DNS errors
       if (message.includes('ENOTFOUND')) {
-        return `Fehler: Server-Adresse nicht gefunden. Prüfe WORKFLOW_PRO_URL in der MCP-Konfiguration.`;
+        return `Fehler: Server-Adresse nicht gefunden. Prüfe DEVFLOW_URL in der MCP-Konfiguration.`;
       }
 
       return `Fehler in ${toolName}: ${message}`;

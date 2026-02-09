@@ -1,9 +1,9 @@
 /**
  * Knowledge MCP Tools
- * Tools for getting and updating project knowledge in WorkFlow Pro
+ * Tools for getting and updating project knowledge in DevFlow
  */
 
-import { workflowProClient } from '../api/client.js';
+import { devFlowClient } from '../api/client.js';
 import type { ProjectKnowledge } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
@@ -57,13 +57,13 @@ Automatically uses the linked project if no projectId is provided.`,
 // ============ Tool Handlers ============
 
 async function handleProjectKnowledgeGet(args: Record<string, unknown>): Promise<string> {
-  const projectId = (args.projectId as string | undefined) || workflowProClient.getLinkedProjectId();
+  const projectId = (args.projectId as string | undefined) || devFlowClient.getLinkedProjectId();
 
   if (!projectId) {
     return 'Error: projectId is required. No linked project found. Use project_list to find the project ID, or link a project first.';
   }
 
-  const result = await workflowProClient.getProjectKnowledge(projectId);
+  const result = await devFlowClient.getProjectKnowledge(projectId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to get project knowledge'}`;
@@ -73,14 +73,14 @@ async function handleProjectKnowledgeGet(args: Record<string, unknown>): Promise
 }
 
 async function handleProjectKnowledgeUpdate(args: Record<string, unknown>): Promise<string> {
-  const projectId = (args.projectId as string | undefined) || workflowProClient.getLinkedProjectId();
+  const projectId = (args.projectId as string | undefined) || devFlowClient.getLinkedProjectId();
   const knowledge = args.knowledge as string;
 
   if (!projectId) {
     return 'Error: projectId is required. No linked project found. Use project_list to find the project ID, or link a project first.';
   }
 
-  const result = await workflowProClient.updateProjectKnowledge(knowledge, projectId);
+  const result = await devFlowClient.updateProjectKnowledge(knowledge, projectId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to update project knowledge'}`;

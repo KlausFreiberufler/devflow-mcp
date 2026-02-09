@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * WorkFlow Pro MCP Server
+ * DevFlow MCP Server
  *
- * Provides Claude Code with tools to interact with WorkFlow Pro.
+ * Provides Claude Code with tools to interact with DevFlow.
  * Tools are automatically registered via the Tool Registry.
  */
 
@@ -13,12 +13,12 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { workflowProClient } from './api/client.js';
+import { devFlowClient } from './api/client.js';
 import { registry } from './tools/registry.js';
 
 // Register all tool modules
 import { tools as projectTools } from './tools/project.js';
-import { tools as workflowTools } from './tools/workflow.js';
+import { tools as flowTools } from './tools/flow.js';
 import { tools as taskTools } from './tools/task.js';
 import { tools as agentSessionTools } from './tools/agent-session.js';
 import { tools as knowledgeTools } from './tools/knowledge.js';
@@ -26,7 +26,7 @@ import { tools as releaseTools } from './tools/release.js';
 import { tools as searchTools } from './tools/search.js';
 
 registry.register(projectTools);
-registry.register(workflowTools);
+registry.register(flowTools);
 registry.register(taskTools);
 registry.register(agentSessionTools);
 registry.register(knowledgeTools);
@@ -35,7 +35,7 @@ registry.register(searchTools);
 
 // Initialize server
 const server = new Server(
-  { name: 'workflow-pro', version: '2.0.0' },
+  { name: 'devflow', version: '2.0.0' },
   { capabilities: { tools: {} } }
 );
 
@@ -64,13 +64,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start server
 async function main() {
-  await workflowProClient.init();
+  await devFlowClient.init();
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  const projectName = workflowProClient.getLinkedProjectName();
-  console.error(`WorkFlow Pro MCP Server v2.0.0 (${registry.size} tools)`);
+  const projectName = devFlowClient.getLinkedProjectName();
+  console.error(`DevFlow MCP Server v2.0.0 (${registry.size} tools)`);
   if (projectName) {
     console.error(`Linked to project: ${projectName}`);
   }

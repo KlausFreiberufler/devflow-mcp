@@ -1,9 +1,9 @@
 /**
  * Release MCP Tools
- * Tools for listing, getting, creating, and updating releases in WorkFlow Pro
+ * Tools for listing, getting, creating, and updating releases in DevFlow
  */
 
-import { workflowProClient } from '../api/client.js';
+import { devFlowClient } from '../api/client.js';
 import type { Release } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
@@ -106,13 +106,13 @@ Use this to change the release name, description, status, or target date.`,
 // ============ Tool Handlers ============
 
 async function handleReleaseList(args: Record<string, unknown>): Promise<string> {
-  const projectId = (args.projectId as string | undefined) || workflowProClient.getLinkedProjectId();
+  const projectId = (args.projectId as string | undefined) || devFlowClient.getLinkedProjectId();
 
   if (!projectId) {
     return 'Error: projectId is required. No linked project found. Use project_list to find the project ID, or link a project first.';
   }
 
-  const result = await workflowProClient.listReleases(projectId);
+  const result = await devFlowClient.listReleases(projectId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to list releases'}`;
@@ -130,7 +130,7 @@ async function handleReleaseList(args: Record<string, unknown>): Promise<string>
 async function handleReleaseGet(args: Record<string, unknown>): Promise<string> {
   const id = args.id as string;
 
-  const result = await workflowProClient.getRelease(id);
+  const result = await devFlowClient.getRelease(id);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Release not found'}`;
@@ -140,7 +140,7 @@ async function handleReleaseGet(args: Record<string, unknown>): Promise<string> 
 }
 
 async function handleReleaseCreate(args: Record<string, unknown>): Promise<string> {
-  const projectId = (args.projectId as string | undefined) || workflowProClient.getLinkedProjectId();
+  const projectId = (args.projectId as string | undefined) || devFlowClient.getLinkedProjectId();
   const name = args.name as string;
   const description = args.description as string | undefined;
   const targetDate = args.targetDate as string | undefined;
@@ -149,7 +149,7 @@ async function handleReleaseCreate(args: Record<string, unknown>): Promise<strin
     return 'Error: projectId is required. No linked project found. Use project_list to find the project ID, or link a project first.';
   }
 
-  const result = await workflowProClient.createRelease({ projectId, name, description, targetDate });
+  const result = await devFlowClient.createRelease({ projectId, name, description, targetDate });
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to create release'}`;
@@ -171,7 +171,7 @@ async function handleReleaseUpdate(args: Record<string, unknown>): Promise<strin
   if (status !== undefined) cleanUpdate.status = status;
   if (targetDate !== undefined) cleanUpdate.targetDate = targetDate;
 
-  const result = await workflowProClient.updateRelease(id, cleanUpdate);
+  const result = await devFlowClient.updateRelease(id, cleanUpdate);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to update release'}`;

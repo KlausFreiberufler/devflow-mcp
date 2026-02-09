@@ -2,7 +2,7 @@
  * CLAUDE.md Generator
  *
  * Creates or updates CLAUDE.md in the project working directory
- * with WorkFlow Pro workflow rules.
+ * with DevFlow workflow rules.
  */
 
 import { readFile, writeFile } from 'fs/promises';

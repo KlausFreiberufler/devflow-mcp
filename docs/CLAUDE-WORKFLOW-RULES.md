@@ -1,6 +1,6 @@
-# WorkFlow Pro - Workflow-Regeln für Claude Code
+# DevFlow - Workflow-Regeln für Claude Code
 
-Dieses Projekt ist mit WorkFlow Pro verbunden. Du hast MCP-Tools um Workflows zu bearbeiten.
+Dieses Projekt ist mit DevFlow verbunden. Du hast MCP-Tools um Workflows zu bearbeiten.
 
 ## Verfügbare MCP-Tools (21 Tools)
 
@@ -10,10 +10,10 @@ Dieses Projekt ist mit WorkFlow Pro verbunden. Du hast MCP-Tools um Workflows zu
 |------|--------------|
 | `project_list` | Listet alle Projekte |
 | `project_get` | Holt Projekt-Details inkl. Tech-Stack |
-| `workflow_list` | Listet Workflows, optional gefiltert |
-| `workflow_get` | Holt Workflow-Details inkl. vollem Plan und Audit-Trail |
-| `workflow_update` | Updated Status, Plan, Agent-Nachrichten (mit Pflichtfeld-Guardrails) |
-| `workflow_get_feedback` | Holt User-Feedback zu Plan oder Code |
+| `flow_list` | Listet Workflows, optional gefiltert |
+| `flow_get` | Holt Workflow-Details inkl. vollem Plan und Audit-Trail |
+| `flow_update` | Updated Status, Plan, Agent-Nachrichten (mit Pflichtfeld-Guardrails) |
+| `flow_get_feedback` | Holt User-Feedback zu Plan oder Code |
 
 ### Tasks
 
@@ -82,7 +82,7 @@ idea → planning → plan_review → progress → code_review → testing → d
 
 ### FEHLER DIE NICHT WIEDERHOLT WERDEN DÜRFEN
 - NIEMALS von plan_review direkt auf progress springen ohne User-Freigabe
-- IMMER implementationPlan im workflow_update setzen BEVOR plan_review
+- IMMER implementationPlan im flow_update setzen BEVOR plan_review
 - Plan muss in der UI sichtbar sein - ohne implementationPlan sieht der User nichts
 - WARTEN heißt WARTEN - nicht einfach weitermachen
 
@@ -94,8 +94,8 @@ Wenn der User sagt **"Plane Workflow WF-123"** oder der Workflow auf `idea` steh
 
 **Phase 1: Analyse**
 ```
-workflow_get <id>                    → Details lesen
-workflow_update                      → currentState: "planning", agentStatus: "analyzing"
+flow_get <id>                        → Details lesen
+flow_update                          → currentState: "planning", agentStatus: "analyzing"
 ```
 
 **Phase 2: Plan erstellen**
@@ -106,10 +106,10 @@ Der Plan kann erstellt werden mit:
 - Manuell vom User/Entwickler
 
 ```
-workflow_update                      → agentStatus: "planning", agentMessage: "Erstelle Plan"
+flow_update                          → agentStatus: "planning", agentMessage: "Erstelle Plan"
 ... Plan schreiben (Markdown) ...
-workflow_update                      → implementationPlan: "<plan>", currentState: "plan_review"
-workflow_update                      → agentStatus: "idle"
+flow_update                          → implementationPlan: "<plan>", currentState: "plan_review"
+flow_update                          → agentStatus: "idle"
 ```
 
 **Phase 3: User Review**
@@ -118,7 +118,7 @@ Der User sieht den Plan in der Web-App und kann:
 - Genehmigen → Workflow geht auf `progress`
 - Feedback geben → `planFeedback` wird gesetzt, Workflow bleibt auf `planning`
 
-Bei Feedback: `workflow_get` erneut aufrufen, `planFeedback` lesen, Plan überarbeiten.
+Bei Feedback: `flow_get` erneut aufrufen, `planFeedback` lesen, Plan überarbeiten.
 
 ---
 
@@ -128,32 +128,32 @@ Wenn der User sagt **"Führe Workflow WF-123 aus"** oder der Workflow auf `progr
 
 **Phase 1: Plan laden**
 ```
-workflow_get <id>                    → implementationPlan lesen!
-workflow_update                      → agentStatus: "analyzing", agentMessage: "Lese Plan"
+flow_get <id>                        → implementationPlan lesen!
+flow_update                          → agentStatus: "analyzing", agentMessage: "Lese Plan"
 ```
 
 **Phase 2: Tasks aus Plan erstellen**
 ```
-workflow_update                      → agentStatus: "planning", agentMessage: "Erstelle Tasks"
-task_create (für jeden Schritt)      → Tasks in WorkFlow Pro anlegen
+flow_update                          → agentStatus: "planning", agentMessage: "Erstelle Tasks"
+task_create (für jeden Schritt)      → Tasks in DevFlow anlegen
 ```
 
 **Phase 3: Implementierung (pro Task)**
 ```
-workflow_update                      → agentStatus: "implementing", agentMessage: "Arbeite an: <task>"
+flow_update                          → agentStatus: "implementing", agentMessage: "Arbeite an: <task>"
 ... Code schreiben ...
 task_update <taskId>                 → isCompleted: true
 ```
 
 **Phase 4: Test**
 ```
-workflow_update                      → agentStatus: "testing", agentMessage: "Build-Test"
+flow_update                          → agentStatus: "testing", agentMessage: "Build-Test"
 npm run build                        → Prüfen ob alles kompiliert
 ```
 
 **Phase 5: Code Review anfordern**
 ```
-workflow_update                      → currentState: "code_review"
+flow_update                          → currentState: "code_review"
                                      → agentSummary: "Was wurde implementiert..."
                                      → testingInstructions: "Wie man testet..."
                                      → agentStatus: "idle"
@@ -166,7 +166,7 @@ Der User reviewed den Code und kann:
 - Genehmigen → Workflow geht auf `done`
 - Feedback geben → `codeFeedback` wird gesetzt, Workflow geht auf `progress`
 
-Bei Feedback: `workflow_get` erneut aufrufen, `codeFeedback` lesen, Code überarbeiten.
+Bei Feedback: `flow_get` erneut aufrufen, `codeFeedback` lesen, Code überarbeiten.
 
 ---
 
@@ -176,20 +176,20 @@ Wenn der User sagt **"Überarbeite den Plan"** oder **"Erstelle einen neuen Plan
 
 **Option 1: Plan überarbeiten**
 ```
-workflow_get <id>                    → Bestehenden Plan lesen
-workflow_update                      → currentState: "planning", agentStatus: "planning"
+flow_get <id>                        → Bestehenden Plan lesen
+flow_update                          → currentState: "planning", agentStatus: "planning"
 ... Plan verbessern basierend auf bestehendem Plan ...
-workflow_update                      → implementationPlan: "<verbesserter-plan>", currentState: "plan_review"
-workflow_update                      → agentStatus: "idle"
+flow_update                          → implementationPlan: "<verbesserter-plan>", currentState: "plan_review"
+flow_update                          → agentStatus: "idle"
 ```
 
 **Option 2: Plan komplett neu erstellen**
 ```
-workflow_get <id>                    → Nur Anforderungen lesen, Plan ignorieren
-workflow_update                      → currentState: "planning", agentStatus: "analyzing"
+flow_get <id>                        → Nur Anforderungen lesen, Plan ignorieren
+flow_update                          → currentState: "planning", agentStatus: "analyzing"
 ... Komplett neuen Plan erstellen ...
-workflow_update                      → implementationPlan: "<neuer-plan>", currentState: "plan_review"
-workflow_update                      → agentStatus: "idle"
+flow_update                          → implementationPlan: "<neuer-plan>", currentState: "plan_review"
+flow_update                          → agentStatus: "idle"
 ```
 
 **Wann welche Option?**
@@ -205,7 +205,7 @@ workflow_update                      → agentStatus: "idle"
 
 ## Checkliste vor Abschluss
 
-- [ ] Plan aus workflow_get gelesen (wenn vorhanden)?
+- [ ] Plan aus flow_get gelesen (wenn vorhanden)?
 - [ ] Alle Tasks auf `isCompleted: true` gesetzt?
 - [ ] Build erfolgreich (`npm run build`)?
 - [ ] `agentSummary` geschrieben (was wurde gemacht)?
@@ -220,7 +220,7 @@ workflow_update                      → agentStatus: "idle"
 ## Workflow-Status melden
 
 ```
-workflow_update <id> --agentStatus=implementing --agentMessage="Erstelle API-Endpoint"
+flow_update <id> --agentStatus=implementing --agentMessage="Erstelle API-Endpoint"
 ```
 
 Der User sieht in Echtzeit was du tust!
@@ -237,5 +237,5 @@ Der Plan kann auch mit anderen Tools erstellt werden:
 
 Nach Plan-Erstellung mit externem Tool:
 ```
-workflow_update <id> --implementationPlan="<plan>" --currentState="plan_review"
+flow_update <id> --implementationPlan="<plan>" --currentState="plan_review"
 ```

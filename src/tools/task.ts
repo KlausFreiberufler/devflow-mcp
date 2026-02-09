@@ -1,9 +1,9 @@
 /**
  * Task MCP Tools
- * Tools for listing, creating, and updating tasks in WorkFlow Pro
+ * Tools for listing, creating, and updating tasks in DevFlow
  */
 
-import { workflowProClient, type Task } from '../api/client.js';
+import { devFlowClient, type Task } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 
@@ -17,12 +17,12 @@ Returns tasks with their completion status and hierarchy.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
-      workflowId: {
+      flowId: {
         type: 'string',
-        description: 'The workflow ID to list tasks for'
+        description: 'The flow ID to list tasks for'
       }
     },
-    required: ['workflowId']
+    required: ['flowId']
   }
 };
 
@@ -40,9 +40,9 @@ Best practice: Create tasks for each logical step before starting implementation
   inputSchema: {
     type: 'object' as const,
     properties: {
-      workflowId: {
+      flowId: {
         type: 'string',
-        description: 'The workflow ID this task belongs to'
+        description: 'The flow ID this task belongs to'
       },
       parentId: {
         type: 'string',
@@ -62,7 +62,7 @@ Best practice: Create tasks for each logical step before starting implementation
         description: 'List of conditions that must be met for task completion'
       }
     },
-    required: ['workflowId', 'summary']
+    required: ['flowId', 'summary']
   }
 };
 
@@ -113,9 +113,9 @@ Always mark tasks complete when you finish them to track progress.`,
 // ============ Tool Handlers ============
 
 async function handleTaskList(args: Record<string, unknown>): Promise<string> {
-  const workflowId = args.workflowId as string;
+  const flowId = args.flowId as string;
 
-  const result = await workflowProClient.listTasks(workflowId);
+  const result = await devFlowClient.listTasks(flowId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to list tasks'}`;
@@ -129,14 +129,14 @@ async function handleTaskList(args: Record<string, unknown>): Promise<string> {
 }
 
 async function handleTaskCreate(args: Record<string, unknown>): Promise<string> {
-  const workflowId = args.workflowId as string;
+  const flowId = args.flowId as string;
   const parentId = args.parentId as string | undefined;
   const summary = args.summary as string;
   const description = args.description as string | undefined;
   const acceptanceCriteria = args.acceptanceCriteria as string[] | undefined;
 
-  const result = await workflowProClient.createTask({
-    workflowId,
+  const result = await devFlowClient.createTask({
+    workflowId: flowId,
     parentId,
     summary,
     description,
@@ -166,7 +166,7 @@ async function handleTaskUpdate(args: Record<string, unknown>): Promise<string> 
   if (acceptanceCriteria !== undefined) cleanUpdate.acceptanceCriteria = acceptanceCriteria;
   if (status !== undefined) cleanUpdate.status = status;
 
-  const result = await workflowProClient.updateTask(taskId, cleanUpdate);
+  const result = await devFlowClient.updateTask(taskId, cleanUpdate);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to update task'}`;

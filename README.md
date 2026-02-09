@@ -1,6 +1,6 @@
-# WorkFlow Pro MCP Server
+# DevFlow MCP Server
 
-MCP-Server für die Integration von [WorkFlow Pro](https://github.com/klausfreiberufler/jira-worklog) mit Claude Code.
+MCP-Server für die Integration von [DevFlow](https://github.com/klausfreiberufler/jira-worklog) mit Claude Code.
 
 Ermöglicht Claude Code, Workflows und Tasks direkt zu verwalten - mit strukturiertem Planungs- und Review-Prozess.
 
@@ -8,7 +8,7 @@ Ermöglicht Claude Code, Workflows und Tasks direkt zu verwalten - mit strukturi
 
 ```bash
 git clone <repo-url>
-cd workflow-pro-mcp
+cd devflow-mcp
 npm run setup
 ```
 
@@ -21,18 +21,18 @@ Das Setup-Script:
 
 ## Projekt verknüpfen
 
-Beim ersten Aufruf von `workflow_list` in einem Projekt:
+Beim ersten Aufruf von `flow_list` in einem Projekt:
 1. Browser öffnet sich zur Authentifizierung
-2. In WorkFlow Pro einloggen
+2. In DevFlow einloggen
 3. Projekt auswählen
-4. `.workflow-pro.json` wird im Projektordner erstellt
+4. `.devflow.json` wird im Projektordner erstellt
 
 Ab jetzt werden nur Workflows dieses Projekts angezeigt.
 
 ## Update
 
 ```bash
-cd workflow-pro-mcp
+cd devflow-mcp
 git pull
 npm run build
 ```
@@ -47,10 +47,10 @@ Die Workflow-Regeln (`CLAUDE-WORKFLOW-RULES.md`) werden automatisch aktualisiert
 |------|--------------|
 | `project_list` | Listet alle Projekte |
 | `project_get` | Holt Projekt-Details inkl. Tech-Stack |
-| `workflow_list` | Listet Workflows (automatisch nach Projekt gefiltert) |
-| `workflow_get` | Holt Workflow-Details inkl. vollem Plan und Audit-Trail |
-| `workflow_update` | Updated Status, Plan, Agent-Nachrichten (mit Pflichtfeld-Guardrails) |
-| `workflow_get_feedback` | Holt User-Feedback zu Plan oder Code |
+| `flow_list` | Listet Workflows (automatisch nach Projekt gefiltert) |
+| `flow_get` | Holt Workflow-Details inkl. vollem Plan und Audit-Trail |
+| `flow_update` | Updated Status, Plan, Agent-Nachrichten (mit Pflichtfeld-Guardrails) |
+| `flow_get_feedback` | Holt User-Feedback zu Plan oder Code |
 
 ### Tasks
 
@@ -109,7 +109,7 @@ Alle wichtigen Aktionen werden automatisch getrackt:
 - **Plan genehmigt von** (User) + Zeitstempel
 - **Code genehmigt von** (User) + Zeitstempel
 
-Diese Felder werden in `workflow_get` angezeigt.
+Diese Felder werden in `flow_get` angezeigt.
 
 Der vollständige Prozess ist in [`docs/CLAUDE-WORKFLOW-RULES.md`](docs/CLAUDE-WORKFLOW-RULES.md) dokumentiert.
 
@@ -124,12 +124,12 @@ In `~/.claude/settings.json` (global) oder `.claude/settings.json` (pro Projekt)
 ```json
 {
   "mcpServers": {
-    "workflow-pro": {
+    "devflow": {
       "command": "node",
-      "args": ["/pfad/zu/workflow-pro-mcp/dist/index.js"],
+      "args": ["/pfad/zu/devflow-mcp/dist/index.js"],
       "env": {
-        "WORKFLOW_PRO_URL": "http://localhost:6011",
-        "WORKFLOW_PRO_PROJECT_ID": "<optional-projekt-id>"
+        "DEVFLOW_URL": "http://localhost:6011",
+        "DEVFLOW_PROJECT_ID": "<optional-projekt-id>"
       }
     }
   }
@@ -138,16 +138,16 @@ In `~/.claude/settings.json` (global) oder `.claude/settings.json` (pro Projekt)
 
 ### Projekt-Scoping
 
-Über `WORKFLOW_PRO_PROJECT_ID` kann der MCP Server auf ein bestimmtes Projekt eingeschränkt werden. Das ist nützlich, wenn man pro Repo eine eigene `.claude/settings.json` hat. Ohne diese Variable wird das verlinkte Projekt aus `.workflow-pro.json` verwendet.
+Über `DEVFLOW_PROJECT_ID` kann der MCP Server auf ein bestimmtes Projekt eingeschränkt werden. Das ist nützlich, wenn man pro Repo eine eigene `.claude/settings.json` hat. Ohne diese Variable wird das verlinkte Projekt aus `.devflow.json` verwendet.
 
 ### 2. Workflow-Regeln verlinken
 
 ```bash
-ln -s /pfad/zu/workflow-pro-mcp/docs/CLAUDE-WORKFLOW-RULES.md ~/.claude/CLAUDE.md
+ln -s /pfad/zu/devflow-mcp/docs/CLAUDE-WORKFLOW-RULES.md ~/.claude/CLAUDE.md
 ```
 
 ## Voraussetzungen
 
 - Node.js >= 18
 - Claude Code CLI
-- WorkFlow Pro Backend (lokal oder remote)
+- DevFlow Backend (lokal oder remote)

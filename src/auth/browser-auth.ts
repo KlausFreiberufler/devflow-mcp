@@ -23,7 +23,7 @@ interface ProjectConfig {
   linkedAt: string;
 }
 
-const CREDENTIALS_PATH = join(homedir(), '.workflow-pro', 'credentials.json');
+const CREDENTIALS_PATH = join(homedir(), '.devflow', 'credentials.json');
 
 /**
  * Find an available port
@@ -98,7 +98,7 @@ async function pollForToken(
  * Save credentials to file
  */
 async function saveCredentials(token: string): Promise<void> {
-  const dir = join(homedir(), '.workflow-pro');
+  const dir = join(homedir(), '.devflow');
   await mkdir(dir, { recursive: true });
 
   const credentials = {
@@ -114,7 +114,7 @@ async function saveCredentials(token: string): Promise<void> {
  * Save project configuration to working directory
  */
 async function saveProjectConfig(workingDir: string, projectId: string, projectName: string): Promise<void> {
-  const configPath = join(workingDir, '.workflow-pro.json');
+  const configPath = join(workingDir, '.devflow.json');
   const config: ProjectConfig = {
     projectId,
     projectName,
@@ -131,7 +131,7 @@ async function saveProjectConfig(workingDir: string, projectId: string, projectN
  */
 export async function loadProjectConfig(workingDir?: string): Promise<ProjectConfig | null> {
   const dir = workingDir || process.cwd();
-  const configPath = join(dir, '.workflow-pro.json');
+  const configPath = join(dir, '.devflow.json');
 
   try {
     const data = await readFile(configPath, 'utf-8');
@@ -228,7 +228,7 @@ export async function authenticateViaBrowser(baseUrl: string, workingDir?: strin
  */
 export async function getToken(baseUrl: string, workingDir?: string): Promise<string> {
   // 1. Check environment variable
-  const envToken = process.env.WORKFLOW_PRO_TOKEN;
+  const envToken = process.env.DEVFLOW_TOKEN;
   if (envToken) {
     return envToken;
   }
