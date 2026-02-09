@@ -1,6 +1,6 @@
 # DevFlow MCP Server
 
-MCP-Server für die Integration von [DevFlow](https://github.com/klausfreiberufler/jira-worklog) mit Claude Code.
+MCP-Server für die Integration von [DevFlow](https://github.com/KlausFreiberufler/devflow) mit Claude Code.
 
 Ermöglicht Claude Code, Workflows und Tasks direkt zu verwalten - mit strukturiertem Planungs- und Review-Prozess.
 
