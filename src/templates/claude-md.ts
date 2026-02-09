@@ -33,6 +33,7 @@ Dieses Projekt ist mit DevFlow verbunden. Du hast MCP-Tools um Workflows zu bear
 | \`project_get\` | Holt Projekt-Details inkl. Tech-Stack |
 | \`flow_list\` | Listet Workflows, optional gefiltert |
 | \`flow_get\` | Holt Workflow-Details inkl. vollem Plan und Audit-Trail |
+| \`flow_create\` | Erstellt neuen Workflow (Feature, Bug, Chore) |
 | \`flow_update\` | Updated Status, Plan, Agent-Nachrichten (mit Pflichtfeld-Guardrails) |
 | \`flow_get_feedback\` | Holt User-Feedback zu Plan oder Code |
 

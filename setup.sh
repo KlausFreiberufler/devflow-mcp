@@ -24,8 +24,8 @@ echo "      Build successful."
 
 # 2. DevFlow URL abfragen
 echo ""
-read -p "[2/3] DevFlow URL (default: http://localhost:6011): " WFP_URL
-WFP_URL="${WFP_URL:-http://localhost:6011}"
+read -p "[2/3] DevFlow URL (default: http://localhost:6011): " DEVFLOW_URL
+DEVFLOW_URL="${DEVFLOW_URL:-http://localhost:6011}"
 
 # 3. Claude Code MCP-Server konfigurieren (global, user scope)
 echo ""
@@ -41,7 +41,7 @@ fi
 claude mcp remove devflow 2>/dev/null || true
 
 # MCP-Server global hinzufügen
-claude mcp add --scope user devflow --transport stdio -e DEVFLOW_URL="$WFP_URL" -- node "$MCP_DIST"
+claude mcp add --scope user devflow --transport stdio -e DEVFLOW_URL="$DEVFLOW_URL" -- node "$MCP_DIST"
 echo "      MCP server added globally (user scope)."
 
 # 4. Cleanup: Remove old global CLAUDE.md symlink if present

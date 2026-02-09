@@ -1,6 +1,6 @@
 /**
  * Project MCP Tools
- * Tools for getting project details in DevFlow
+ * Tools for listing and getting project details in DevFlow
  */
 
 import { devFlowClient, type Project } from '../api/client.js';
@@ -9,7 +9,18 @@ import { withErrorHandling } from '../utils/errors.js';
 
 // ============ Tool Definitions ============
 
-const projectGetTool = {
+const projectListDef = {
+  name: 'project_list',
+  description: `List all available projects.
+Returns projects with their ID, name, and status.
+Use this to find the project ID for other tools like flow_list or release_list.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {}
+  }
+};
+
+const projectGetDef = {
   name: 'project_get',
   description: `Get detailed information about a specific project.
 Returns the full project including:
@@ -32,11 +43,26 @@ Use this to understand the project context before working on workflows.`,
 
 // ============ Tool Handlers ============
 
+async function handleProjectList(): Promise<string> {
+  const result = await devFlowClient.listProjects();
+
+  if (!result.success || !result.data) {
+    return `Error: ${result.error || 'Failed to list projects'}`;
+  }
+
+  if (result.data.length === 0) {
+    return 'No projects found.';
+  }
+
+  const linkedId = devFlowClient.getLinkedProjectId();
+  return formatProjectList(result.data, linkedId);
+}
+
 async function handleProjectGet(args: Record<string, unknown>): Promise<string> {
   const projectId = (args.projectId as string) || devFlowClient.getLinkedProjectId();
 
   if (!projectId) {
-    return 'Error: No project ID provided and no linked project configured. Set DEVFLOW_PROJECT_ID in .mcp.json.';
+    return 'Error: No project ID provided and no linked project configured. Use project_list to find available projects.';
   }
 
   const result = await devFlowClient.getProject(projectId);
@@ -49,6 +75,22 @@ async function handleProjectGet(args: Record<string, unknown>): Promise<string> 
 }
 
 // ============ Formatters ============
+
+function formatProjectList(projects: Project[], linkedId: string | null): string {
+  const lines = ['# Projects\n'];
+
+  for (const p of projects) {
+    const linked = p.id === linkedId ? ' ⭐ (linked)' : '';
+    const status = p.isActive ? '' : ' [archived]';
+    lines.push(`- **${p.name}**${linked}${status}`);
+    lines.push(`  ID: ${p.id}`);
+    if (p.description) {
+      lines.push(`  ${p.description.substring(0, 120)}${p.description.length > 120 ? '...' : ''}`);
+    }
+  }
+
+  return lines.join('\n');
+}
 
 function formatProjectDetail(project: Project): string {
   const lines = [
@@ -83,8 +125,12 @@ function formatProjectDetail(project: Project): string {
 // ============ Tool Module Export ============
 
 export const tools: ToolModule = {
+  project_list: {
+    definition: projectListDef,
+    handler: withErrorHandling('project_list', handleProjectList),
+  },
   project_get: {
-    definition: projectGetTool,
+    definition: projectGetDef,
     handler: withErrorHandling('project_get', handleProjectGet),
   },
 };
