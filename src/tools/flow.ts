@@ -95,19 +95,17 @@ Requires a projectId (use project_list to find it) and a summary.`,
 
 const flowUpdateDef = {
   name: 'flow_update',
-  description: `Update a workflow's status or progress.
+  description: `Update a workflow's state or submit deliverables.
 Use this to:
 - Change workflow state (idea -> planning -> plan_review -> progress -> code_review -> testing -> done)
-- Report agent status (what you're currently doing)
-- Send progress messages to the user
 - Submit implementation plan for review
 - Submit agent summary after implementation
 
+agentStatus is automatically derived from your tool calls - you don't need to set it manually.
+
 IMPORTANT: Some state transitions require mandatory fields:
 - plan_review requires: implementationPlan
-- code_review requires: agentSummary AND testingInstructions
-
-The agentStatus and agentMessage are visible in the DevFlow UI.`,
+- code_review requires: agentSummary AND testingInstructions`,
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -123,11 +121,11 @@ The agentStatus and agentMessage are visible in the DevFlow UI.`,
       agentStatus: {
         type: 'string',
         enum: ['idle', 'analyzing', 'planning', 'implementing', 'testing', 'reviewing'],
-        description: 'Current agent activity status'
+        description: 'Override for agent status (normally auto-derived, only set if needed)'
       },
       agentMessage: {
         type: 'string',
-        description: 'Human-readable message about what the agent is doing'
+        description: 'Override for agent message (normally auto-derived, only set if needed)'
       },
       implementationPlan: {
         type: 'string',
@@ -413,8 +411,21 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
     const newState = updatedWorkflow.currentState;
     sessionContext.updateAllowedActions(getAllowedTools(newState));
 
-    // Provide guidance for review/wait states
-    if (['plan_review', 'code_review', 'testing'].includes(newState)) {
+    // Auto-complete session on review/wait/done states
+    if (['plan_review', 'code_review', 'testing', 'done'].includes(newState)) {
+      const sessionId = sessionContext.get()?.sessionId;
+      if (sessionId && sessionId !== 'local-session') {
+        const summaryMap: Record<string, string> = {
+          plan_review: 'Plan eingereicht, warte auf Review',
+          code_review: 'Implementierung abgeschlossen, warte auf Code-Review',
+          testing: 'Code genehmigt, warte auf Testing',
+          done: 'Workflow abgeschlossen',
+        };
+        devFlowClient.completeAgentSession(sessionId, {
+          summary: summaryMap[newState] || 'Session beendet',
+        }).catch(() => {});
+      }
+
       const guidance = NEXT_STEP_GUIDANCE[newState] || '';
       return `Workflow updated successfully.\n\n${formatWorkflowDetail(updatedWorkflow)}\n\n---\n**Naechster Schritt:** ${guidance}`;
     }
