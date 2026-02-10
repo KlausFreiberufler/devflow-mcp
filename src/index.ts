@@ -16,6 +16,7 @@ import {
 import { devFlowClient } from './api/client.js';
 import { registry } from './tools/registry.js';
 import { sessionContext } from './context/session.js';
+import { syncConfig } from './config/sync.js';
 
 // Register tool modules
 import { tools as initTools } from './tools/init.js';
@@ -79,6 +80,9 @@ process.on('SIGTERM', () => { cleanup(); process.exit(0); });
 
 async function main() {
   await devFlowClient.init();
+
+  // Sync config from backend (falls back to cache or defaults)
+  await syncConfig();
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
