@@ -7,7 +7,14 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { generateClaudeMdContent, MARKER_START, MARKER_END } from '../templates/claude-md.js';
+import {
+  generateClaudeMdContent,
+  generateGuidelinesBlock,
+  MARKER_START,
+  MARKER_END,
+  GUIDELINES_MARKER_START,
+  GUIDELINES_MARKER_END,
+} from '../templates/claude-md.js';
 
 /**
  * Setup CLAUDE.md in the working directory
@@ -60,6 +67,76 @@ export async function setupClaudeMd(
   const updatedContent = existingContent + separator + rulesContent;
   await writeFile(claudeMdPath, updatedContent);
   console.error(`CLAUDE.md updated in ${workingDir} (rules appended)`);
+}
+
+/**
+ * Sync project guidelines into CLAUDE.md
+ *
+ * - If guidelines empty/null: remove existing block (if present)
+ * - If guidelines present + markers exist: replace block between markers
+ * - If guidelines present + no markers: append block after DevFlow rules block
+ */
+export async function syncProjectGuidelines(
+  workingDir: string,
+  guidelines: string,
+): Promise<void> {
+  const claudeMdPath = join(workingDir, 'CLAUDE.md');
+
+  let existingContent: string;
+  try {
+    existingContent = await readFile(claudeMdPath, 'utf-8');
+  } catch {
+    // No CLAUDE.md exists - nothing to sync into
+    return;
+  }
+
+  const hasMarkers =
+    existingContent.includes(GUIDELINES_MARKER_START) &&
+    existingContent.includes(GUIDELINES_MARKER_END);
+
+  const guidelinesBlock = generateGuidelinesBlock(guidelines);
+
+  if (hasMarkers) {
+    // Replace or remove existing guidelines block
+    const startIdx = existingContent.indexOf(GUIDELINES_MARKER_START);
+    const endIdx = existingContent.indexOf(GUIDELINES_MARKER_END) + GUIDELINES_MARKER_END.length;
+    const before = existingContent.substring(0, startIdx);
+    const after = existingContent.substring(endIdx);
+
+    // Clean up whitespace: trim trailing newlines from before, then add appropriate spacing
+    const trimmedBefore = before.replace(/\n+$/, '');
+    const trimmedAfter = after.replace(/^\n+/, '');
+
+    let updatedContent: string;
+    if (guidelinesBlock) {
+      updatedContent = trimmedBefore + '\n\n' + guidelinesBlock + (trimmedAfter ? '\n' + trimmedAfter : '\n');
+    } else {
+      // Remove the block entirely
+      updatedContent = trimmedBefore + (trimmedAfter ? '\n\n' + trimmedAfter : '\n');
+    }
+
+    await writeFile(claudeMdPath, updatedContent);
+    console.error(`CLAUDE.md updated (guidelines ${guidelinesBlock ? 'replaced' : 'removed'})`);
+    return;
+  }
+
+  // No markers yet - append after DevFlow rules block if guidelines present
+  if (!guidelinesBlock) return;
+
+  if (existingContent.includes(MARKER_END)) {
+    // Insert after the DevFlow rules end marker
+    const endIdx = existingContent.indexOf(MARKER_END) + MARKER_END.length;
+    const before = existingContent.substring(0, endIdx);
+    const after = existingContent.substring(endIdx);
+    const updatedContent = before + '\n\n' + guidelinesBlock + after;
+    await writeFile(claudeMdPath, updatedContent);
+  } else {
+    // No DevFlow markers at all - append at end
+    const separator = existingContent.endsWith('\n') ? '\n' : '\n\n';
+    await writeFile(claudeMdPath, existingContent + separator + guidelinesBlock);
+  }
+
+  console.error('CLAUDE.md updated (guidelines added)');
 }
 
 /**

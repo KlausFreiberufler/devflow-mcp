@@ -34,6 +34,7 @@ import { tools as agentSessionTools } from './tools/agent-session.js';
 import { tools as knowledgeTools } from './tools/knowledge.js';
 import { tools as releaseTools } from './tools/release.js';
 import { tools as searchTools } from './tools/search.js';
+import { tools as guidelinesTools } from './tools/guidelines.js';
 
 // Subcommand routing: `devflow-mcp setup [--url ...]` delegates to setup script
 if (process.argv[2] === 'setup') {
@@ -51,6 +52,7 @@ registry.register(agentSessionTools);
 registry.register(knowledgeTools);
 registry.register(releaseTools);
 registry.register(searchTools);
+registry.register(guidelinesTools);
 
 const server = new Server(
   { name: 'devflow', version: '3.0.0' },

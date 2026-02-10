@@ -8,6 +8,9 @@
 export const MARKER_START = '<!-- DEVFLOW-RULES-START -->';
 export const MARKER_END = '<!-- DEVFLOW-RULES-END -->';
 
+export const GUIDELINES_MARKER_START = '<!-- PROJECT-GUIDELINES-START -->';
+export const GUIDELINES_MARKER_END = '<!-- PROJECT-GUIDELINES-END -->';
+
 /**
  * Generate CLAUDE.md content with project-specific information
  */
@@ -53,5 +56,22 @@ idea → planning → plan_review → progress → code_review → testing → d
 Review-States (plan_review, code_review, testing) sind Wartezustaende.
 Der User muss in der DevFlow-UI genehmigen bevor es weitergeht.
 ${MARKER_END}
+`;
+}
+
+/**
+ * Generate a guidelines block wrapped in markers.
+ * Returns empty string if guidelines are empty/null.
+ */
+export function generateGuidelinesBlock(guidelines: string): string {
+  if (!guidelines || !guidelines.trim()) {
+    return '';
+  }
+
+  return `${GUIDELINES_MARKER_START}
+## Projekt-Richtlinien
+
+${guidelines.trim()}
+${GUIDELINES_MARKER_END}
 `;
 }

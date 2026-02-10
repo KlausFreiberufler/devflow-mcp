@@ -37,15 +37,16 @@ export const DEFAULT_CONFIG: RemoteConfig = {
   version: 'hardcoded-v3.0',
   statePermissions: {
     idea: ['flow_update', 'flow_get'],
-    planning: ['flow_update', 'flow_get', 'flow_get_feedback'],
+    planning: ['flow_update', 'flow_get', 'flow_get_feedback', 'project_guidelines_get'],
     plan_review: ['flow_get', 'flow_get_feedback'],
     progress: [
       'flow_update', 'flow_get', 'task_list', 'task_create', 'task_update',
       'project_knowledge_get', 'project_knowledge_update',
+      'project_guidelines_get', 'project_guidelines_update',
     ],
-    code_review: ['flow_get', 'flow_get_feedback'],
-    testing: ['flow_get', 'flow_get_feedback', 'task_list'],
-    done: ['flow_get', 'task_list'],
+    code_review: ['flow_get', 'flow_get_feedback', 'project_guidelines_get'],
+    testing: ['flow_get', 'flow_get_feedback', 'task_list', 'project_guidelines_get'],
+    done: ['flow_get', 'task_list', 'project_guidelines_get'],
   },
   nextStepGuidance: {
     idea: 'Wechsle den Flow zu "planning" mit flow_update({ currentState: "planning" }) und beginne die Analyse.',

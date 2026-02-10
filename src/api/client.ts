@@ -474,6 +474,24 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<ProjectKnowledge>('PATCH', `/api/projects/${id}/knowledge`, { knowledge });
   }
 
+  // ============ Guidelines Methods ============
+
+  async getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>> {
+    const id = projectId || this.getLinkedProjectId();
+    if (!id) {
+      return { success: false, error: 'No project ID. Use project_list or set DEVFLOW_PROJECT_ID.' };
+    }
+    return this.request<ProjectGuidelines>('GET', `/api/projects/${id}/guidelines`);
+  }
+
+  async updateProjectGuidelines(guidelines: string, projectId?: string): Promise<ApiResponse<ProjectGuidelines>> {
+    const id = projectId || this.getLinkedProjectId();
+    if (!id) {
+      return { success: false, error: 'No project ID. Use project_list or set DEVFLOW_PROJECT_ID.' };
+    }
+    return this.request<ProjectGuidelines>('PATCH', `/api/projects/${id}/guidelines`, { guidelines });
+  }
+
   // ============ Release Methods ============
 
   async listReleases(projectId?: string): Promise<ApiResponse<Release[]>> {
@@ -667,6 +685,11 @@ export interface AgentSession {
 
 export interface ProjectKnowledge {
   knowledge: string;
+  updatedAt?: string;
+}
+
+export interface ProjectGuidelines {
+  guidelines: string;
   updatedAt?: string;
 }
 

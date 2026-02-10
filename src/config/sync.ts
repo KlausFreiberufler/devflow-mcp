@@ -12,7 +12,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { devFlowClient } from '../api/client.js';
 import { type RemoteConfig, DEFAULT_CONFIG } from './types.js';
-import { setupClaudeMd } from '../setup/claude-md-generator.js';
+import { setupClaudeMd, syncProjectGuidelines } from '../setup/claude-md-generator.js';
 
 const CACHE_PATH = join(homedir(), '.devflow', 'config.cache.json');
 
@@ -98,6 +98,9 @@ export async function syncConfig(): Promise<void> {
       if (activeConfig.version !== previousVersion) {
         await updateClaudeMd();
       }
+
+      // Sync project guidelines into CLAUDE.md
+      await syncGuidelinesFromBackend();
       return;
     }
   } catch {
@@ -115,6 +118,21 @@ export async function syncConfig(): Promise<void> {
   // Use defaults
   activeConfig = DEFAULT_CONFIG;
   console.error('Config: using hardcoded defaults');
+}
+
+/**
+ * Sync project guidelines from backend into CLAUDE.md.
+ */
+async function syncGuidelinesFromBackend(): Promise<void> {
+  try {
+    const result = await devFlowClient.getProjectGuidelines();
+    if (result.success && result.data && result.data.guidelines) {
+      await syncProjectGuidelines(process.cwd(), result.data.guidelines);
+      console.error('CLAUDE.md guidelines synced from backend');
+    }
+  } catch {
+    // Non-critical: guidelines sync failure doesn't block startup
+  }
 }
 
 /**
