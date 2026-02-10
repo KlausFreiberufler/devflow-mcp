@@ -2,17 +2,33 @@
   "name": "devflow-mcp",
   "version": "3.0.0",
   "description": "MCP Server for DevFlow - Claude Code Integration",
+  "private": true,
   "type": "module",
   "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
   "bin": {
-    "devflow-mcp": "dist/index.js"
+    "devflow-mcp": "dist/index.js",
+    "devflow-mcp-setup": "dist/setup/setup.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "setup": "node dist/setup/setup.js"
+    "setup": "node dist/setup/setup.js",
+    "prepublishOnly": "npm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KlausFreiberufler/devflow-mcp.git"
+  },
+  "keywords": [
+    "devflow",
+    "mcp",
+    "claude-code",
+    "ai-development"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
   },

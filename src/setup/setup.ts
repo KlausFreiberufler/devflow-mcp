@@ -2,7 +2,10 @@
 /**
  * DevFlow MCP Server - TypeScript Setup Command
  *
- * Usage: npx devflow-mcp setup
+ * Usage:
+ *   npx github:KlausFreiberufler/devflow-mcp setup
+ *   npx devflow-mcp-setup
+ *   npx devflow-mcp-setup --url http://localhost:6011
  *
  * Handles:
  * 1. Build verification
@@ -14,20 +17,11 @@ import { execSync } from 'child_process';
 import { existsSync, readlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { createInterface } from 'readline';
+
+const DEFAULT_URL = 'https://api.flow.dev';
 
 function log(msg: string): void {
   process.stderr.write(msg + '\n');
-}
-
-function prompt(question: string, defaultValue: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
-  return new Promise((resolve) => {
-    rl.question(`${question} (default: ${defaultValue}): `, (answer) => {
-      rl.close();
-      resolve(answer.trim() || defaultValue);
-    });
-  });
 }
 
 function exec(cmd: string, silent = false): string {
@@ -44,9 +38,24 @@ function exec(cmd: string, silent = false): string {
   }
 }
 
+function parseArgs(): { url: string } {
+  const args = process.argv.slice(2);
+  let url = DEFAULT_URL;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--url' && args[i + 1]) {
+      url = args[i + 1];
+      i++;
+    }
+  }
+
+  return { url };
+}
+
 async function setup(): Promise<void> {
   const scriptDir = join(import.meta.url.replace('file://', ''), '..', '..', '..');
   const distFile = join(scriptDir, 'dist', 'index.js');
+  const { url: devflowUrl } = parseArgs();
 
   log('=== DevFlow MCP Server v3.0 Setup ===');
   log('');
@@ -70,7 +79,10 @@ async function setup(): Promise<void> {
 
   // Step 2: DevFlow URL
   log('');
-  const devflowUrl = await prompt('[2/3] DevFlow URL', 'http://localhost:6011');
+  log(`[2/3] DevFlow URL: ${devflowUrl}`);
+  if (devflowUrl !== DEFAULT_URL) {
+    log('      (custom URL via --url flag)');
+  }
 
   // Step 3: Claude Code MCP registration
   log('');

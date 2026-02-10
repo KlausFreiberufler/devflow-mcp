@@ -36,7 +36,7 @@ export class DevFlowClient {
   private scopedProjectId: string | null = null;
 
   constructor(baseUrl?: string, workingDir?: string) {
-    this.baseUrl = baseUrl || process.env.DEVFLOW_URL || 'http://localhost:6011';
+    this.baseUrl = baseUrl || process.env.DEVFLOW_URL || 'https://api.flow.dev';
     this.credentialsPath = join(homedir(), '.devflow', 'credentials.json');
     this.workingDir = workingDir || process.cwd();
     // Project scoping via environment variable
