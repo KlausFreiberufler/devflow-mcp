@@ -500,6 +500,30 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<Release>('PATCH', `/api/releases/${releaseId}`, data);
   }
 
+  // ============ Config Methods ============
+
+  /**
+   * Get the base URL for direct API calls
+   */
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  /**
+   * Get the current access token (or null if not authenticated)
+   */
+  getAccessToken(): string | null {
+    return this.credentials?.accessToken ?? null;
+  }
+
+  async getProjectConfig(projectId?: string): Promise<ApiResponse<Record<string, unknown>>> {
+    const id = projectId || this.getLinkedProjectId();
+    if (!id) {
+      return { success: false, error: 'No project ID for config sync.' };
+    }
+    return this.request<Record<string, unknown>>('GET', `/api/projects/${id}/config`);
+  }
+
   // ============ Search Methods ============
 
   async search(query: string, type?: string): Promise<ApiResponse<SearchResult[]>> {
