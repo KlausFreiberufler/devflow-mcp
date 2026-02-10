@@ -4,7 +4,15 @@
  *
  * Enforced flow development with Init-Gate.
  * Tools are gated: devflow_init must be called first.
+ *
+ * Subcommands:
+ *   devflow-mcp         → Start MCP server (default)
+ *   devflow-mcp setup   → Run setup wizard
  */
+
+import { execFileSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -26,6 +34,14 @@ import { tools as agentSessionTools } from './tools/agent-session.js';
 import { tools as knowledgeTools } from './tools/knowledge.js';
 import { tools as releaseTools } from './tools/release.js';
 import { tools as searchTools } from './tools/search.js';
+
+// Subcommand routing: `devflow-mcp setup [--url ...]` delegates to setup script
+if (process.argv[2] === 'setup') {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const setupScript = join(__dirname, 'setup', 'setup.js');
+  execFileSync('node', [setupScript, ...process.argv.slice(3)], { stdio: 'inherit' });
+  process.exit(0);
+}
 
 // NOTE: project_list removed from runtime (only used during setup)
 registry.register(initTools);
