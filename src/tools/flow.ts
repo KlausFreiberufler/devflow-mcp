@@ -6,6 +6,8 @@
 import { devFlowClient, type Workflow } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
+import { sessionContext } from '../context/session.js';
+import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 
 // ============ Tool Definitions ============
 
@@ -301,7 +303,50 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
     return `Error: ${result.error || 'Failed to create workflow'}`;
   }
 
-  return `Workflow created successfully.\n\n${formatWorkflowDetail(result.data)}`;
+  // Auto-init: set session context for the newly created workflow
+  const newWorkflow = result.data;
+  const allowedActions = getAllowedTools(newWorkflow.currentState);
+  const nextStep = NEXT_STEP_GUIDANCE[newWorkflow.currentState] || 'Beginne mit der Planung.';
+
+  // Lock the workflow
+  await devFlowClient.updateWorkflow(newWorkflow.id, {
+    agentStatus: 'analyzing',
+    agentMessage: 'Neuer Workflow erstellt',
+  });
+
+  // Create agent session
+  let sessionId = 'local-session';
+  try {
+    const sessionResult = await devFlowClient.createAgentSession({
+      workflowId: newWorkflow.id,
+      type: 'enforcement-v3',
+    });
+    if (sessionResult.success && sessionResult.data) {
+      sessionId = sessionResult.data.id;
+    }
+  } catch {
+    // Continue with local tracking
+  }
+
+  sessionContext.init({
+    workflow: newWorkflow,
+    sessionId,
+    startedAt: new Date().toISOString(),
+    feedback: null,
+    tasks: [],
+    allowedActions,
+    nextStep,
+  });
+
+  return [
+    'Workflow erstellt und Session gestartet.',
+    '',
+    formatWorkflowDetail(newWorkflow),
+    '',
+    '---',
+    `**Erlaubte Aktionen:** ${allowedActions.join(', ')}`,
+    `**Naechster Schritt:** ${nextStep}`,
+  ].join('\n');
 }
 
 async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> {
@@ -358,6 +403,21 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to update workflow'}`;
+  }
+
+  // Context integration: refresh session after successful update
+  if (sessionContext.isActive() && sessionContext.getFlowId() === resolvedId) {
+    const updatedWorkflow = result.data!;
+    sessionContext.updateWorkflow(updatedWorkflow);
+
+    const newState = updatedWorkflow.currentState;
+    sessionContext.updateAllowedActions(getAllowedTools(newState));
+
+    // Provide guidance for review/wait states
+    if (['plan_review', 'code_review', 'testing'].includes(newState)) {
+      const guidance = NEXT_STEP_GUIDANCE[newState] || '';
+      return `Workflow updated successfully.\n\n${formatWorkflowDetail(updatedWorkflow)}\n\n---\n**Naechster Schritt:** ${guidance}`;
+    }
   }
 
   return `Workflow updated successfully.\n\n${formatWorkflowDetail(result.data)}`;
@@ -436,9 +496,12 @@ function formatWorkflowList(workflows: Workflow[]): string {
 
     for (const w of wfs) {
       const ticket = w.ticketKey ? `[${w.ticketKey}] ` : '';
-      lines.push(`- **${w.id}**: ${ticket}${w.summary}`);
-      if (w.agentStatus) {
-        lines.push(`  └─ Agent: ${w.agentStatus}${w.agentMessage ? ` - ${w.agentMessage}` : ''}`);
+      const lockInfo = (w.agentStatus && w.agentStatus !== 'idle')
+        ? ` [🔒 ${w.agentStatus}]`
+        : ' (frei)';
+      lines.push(`- **${w.id}**: ${ticket}${w.summary}${lockInfo}`);
+      if (w.agentMessage) {
+        lines.push(`  └─ ${w.agentMessage}`);
       }
     }
     lines.push('');
