@@ -99,6 +99,29 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     }
   }
 
+  // 0. Agent-Slot check (if not already in a session)
+  if (!sessionContext.isActive()) {
+    try {
+      const slotResult = await devFlowClient.getAgentSlotStatus();
+      if (slotResult.success && slotResult.data?.active && slotResult.data.workflow) {
+        const slot = slotResult.data.workflow;
+        return [
+          '⛔ Dein Agent-Slot ist bereits belegt.',
+          '',
+          'Aktiver Agent:',
+          `  Workflow: ${slot.summary} (${slot.id})`,
+          `  Status: ${slot.agentStatus}`,
+          `  Seit: ${new Date(slot.since).toLocaleString()}`,
+          '',
+          'Trenne den aktiven Agent in DevFlow → Einstellungen → API-Zugang,',
+          'oder warte bis die aktuelle Session endet.',
+        ].join('\n');
+      }
+    } catch {
+      // Slot endpoint not available → continue (no enforcement)
+    }
+  }
+
   // 1. Resolve workflow ID
   const resolvedId = await resolveWorkflowId(flowId);
   if (!resolvedId) {

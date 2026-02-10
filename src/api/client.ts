@@ -524,6 +524,22 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<Record<string, unknown>>('GET', `/api/projects/${id}/config`);
   }
 
+  // ============ Agent Slot Methods ============
+
+  /**
+   * Check if the current user has a free agent slot.
+   * Returns slot status: { active: boolean, workflow?: { id, summary, agentStatus, since } }
+   * 404 means the backend doesn't support slots yet → treat as free.
+   */
+  async getAgentSlotStatus(): Promise<ApiResponse<AgentSlotStatus>> {
+    const result = await this.request<AgentSlotStatus>('GET', '/api/agent-slots/status');
+    // If endpoint doesn't exist, treat slot as free
+    if (!result.success && result.error?.includes('404')) {
+      return { success: true, data: { active: false } };
+    }
+    return result;
+  }
+
   // ============ Search Methods ============
 
   async search(query: string, type?: string): Promise<ApiResponse<SearchResult[]>> {
@@ -669,6 +685,16 @@ export interface SearchResult {
   title: string;
   description?: string;
   state?: string;
+}
+
+export interface AgentSlotStatus {
+  active: boolean;
+  workflow?: {
+    id: string;
+    summary: string;
+    agentStatus: string;
+    since: string;
+  };
 }
 
 // ============ Response Transformers ============
