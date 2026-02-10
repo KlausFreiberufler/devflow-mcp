@@ -3,6 +3,7 @@
  *
  * Fires-and-forgets: logging never blocks tool responses.
  * Uses the existing agent_session_log API endpoint.
+ * Includes a retry buffer for offline resilience.
  */
 
 import { devFlowClient } from '../api/client.js';
@@ -34,9 +35,54 @@ export interface ToolCallLog {
   durationMs?: number;
 }
 
+interface PendingLog {
+  sessionId: string;
+  message: string;
+  level: string;
+}
+
+// Buffer for failed log entries (max 50, oldest dropped on overflow)
+const pendingLogs: PendingLog[] = [];
+const MAX_PENDING = 50;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Try to flush pending logs to the backend.
+ */
+async function flushPendingLogs(): Promise<void> {
+  if (pendingLogs.length === 0) return;
+
+  const toFlush = pendingLogs.splice(0, 10); // Flush in batches of 10
+  for (const entry of toFlush) {
+    try {
+      await devFlowClient.logAgentSession(entry.sessionId, {
+        message: entry.message,
+        level: entry.level,
+      });
+    } catch {
+      // Still failing, put back at front (will retry next time)
+      pendingLogs.unshift(entry);
+      return; // Stop trying, backend is still down
+    }
+  }
+
+  // If more pending, schedule another flush
+  if (pendingLogs.length > 0) {
+    scheduleFlush();
+  }
+}
+
+function scheduleFlush(): void {
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    flushPendingLogs().catch(() => {});
+  }, 10_000); // Retry after 10 seconds
+}
+
 /**
  * Log a tool call to the active agent session.
- * Non-blocking: errors are silently ignored.
+ * Non-blocking: errors are buffered and retried.
  */
 export function logToolCall(log: ToolCallLog): void {
   const ctx = sessionContext.get();
@@ -56,6 +102,15 @@ export function logToolCall(log: ToolCallLog): void {
     level = 'info';
   }
 
-  // Fire-and-forget
-  devFlowClient.logAgentSession(ctx.sessionId, { message, level }).catch(() => {});
+  const sessionId = ctx.sessionId;
+
+  // Fire-and-forget with retry buffer
+  devFlowClient.logAgentSession(sessionId, { message, level }).catch(() => {
+    // Backend unavailable - buffer for retry
+    if (pendingLogs.length >= MAX_PENDING) {
+      pendingLogs.shift(); // Drop oldest
+    }
+    pendingLogs.push({ sessionId, message, level });
+    scheduleFlush();
+  });
 }
