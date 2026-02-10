@@ -202,33 +202,9 @@ async function resolveWorkflowId(partialId: string): Promise<string | null> {
   return null;
 }
 
-// ============ State Transition Guardrails ============
+// ============ State Transition Guardrails (from config) ============
 
-/** Transitions that can only be triggered by the user via UI */
-const BLOCKED_TRANSITIONS: Record<string, { target: string; reason: string }[]> = {
-  'plan_review': [
-    { target: 'progress', reason: 'Der User muss den Plan zuerst in der UI freigeben. Warte auf Freigabe in plan_review.' }
-  ],
-  'code_review': [
-    { target: 'testing', reason: 'Der User muss den Code zuerst in der UI freigeben. Warte auf Freigabe in code_review.' },
-    { target: 'done', reason: 'Der User muss den Code zuerst in der UI freigeben. Warte auf Freigabe in code_review.' }
-  ],
-  'testing': [
-    { target: 'done', reason: 'Der User muss das Testing zuerst in der UI abschließen. Warte auf Freigabe in testing.' }
-  ]
-};
-
-/** Required fields for state transitions */
-const REQUIRED_FIELDS: Record<string, { fields: string[]; message: string }> = {
-  'plan_review': {
-    fields: ['implementationPlan'],
-    message: 'implementationPlan ist Pflicht beim Übergang zu plan_review. Schreibe einen Plan bevor du den State wechselst.'
-  },
-  'code_review': {
-    fields: ['agentSummary', 'testingInstructions'],
-    message: 'agentSummary und testingInstructions sind Pflicht beim Übergang zu code_review. Beschreibe was implementiert wurde und was der User testen soll.'
-  }
-};
+import { getConfig } from '../config/sync.js';
 
 // ============ Tool Handlers ============
 
@@ -368,15 +344,15 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
     if (currentWorkflow.success && currentWorkflow.data) {
       const fromState = currentWorkflow.data.currentState;
 
-      // Check blocked transitions (user-only)
-      const blocked = BLOCKED_TRANSITIONS[fromState]?.find(b => b.target === currentState);
+      // Check blocked transitions (user-only, from config)
+      const blocked = getConfig().blockedTransitions[fromState]?.find(b => b.target === currentState);
       if (blocked) {
         return `⛔ Blockiert: ${blocked.reason}\n\nAktueller State: ${fromState} → Gewünschter State: ${currentState}\n\nDiese Transition kann nur vom User über die DevFlow UI ausgelöst werden.`;
       }
     }
 
-    // Check required fields for target state
-    const required = REQUIRED_FIELDS[currentState];
+    // Check required fields for target state (from config)
+    const required = getConfig().requiredFields[currentState];
     if (required) {
       const allArgs = { implementationPlan, agentSummary, testingInstructions };
       const missing = required.fields.filter(f => !allArgs[f as keyof typeof allArgs]);
