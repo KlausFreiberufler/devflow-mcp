@@ -1,9 +1,11 @@
 /**
  * Tool Registry with Guard Middleware
  *
- * All tool calls pass through two guards:
+ * All tool calls pass through guards and post-processing:
  * 1. Context-Guard: blocks tools without active devflow_init session
  * 2. State-Guard: blocks tools not allowed in the current workflow state
+ * 3. Auto-Logger: logs every tool call to the agent session
+ * 4. Auto-Status: derives agentStatus from tool calls
  */
 
 import { sessionContext } from '../context/session.js';
@@ -12,6 +14,8 @@ import {
   buildNoContextMessage,
   buildStateBlockMessage,
 } from '../context/permissions.js';
+import { logToolCall } from '../context/auto-logger.js';
+import { applyDerivedStatus } from '../context/auto-status.js';
 
 export interface ToolDefinition {
   name: string;
@@ -43,7 +47,7 @@ class ToolRegistry {
   }
 
   /**
-   * Dispatch a tool call with Context-Guard and State-Guard.
+   * Dispatch a tool call with Context-Guard, State-Guard, Auto-Logging, and Auto-Status.
    */
   async handle(name: string, args: Record<string, unknown>): Promise<string> {
     const tool = this.tools.get(name);
@@ -54,12 +58,14 @@ class ToolRegistry {
     // Guard 1: Context-Guard - discovery tools bypass
     if (!DISCOVERY_TOOLS.has(name)) {
       if (!sessionContext.isActive()) {
+        logToolCall({ toolName: name, args, blocked: true, blockReason: 'Kein aktiver Context' });
         return buildNoContextMessage(name);
       }
 
       // Guard 2: State-Guard
       if (!sessionContext.isToolAllowed(name)) {
         const ctx = sessionContext.get()!;
+        logToolCall({ toolName: name, args, blocked: true, blockReason: `State '${ctx.workflow.currentState}'` });
         return buildStateBlockMessage(
           name,
           ctx.workflow.summary,
@@ -69,7 +75,20 @@ class ToolRegistry {
       }
     }
 
-    return tool.handler(args);
+    // Execute tool
+    const start = Date.now();
+    const result = await tool.handler(args);
+    const durationMs = Date.now() - start;
+
+    // Auto-Log (fire-and-forget)
+    logToolCall({ toolName: name, args, blocked: false, durationMs });
+
+    // Auto-Status (fire-and-forget, skip devflow_init - it sets its own status)
+    if (name !== 'devflow_init') {
+      applyDerivedStatus(name, args);
+    }
+
+    return result;
   }
 
   has(name: string): boolean {
