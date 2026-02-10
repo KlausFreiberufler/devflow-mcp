@@ -2,7 +2,6 @@
 # DevFlow - Strukturierte KI-Entwicklung
 
 **Projekt:** MCP-Server
-**Tech-Stack:** TypeScript, MCP SDK, Node.js ESM
 
 Dieses Projekt nutzt DevFlow fuer strukturierte, nachvollziehbare KI-Entwicklung.
 Alle Regeln werden technisch vom MCP-Server erzwungen.
@@ -36,3 +35,5 @@ idea → planning → plan_review → progress → code_review → testing → d
 Review-States (plan_review, code_review, testing) sind Wartezustaende.
 Der User muss in der DevFlow-UI genehmigen bevor es weitergeht.
 <!-- DEVFLOW-RULES-END -->
+
+
