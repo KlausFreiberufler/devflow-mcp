@@ -10,10 +10,10 @@ Alle Regeln werden technisch vom MCP-Server erzwungen.
 
 BEVOR du mit der Arbeit beginnst:
 
-1. `flow_list()` → Finde einen freien Workflow
+1. `flow_list()` → Finde einen freien Flow
 2. `devflow_init({ flowId: "<id>" })` → Starte deine Session
    ODER
-3. `flow_create({ summary: "..." })` → Erstelle einen neuen Workflow
+3. `flow_create({ summary: "..." })` → Erstelle einen neuen Flow
 
 **Ohne `devflow_init` sind alle Tools blockiert.**
 
@@ -24,9 +24,9 @@ Der Server gibt dir bei jedem Schritt Anweisungen:
 - **nextStep** → was du als naechstes tun sollst
 
 Folge den Anweisungen aus den Tool-Responses. Erlaubte Aktionen haengen vom
-Workflow-State ab und werden vom Server erzwungen.
+Flow-State ab und werden vom Server erzwungen.
 
-## Workflow-States
+## Flow-States
 
 ```
 idea → planning → plan_review → progress → code_review → testing → done
