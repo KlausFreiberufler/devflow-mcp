@@ -1,7 +1,7 @@
 /**
  * State-Permission Map
  *
- * Defines which tools are allowed in which workflow state,
+ * Defines which tools are allowed in which flow state,
  * which tools work without init (discovery), and block messages.
  *
  * Uses remote config when available, falls back to hardcoded defaults.
@@ -45,13 +45,13 @@ export const NEXT_STEP_GUIDANCE: Record<string, string> = new Proxy(
 
 export function buildNoContextMessage(toolName: string): string {
   return [
-    `⛔ Kein aktiver Workflow-Context. Tool '${toolName}' ist blockiert.`,
+    `⛔ Kein aktiver Flow-Context. Tool '${toolName}' ist blockiert.`,
     '',
     'Starte deine Arbeit mit einem dieser Schritte:',
-    '1. flow_list() → Finde einen freien Workflow',
+    '1. flow_list() → Finde einen freien Flow',
     '2. devflow_init({ flowId: "<id>" }) → Beanspruche ihn',
     '   ODER',
-    '3. flow_create({ summary: "..." }) → Erstelle einen neuen Workflow',
+    '3. flow_create({ summary: "..." }) → Erstelle einen neuen Flow',
     '',
     'Ohne aktiven Context sind keine weiteren Tools verfuegbar.',
   ].join('\n');
@@ -59,18 +59,18 @@ export function buildNoContextMessage(toolName: string): string {
 
 export function buildStateBlockMessage(
   toolName: string,
-  workflowSummary: string,
-  workflowId: string,
+  flowSummary: string,
+  flowId: string,
   currentState: string,
 ): string {
   const config = getConfig();
   const allowed = config.statePermissions[currentState] || [];
-  const nextStep = config.nextStepGuidance[currentState] || 'Pruefe den Workflow-Status.';
+  const nextStep = config.nextStepGuidance[currentState] || 'Pruefe den Flow-Status.';
 
   return [
     `⛔ Aktion '${toolName}' nicht erlaubt im State '${currentState}'.`,
     '',
-    `Workflow: '${workflowSummary}' (${workflowId})`,
+    `Flow: '${flowSummary}' (${flowId})`,
     `Aktueller State: ${currentState}`,
     `Erlaubte Aktionen: ${allowed.length > 0 ? allowed.join(', ') : 'keine'}`,
     '',

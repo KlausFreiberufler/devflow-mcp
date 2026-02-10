@@ -2,7 +2,7 @@
 /**
  * DevFlow MCP Server v3.0.0
  *
- * Enforced workflow development with Init-Gate.
+ * Enforced flow development with Init-Gate.
  * Tools are gated: devflow_init must be called first.
  */
 
@@ -62,12 +62,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-// Graceful shutdown: release workflow lock
+// Graceful shutdown: release flow lock
 function cleanup() {
   if (sessionContext.isActive()) {
     const flowId = sessionContext.getFlowId();
     if (flowId) {
-      devFlowClient.updateWorkflow(flowId, {
+      devFlowClient.updateFlow(flowId, {
         agentStatus: 'idle',
       }).catch(() => {});
     }

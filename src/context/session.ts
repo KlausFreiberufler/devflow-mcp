@@ -1,11 +1,11 @@
 /**
- * Session Context - Singleton that holds the active workflow context.
+ * Session Context - Singleton that holds the active flow context.
  *
  * Core of the Init-Gate: no context = no tools.
  * Set via devflow_init, cleared on session end.
  */
 
-import type { Workflow, Task } from '../api/client.js';
+import type { Flow, Task } from '../api/client.js';
 
 export interface SessionFeedback {
   type: 'plan_rejected' | 'code_rejected' | 'testing_failed';
@@ -15,7 +15,7 @@ export interface SessionFeedback {
 }
 
 export interface ActiveContext {
-  workflow: Workflow;
+  flow: Flow;
   sessionId: string;
   startedAt: string;
   previousState?: string;
@@ -45,11 +45,11 @@ class SessionContext {
   }
 
   getFlowId(): string | null {
-    return this.context?.workflow.id ?? null;
+    return this.context?.flow.id ?? null;
   }
 
   getState(): string | null {
-    return this.context?.workflow.currentState ?? null;
+    return this.context?.flow.currentState ?? null;
   }
 
   isToolAllowed(toolName: string): boolean {
@@ -57,9 +57,9 @@ class SessionContext {
     return this.context.allowedActions.includes(toolName);
   }
 
-  updateWorkflow(workflow: Workflow): void {
+  updateFlow(flow: Flow): void {
     if (this.context) {
-      this.context.workflow = workflow;
+      this.context.flow = flow;
     }
   }
 

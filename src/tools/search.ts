@@ -1,6 +1,6 @@
 /**
  * Search MCP Tools
- * Tools for searching across workflows, tasks, and projects in DevFlow
+ * Tools for searching across flows, tasks, and projects in DevFlow
  */
 
 import { devFlowClient } from '../api/client.js';
@@ -12,9 +12,9 @@ import { withErrorHandling } from '../utils/errors.js';
 
 const searchDef = {
   name: 'search',
-  description: `Search across workflows, tasks, and projects in DevFlow.
+  description: `Search across flows, tasks, and projects in DevFlow.
 Use this to find items by keyword, title, or content.
-Supports filtering by type (workflow, task, project).
+Supports filtering by type (flow, task, project).
 
 Returns matching items with their type, title, and a content snippet.`,
   inputSchema: {
@@ -26,7 +26,7 @@ Returns matching items with their type, title, and a content snippet.`,
       },
       type: {
         type: 'string',
-        enum: ['workflow', 'task', 'project'],
+        enum: ['flow', 'task', 'project'],
         description: 'Optional: filter results by type'
       }
     },
@@ -65,7 +65,7 @@ function formatSearchResults(query: string, results: SearchResult[]): string {
   ];
 
   const typeEmoji: Record<string, string> = {
-    workflow: '🔄',
+    flow: '🔄',
     task: '✅',
     project: '📁',
   };

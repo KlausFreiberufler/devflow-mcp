@@ -3,7 +3,7 @@
  * Tools for listing, getting, creating, and updating flows in DevFlow
  */
 
-import { devFlowClient, type Workflow } from '../api/client.js';
+import { devFlowClient, type Flow } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
@@ -13,15 +13,15 @@ import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 
 const flowListDef = {
   name: 'flow_list',
-  description: `List all workflows, optionally filtered by project.
-Returns workflows with their current state (idea, planning, plan_review, progress, code_review, testing, done).
-Use this to find workflows to work on.`,
+  description: `List all flows, optionally filtered by project.
+Returns flows with their current state (idea, planning, plan_review, progress, code_review, testing, done).
+Use this to find flows to work on.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
       projectId: {
         type: 'string',
-        description: 'Optional project ID to filter workflows'
+        description: 'Optional project ID to filter flows'
       },
       state: {
         type: 'string',
@@ -34,8 +34,8 @@ Use this to find workflows to work on.`,
 
 const flowGetDef = {
   name: 'flow_get',
-  description: `Get detailed information about a specific workflow.
-Returns the full workflow including:
+  description: `Get detailed information about a specific flow.
+Returns the full flow including:
 - Summary and description
 - Acceptance criteria
 - Current state
@@ -43,13 +43,13 @@ Returns the full workflow including:
 - Implementation plan (full content)
 - Audit info (who created/approved)
 
-Use this before starting work on a workflow to understand requirements.`,
+Use this before starting work on a flow to understand requirements.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
       flowId: {
         type: 'string',
-        description: 'The workflow ID (e.g., "abc123" or full ID)'
+        description: 'The flow ID (e.g., "abc123" or full ID)'
       }
     },
     required: ['flowId']
@@ -58,9 +58,9 @@ Use this before starting work on a workflow to understand requirements.`,
 
 const flowCreateDef = {
   name: 'flow_create',
-  description: `Create a new workflow in a project.
+  description: `Create a new flow in a project.
 Use this to create new feature requests, bug reports, or tasks.
-The workflow starts in 'idea' state by default.
+The flow starts in 'idea' state by default.
 
 Requires a projectId (use project_list to find it) and a summary.`,
   inputSchema: {
@@ -68,11 +68,11 @@ Requires a projectId (use project_list to find it) and a summary.`,
     properties: {
       projectId: {
         type: 'string',
-        description: 'The project ID this workflow belongs to'
+        description: 'The project ID this flow belongs to'
       },
       summary: {
         type: 'string',
-        description: 'Brief summary/title of the workflow'
+        description: 'Brief summary/title of the flow'
       },
       description: {
         type: 'string',
@@ -81,7 +81,7 @@ Requires a projectId (use project_list to find it) and a summary.`,
       flowType: {
         type: 'string',
         enum: ['feature', 'bug', 'chore'],
-        description: 'Type of workflow (default: feature)'
+        description: 'Type of flow (default: feature)'
       },
       acceptanceCriteria: {
         type: 'array',
@@ -95,9 +95,9 @@ Requires a projectId (use project_list to find it) and a summary.`,
 
 const flowUpdateDef = {
   name: 'flow_update',
-  description: `Update a workflow's state or submit deliverables.
+  description: `Update a flow's state or submit deliverables.
 Use this to:
-- Change workflow state (idea -> planning -> plan_review -> progress -> code_review -> testing -> done)
+- Change flow state (idea -> planning -> plan_review -> progress -> code_review -> testing -> done)
 - Submit implementation plan for review
 - Submit agent summary after implementation
 
@@ -111,12 +111,12 @@ IMPORTANT: Some state transitions require mandatory fields:
     properties: {
       flowId: {
         type: 'string',
-        description: 'The workflow ID to update'
+        description: 'The flow ID to update'
       },
       currentState: {
         type: 'string',
         enum: ['idea', 'planning', 'plan_review', 'progress', 'code_review', 'testing', 'done'],
-        description: 'New state for the workflow'
+        description: 'New state for the flow'
       },
       agentStatus: {
         type: 'string',
@@ -149,7 +149,7 @@ IMPORTANT: Some state transitions require mandatory fields:
           },
           required: ['hash', 'message']
         },
-        description: 'List of git commits to add to this workflow. New commits are appended to existing ones.'
+        description: 'List of git commits to add to this flow. New commits are appended to existing ones.'
       }
     },
     required: ['flowId']
@@ -158,7 +158,7 @@ IMPORTANT: Some state transitions require mandatory fields:
 
 const flowGetFeedbackDef = {
   name: 'flow_get_feedback',
-  description: `Get user feedback for a workflow.
+  description: `Get user feedback for a flow.
 Use this at the start of a session to check if the user has provided feedback on:
 - The implementation plan (plan_review phase)
 - The code implementation (code_review phase)
@@ -169,7 +169,7 @@ If feedback exists, you should address it before continuing work.`,
     properties: {
       flowId: {
         type: 'string',
-        description: 'The workflow ID to get feedback for'
+        description: 'The flow ID to get feedback for'
       }
     },
     required: ['flowId']
@@ -179,17 +179,17 @@ If feedback exists, you should address it before continuing work.`,
 // ============ Helpers ============
 
 /**
- * Resolve a partial workflow ID to a full ID by prefix matching.
+ * Resolve a partial flow ID to a full ID by prefix matching.
  */
-async function resolveWorkflowId(partialId: string): Promise<string | null> {
+async function resolveFlowId(partialId: string): Promise<string | null> {
   // Try exact match first
-  const exact = await devFlowClient.getWorkflow(partialId);
+  const exact = await devFlowClient.getFlow(partialId);
   if (exact.success && exact.data) {
     return partialId;
   }
 
-  // Fallback: list all workflows and find by prefix
-  const list = await devFlowClient.listWorkflows();
+  // Fallback: list all flows and find by prefix
+  const list = await devFlowClient.listFlows();
   if (!list.success || !list.data) {
     return null;
   }
@@ -212,44 +212,44 @@ async function handleFlowList(args: Record<string, unknown>): Promise<string> {
   const projectId = args.projectId as string | undefined;
   const state = args.state as string | undefined;
 
-  const result = await devFlowClient.listWorkflows(projectId);
+  const result = await devFlowClient.listFlows(projectId);
 
   if (!result.success || !result.data) {
-    return `Error: ${result.error || 'Failed to list workflows'}`;
+    return `Error: ${result.error || 'Failed to list flows'}`;
   }
 
-  let workflows = result.data;
+  let flows = result.data;
 
   if (state) {
-    workflows = workflows.filter(w => w.currentState === state);
+    flows = flows.filter(w => w.currentState === state);
   }
 
   const linkedProject = devFlowClient.getLinkedProjectName();
   const contextInfo = linkedProject
-    ? `*Showing workflows for project: ${linkedProject}*\n\n`
+    ? `*Showing flows for project: ${linkedProject}*\n\n`
     : '';
 
-  if (workflows.length === 0) {
-    return contextInfo + 'No workflows found matching the criteria.';
+  if (flows.length === 0) {
+    return contextInfo + 'No flows found matching the criteria.';
   }
 
-  return contextInfo + formatWorkflowList(workflows);
+  return contextInfo + formatFlowList(flows);
 }
 
 async function handleFlowGet(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
 
-  const resolvedId = await resolveWorkflowId(flowId);
+  const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
-    return `Error: Workflow not found (tried exact and prefix match for "${flowId}")`;
+    return `Error: Flow not found (tried exact and prefix match for "${flowId}")`;
   }
 
-  const result = await devFlowClient.getWorkflow(resolvedId);
+  const result = await devFlowClient.getFlow(resolvedId);
   if (!result.success || !result.data) {
-    return `Error: ${result.error || 'Workflow not found'}`;
+    return `Error: ${result.error || 'Flow not found'}`;
   }
 
-  return formatWorkflowDetail(result.data);
+  return formatFlowDetail(result.data);
 }
 
 async function handleFlowCreate(args: Record<string, unknown>): Promise<string> {
@@ -265,34 +265,34 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
     return 'Error: projectId ist erforderlich. Nutze project_list um die verfügbaren Projekte zu sehen, oder verknüpfe ein Projekt.';
   }
 
-  const result = await devFlowClient.createWorkflow({
+  const result = await devFlowClient.createFlow({
     projectId: effectiveProjectId,
     summary,
     description,
-    workflowType: flowType || 'feature',
+    flowType: flowType || 'feature',
     acceptanceCriteria,
   });
 
   if (!result.success || !result.data) {
-    return `Error: ${result.error || 'Failed to create workflow'}`;
+    return `Error: ${result.error || 'Failed to create flow'}`;
   }
 
-  // Auto-init: set session context for the newly created workflow
-  const newWorkflow = result.data;
-  const allowedActions = getAllowedTools(newWorkflow.currentState);
-  const nextStep = NEXT_STEP_GUIDANCE[newWorkflow.currentState] || 'Beginne mit der Planung.';
+  // Auto-init: set session context for the newly created flow
+  const newFlow = result.data;
+  const allowedActions = getAllowedTools(newFlow.currentState);
+  const nextStep = NEXT_STEP_GUIDANCE[newFlow.currentState] || 'Beginne mit der Planung.';
 
-  // Lock the workflow
-  await devFlowClient.updateWorkflow(newWorkflow.id, {
+  // Lock the flow
+  await devFlowClient.updateFlow(newFlow.id, {
     agentStatus: 'analyzing',
-    agentMessage: 'Neuer Workflow erstellt',
+    agentMessage: 'Neuer Flow erstellt',
   });
 
   // Create agent session
   let sessionId = 'local-session';
   try {
     const sessionResult = await devFlowClient.createAgentSession({
-      workflowId: newWorkflow.id,
+      flowId: newFlow.id,
       type: 'enforcement-v3',
     });
     if (sessionResult.success && sessionResult.data) {
@@ -303,7 +303,7 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
   }
 
   sessionContext.init({
-    workflow: newWorkflow,
+    flow: newFlow,
     sessionId,
     startedAt: new Date().toISOString(),
     feedback: null,
@@ -313,9 +313,9 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
   });
 
   return [
-    'Workflow erstellt und Session gestartet.',
+    'Flow erstellt und Session gestartet.',
     '',
-    formatWorkflowDetail(newWorkflow),
+    formatFlowDetail(newFlow),
     '',
     '---',
     `**Erlaubte Aktionen:** ${allowedActions.join(', ')}`,
@@ -325,7 +325,7 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
 
 async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
-  const currentState = args.currentState as Workflow['currentState'] | undefined;
+  const currentState = args.currentState as Flow['currentState'] | undefined;
   const agentStatus = args.agentStatus as string | undefined;
   const agentMessage = args.agentMessage as string | undefined;
   const implementationPlan = args.implementationPlan as string | undefined;
@@ -333,16 +333,16 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   const testingInstructions = args.testingInstructions as string | undefined;
   const commits = args.commits as { hash: string; message: string }[] | undefined;
 
-  const resolvedId = await resolveWorkflowId(flowId);
+  const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
-    return `Error: Workflow not found (tried exact and prefix match for "${flowId}")`;
+    return `Error: Flow not found (tried exact and prefix match for "${flowId}")`;
   }
 
   // Guardrail: Check state transitions
   if (currentState) {
-    const currentWorkflow = await devFlowClient.getWorkflow(resolvedId);
-    if (currentWorkflow.success && currentWorkflow.data) {
-      const fromState = currentWorkflow.data.currentState;
+    const currentFlow = await devFlowClient.getFlow(resolvedId);
+    if (currentFlow.success && currentFlow.data) {
+      const fromState = currentFlow.data.currentState;
 
       // Check blocked transitions (user-only, from config)
       const blocked = getConfig().blockedTransitions[fromState]?.find(b => b.target === currentState);
@@ -373,18 +373,18 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions.replace(/\\n/g, '\n');
   if (commits) cleanUpdate.commits = commits;
 
-  const result = await devFlowClient.updateWorkflow(resolvedId, cleanUpdate);
+  const result = await devFlowClient.updateFlow(resolvedId, cleanUpdate);
 
   if (!result.success || !result.data) {
-    return `Error: ${result.error || 'Failed to update workflow'}`;
+    return `Error: ${result.error || 'Failed to update flow'}`;
   }
 
   // Context integration: refresh session after successful update
   if (sessionContext.isActive() && sessionContext.getFlowId() === resolvedId) {
-    const updatedWorkflow = result.data!;
-    sessionContext.updateWorkflow(updatedWorkflow);
+    const updatedFlow = result.data!;
+    sessionContext.updateFlow(updatedFlow);
 
-    const newState = updatedWorkflow.currentState;
+    const newState = updatedFlow.currentState;
     sessionContext.updateAllowedActions(getAllowedTools(newState));
 
     // Auto-complete session on review/wait/done states
@@ -395,7 +395,7 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
           plan_review: 'Plan eingereicht, warte auf Review',
           code_review: 'Implementierung abgeschlossen, warte auf Code-Review',
           testing: 'Code genehmigt, warte auf Testing',
-          done: 'Workflow abgeschlossen',
+          done: 'Flow abgeschlossen',
         };
         devFlowClient.completeAgentSession(sessionId, {
           summary: summaryMap[newState] || 'Session beendet',
@@ -403,22 +403,22 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
       }
 
       const guidance = NEXT_STEP_GUIDANCE[newState] || '';
-      return `Workflow updated successfully.\n\n${formatWorkflowDetail(updatedWorkflow)}\n\n---\n**Naechster Schritt:** ${guidance}`;
+      return `Flow updated successfully.\n\n${formatFlowDetail(updatedFlow)}\n\n---\n**Naechster Schritt:** ${guidance}`;
     }
   }
 
-  return `Workflow updated successfully.\n\n${formatWorkflowDetail(result.data)}`;
+  return `Flow updated successfully.\n\n${formatFlowDetail(result.data)}`;
 }
 
 async function handleFlowGetFeedback(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
 
-  const resolvedId = await resolveWorkflowId(flowId);
+  const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
-    return `Error: Workflow not found (tried exact and prefix match for "${flowId}")`;
+    return `Error: Flow not found (tried exact and prefix match for "${flowId}")`;
   }
 
-  const result = await devFlowClient.getWorkflowFeedback(resolvedId);
+  const result = await devFlowClient.getFlowFeedback(resolvedId);
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to get feedback'}`;
@@ -443,7 +443,7 @@ async function handleFlowGetFeedback(args: Record<string, unknown>): Promise<str
     lines.push('## Code Feedback');
     lines.push('The user has provided feedback on the implementation:\n');
     lines.push(codeFeedback);
-    lines.push('\nPlease address these points before completing the workflow.\n');
+    lines.push('\nPlease address these points before completing the flow.\n');
   }
 
   if (feedbackAt) {
@@ -455,15 +455,15 @@ async function handleFlowGetFeedback(args: Record<string, unknown>): Promise<str
 
 // ============ Formatters ============
 
-function formatWorkflowList(workflows: Workflow[]): string {
-  const lines = ['# Workflows\n'];
+function formatFlowList(flows: Flow[]): string {
+  const lines = ['# Flows\n'];
 
-  const byState: Record<string, Workflow[]> = {
+  const byState: Record<string, Flow[]> = {
     idea: [], planning: [], plan_review: [], progress: [],
     code_review: [], testing: [], done: []
   };
 
-  for (const w of workflows) {
+  for (const w of flows) {
     byState[w.currentState]?.push(w);
   }
 
@@ -497,88 +497,88 @@ function formatWorkflowList(workflows: Workflow[]): string {
   return lines.join('\n');
 }
 
-function formatWorkflowDetail(workflow: Workflow): string {
+function formatFlowDetail(flow: Flow): string {
   const lines = [
-    `# Workflow: ${workflow.summary}`,
+    `# Flow: ${flow.summary}`,
     '',
-    `**ID:** ${workflow.id}`,
-    `**State:** ${workflow.currentState}`,
+    `**ID:** ${flow.id}`,
+    `**State:** ${flow.currentState}`,
   ];
 
-  if (workflow.ticketKey) {
-    lines.push(`**Ticket:** ${workflow.ticketKey}`);
+  if (flow.ticketKey) {
+    lines.push(`**Ticket:** ${flow.ticketKey}`);
   }
 
-  if (workflow.agentStatus) {
-    lines.push(`**Agent Status:** ${workflow.agentStatus}`);
-    if (workflow.agentMessage) {
-      lines.push(`**Agent Message:** ${workflow.agentMessage}`);
+  if (flow.agentStatus) {
+    lines.push(`**Agent Status:** ${flow.agentStatus}`);
+    if (flow.agentMessage) {
+      lines.push(`**Agent Message:** ${flow.agentMessage}`);
     }
   }
 
   lines.push('');
 
-  if (workflow.description) {
+  if (flow.description) {
     lines.push('## Description\n');
-    lines.push(workflow.description);
+    lines.push(flow.description);
     lines.push('');
   }
 
-  if (workflow.acceptanceCriteria && workflow.acceptanceCriteria.length > 0) {
+  if (flow.acceptanceCriteria && flow.acceptanceCriteria.length > 0) {
     lines.push('## Acceptance Criteria\n');
-    for (const criterion of workflow.acceptanceCriteria) {
+    for (const criterion of flow.acceptanceCriteria) {
       lines.push(`- [ ] ${criterion}`);
     }
     lines.push('');
   }
 
   // Show feedback if any
-  if (workflow.planFeedback) {
+  if (flow.planFeedback) {
     lines.push('## Plan Feedback (from user)\n');
-    lines.push(workflow.planFeedback);
+    lines.push(flow.planFeedback);
     lines.push('');
   }
 
-  if (workflow.codeFeedback) {
+  if (flow.codeFeedback) {
     lines.push('## Code Feedback (from user)\n');
-    lines.push(workflow.codeFeedback);
+    lines.push(flow.codeFeedback);
     lines.push('');
   }
 
   // Show full implementation plan (not truncated!)
-  if (workflow.implementationPlan) {
+  if (flow.implementationPlan) {
     lines.push('## Implementation Plan\n');
-    lines.push(workflow.implementationPlan);
+    lines.push(flow.implementationPlan);
     lines.push('');
   }
 
   // Show agent summary
-  if (workflow.agentSummary) {
+  if (flow.agentSummary) {
     lines.push('## Agent Summary\n');
-    lines.push(workflow.agentSummary);
+    lines.push(flow.agentSummary);
     lines.push('');
   }
 
   // Show testing instructions
-  if (workflow.testingInstructions) {
+  if (flow.testingInstructions) {
     lines.push('## Testing Instructions\n');
-    lines.push(workflow.testingInstructions);
+    lines.push(flow.testingInstructions);
     lines.push('');
   }
 
   // Audit trail
   const auditLines: string[] = [];
-  if (workflow.planCreatedBy) {
-    const at = workflow.planCreatedAt ? ` (${new Date(workflow.planCreatedAt).toLocaleString()})` : '';
-    auditLines.push(`- **Plan erstellt von:** ${workflow.planCreatedBy}${at}`);
+  if (flow.planCreatedBy) {
+    const at = flow.planCreatedAt ? ` (${new Date(flow.planCreatedAt).toLocaleString()})` : '';
+    auditLines.push(`- **Plan erstellt von:** ${flow.planCreatedBy}${at}`);
   }
-  if (workflow.planApprovedBy) {
-    const at = workflow.planApprovedAt ? ` (${new Date(workflow.planApprovedAt).toLocaleString()})` : '';
-    auditLines.push(`- **Plan genehmigt von:** ${workflow.planApprovedBy}${at}`);
+  if (flow.planApprovedBy) {
+    const at = flow.planApprovedAt ? ` (${new Date(flow.planApprovedAt).toLocaleString()})` : '';
+    auditLines.push(`- **Plan genehmigt von:** ${flow.planApprovedBy}${at}`);
   }
-  if (workflow.codeApprovedBy) {
-    const at = workflow.codeApprovedAt ? ` (${new Date(workflow.codeApprovedAt).toLocaleString()})` : '';
-    auditLines.push(`- **Code genehmigt von:** ${workflow.codeApprovedBy}${at}`);
+  if (flow.codeApprovedBy) {
+    const at = flow.codeApprovedAt ? ` (${new Date(flow.codeApprovedAt).toLocaleString()})` : '';
+    auditLines.push(`- **Code genehmigt von:** ${flow.codeApprovedBy}${at}`);
   }
   if (auditLines.length > 0) {
     lines.push('## Audit\n');
@@ -586,9 +586,9 @@ function formatWorkflowDetail(workflow: Workflow): string {
     lines.push('');
   }
 
-  lines.push(`**Created:** ${new Date(workflow.createdAt).toLocaleString()}`);
-  if (workflow.completedAt) {
-    lines.push(`**Completed:** ${new Date(workflow.completedAt).toLocaleString()}`);
+  lines.push(`**Created:** ${new Date(flow.createdAt).toLocaleString()}`);
+  if (flow.completedAt) {
+    lines.push(`**Completed:** ${new Date(flow.completedAt).toLocaleString()}`);
   }
 
   return lines.join('\n');

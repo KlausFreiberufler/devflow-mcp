@@ -1,6 +1,7 @@
 /**
  * DevFlow API Client
  * Handles authentication and API communication with the DevFlow backend
+ * Uses 'flow' terminology (backend endpoints: /api/flows)
  */
 
 import { readFile, writeFile, mkdir } from 'fs/promises';
@@ -331,71 +332,71 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.getProject(projectId);
   }
 
-  // ============ Workflow Methods ============
+  // ============ Flow Methods ============
 
   /**
-   * List workflows - automatically filtered by linked project if available
+   * List flows - automatically filtered by linked project if available
    */
-  async listWorkflows(projectId?: string): Promise<ApiResponse<Workflow[]>> {
+  async listFlows(projectId?: string): Promise<ApiResponse<Flow[]>> {
     // Use linked project if no projectId provided and project is linked
     const effectiveProjectId = projectId || this.getLinkedProjectId();
 
     const path = effectiveProjectId
-      ? `/api/workflows?projectId=${effectiveProjectId}`
-      : '/api/workflows';
+      ? `/api/flows?projectId=${effectiveProjectId}`
+      : '/api/flows';
     const result = await this.request<unknown[]>('GET', path);
     if (result.success && result.data) {
-      return { success: true, data: result.data.map(transformWorkflow) };
+      return { success: true, data: result.data.map(transformFlow) };
     }
-    return result as ApiResponse<Workflow[]>;
+    return result as ApiResponse<Flow[]>;
   }
 
-  async createWorkflow(workflow: WorkflowCreate): Promise<ApiResponse<Workflow>> {
+  async createFlow(flow: FlowCreate): Promise<ApiResponse<Flow>> {
     // Map to backend field names
-    const apiWorkflow: Record<string, unknown> = {
-      projectId: workflow.projectId,
-      ticketSummary: workflow.summary,
-      ticketDescription: workflow.description,
-      workflowType: workflow.workflowType || 'feature',
+    const apiFlow: Record<string, unknown> = {
+      projectId: flow.projectId,
+      ticketSummary: flow.summary,
+      ticketDescription: flow.description,
+      flowType: flow.flowType || 'feature',
     };
-    if (workflow.acceptanceCriteria) {
-      apiWorkflow.acceptanceCriteria = JSON.stringify(workflow.acceptanceCriteria);
+    if (flow.acceptanceCriteria) {
+      apiFlow.acceptanceCriteria = JSON.stringify(flow.acceptanceCriteria);
     }
 
-    const result = await this.request<unknown>('POST', '/api/workflows', apiWorkflow);
+    const result = await this.request<unknown>('POST', '/api/flows', apiFlow);
     if (result.success && result.data) {
-      return { success: true, data: transformWorkflow(result.data) };
+      return { success: true, data: transformFlow(result.data) };
     }
-    return result as ApiResponse<Workflow>;
+    return result as ApiResponse<Flow>;
   }
 
-  async getWorkflow(workflowId: string): Promise<ApiResponse<Workflow>> {
-    const result = await this.request<unknown>('GET', `/api/workflows/${workflowId}`);
+  async getFlow(flowId: string): Promise<ApiResponse<Flow>> {
+    const result = await this.request<unknown>('GET', `/api/flows/${flowId}`);
     if (result.success && result.data) {
-      return { success: true, data: transformWorkflow(result.data) };
+      return { success: true, data: transformFlow(result.data) };
     }
-    return result as ApiResponse<Workflow>;
+    return result as ApiResponse<Flow>;
   }
 
-  async updateWorkflow(
-    workflowId: string,
-    update: WorkflowUpdate
-  ): Promise<ApiResponse<Workflow>> {
-    const result = await this.request<unknown>('PATCH', `/api/workflows/${workflowId}`, update);
+  async updateFlow(
+    flowId: string,
+    update: FlowUpdate
+  ): Promise<ApiResponse<Flow>> {
+    const result = await this.request<unknown>('PATCH', `/api/flows/${flowId}`, update);
     if (result.success && result.data) {
-      return { success: true, data: transformWorkflow(result.data) };
+      return { success: true, data: transformFlow(result.data) };
     }
-    return result as ApiResponse<Workflow>;
+    return result as ApiResponse<Flow>;
   }
 
-  async getWorkflowFeedback(workflowId: string): Promise<ApiResponse<WorkflowFeedback>> {
-    return this.request<WorkflowFeedback>('GET', `/api/workflows/${workflowId}/feedback`);
+  async getFlowFeedback(flowId: string): Promise<ApiResponse<FlowFeedback>> {
+    return this.request<FlowFeedback>('GET', `/api/flows/${flowId}/feedback`);
   }
 
   // ============ Task/Todo Methods ============
 
-  async listTasks(workflowId: string): Promise<ApiResponse<Task[]>> {
-    const result = await this.request<unknown[]>('GET', `/api/workflows/${workflowId}/todos`);
+  async listTasks(flowId: string): Promise<ApiResponse<Task[]>> {
+    const result = await this.request<unknown[]>('GET', `/api/flows/${flowId}/todos`);
     if (result.success && result.data) {
       return { success: true, data: result.data.map(transformTask) };
     }
@@ -405,7 +406,7 @@ Or set: export DEVFLOW_TOKEN="your-token"
   async createTask(task: TaskCreate): Promise<ApiResponse<Task>> {
     // API expects 'text' instead of 'summary'
     const apiTask = {
-      workflowId: task.workflowId,
+      flowId: task.flowId,
       parentId: task.parentId,
       text: task.summary,  // Map summary -> text
       description: task.description,
@@ -436,14 +437,14 @@ Or set: export DEVFLOW_TOKEN="your-token"
 
   // ============ Agent Session Methods ============
 
-  async listAgentSessions(workflowId?: string): Promise<ApiResponse<AgentSession[]>> {
-    const path = workflowId
-      ? `/api/agent-sessions/workflow/${workflowId}`
+  async listAgentSessions(flowId?: string): Promise<ApiResponse<AgentSession[]>> {
+    const path = flowId
+      ? `/api/agent-sessions/flow/${flowId}`
       : '/api/agent-sessions';
     return this.request<AgentSession[]>('GET', path);
   }
 
-  async createAgentSession(data: { workflowId: string; type?: string }): Promise<ApiResponse<AgentSession>> {
+  async createAgentSession(data: { flowId: string; type?: string }): Promise<ApiResponse<AgentSession>> {
     return this.request<AgentSession>('POST', '/api/agent-sessions', data);
   }
 
@@ -528,7 +529,7 @@ Or set: export DEVFLOW_TOKEN="your-token"
 
   /**
    * Check if the current user has a free agent slot.
-   * Returns slot status: { active: boolean, workflow?: { id, summary, agentStatus, since } }
+   * Returns slot status: { active: boolean, flow?: { id, summary, agentStatus, since } }
    * 404 means the backend doesn't support slots yet → treat as free.
    */
   async getAgentSlotStatus(): Promise<ApiResponse<AgentSlotStatus>> {
@@ -566,7 +567,7 @@ export interface Project {
   createdAt: string;
 }
 
-export interface Workflow {
+export interface Flow {
   id: string;
   projectId: string;
   ticketKey?: string;
@@ -598,15 +599,15 @@ export interface Workflow {
   codeApprovedAt?: string;
 }
 
-export interface WorkflowCreate {
+export interface FlowCreate {
   projectId: string;
   summary: string;
   description?: string;
-  workflowType?: string;
+  flowType?: string;
   acceptanceCriteria?: string[];
 }
 
-export interface WorkflowUpdate {
+export interface FlowUpdate {
   currentState?: 'idea' | 'planning' | 'plan_review' | 'progress' | 'code_review' | 'testing' | 'done';
   agentStatus?: string;
   agentMessage?: string;
@@ -617,7 +618,7 @@ export interface WorkflowUpdate {
   commits?: { hash: string; message: string }[];
 }
 
-export interface WorkflowFeedback {
+export interface FlowFeedback {
   planFeedback: string | null;
   codeFeedback: string | null;
   feedbackAt: string | null;
@@ -625,7 +626,7 @@ export interface WorkflowFeedback {
 
 export interface Task {
   id: string;
-  workflowId: string;
+  flowId: string;
   parentId?: string;
   summary: string;
   description?: string;
@@ -637,7 +638,7 @@ export interface Task {
 }
 
 export interface TaskCreate {
-  workflowId: string;
+  flowId: string;
   parentId?: string;
   summary: string;
   description?: string;
@@ -656,7 +657,7 @@ export interface TaskUpdate {
 
 export interface AgentSession {
   id: string;
-  workflowId: string;
+  flowId: string;
   type?: string;
   status?: string;
   summary?: string;
@@ -689,7 +690,7 @@ export interface SearchResult {
 
 export interface AgentSlotStatus {
   active: boolean;
-  workflow?: {
+  flow?: {
     id: string;
     summary: string;
     agentStatus: string;
@@ -744,9 +745,9 @@ export function transformProject(raw: unknown): Project {
 }
 
 /**
- * Transform API workflow response to typed Workflow
+ * Transform API flow response to typed Flow
  */
-export function transformWorkflow(raw: unknown): Workflow {
+export function transformFlow(raw: unknown): Flow {
   const w = transformKeys<Record<string, unknown>>(raw);
   return {
     id: w.id as string,
@@ -755,7 +756,7 @@ export function transformWorkflow(raw: unknown): Workflow {
     summary: w.ticketSummary as string,
     description: w.ticketDescription as string | undefined,
     acceptanceCriteria: w.acceptanceCriteria as string[] | undefined,
-    currentState: w.currentState as Workflow['currentState'],
+    currentState: w.currentState as Flow['currentState'],
     agentStatus: w.agentStatus as string | undefined,
     agentMessage: w.agentMessage as string | undefined,
     implementationPlan: w.implementationPlan as string | undefined,
@@ -787,7 +788,7 @@ export function transformTask(raw: unknown): Task {
   const t = transformKeys<Record<string, unknown>>(raw);
   return {
     id: t.id as string,
-    workflowId: t.workflowId as string,
+    flowId: t.flowId as string,
     parentId: t.parentId as string | undefined,
     summary: (t.text || t.summary) as string,  // API returns 'text', we use 'summary'
     description: t.description as string | undefined,

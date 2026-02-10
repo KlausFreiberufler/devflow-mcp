@@ -2,7 +2,7 @@
  * CLAUDE.md Template Generator
  *
  * Generates project-specific CLAUDE.md content with DevFlow rules.
- * The template includes all workflow states, mandatory processes, and guardrails.
+ * The template includes all flow states, mandatory processes, and guardrails.
  */
 
 export const MARKER_START = '<!-- DEVFLOW-RULES-START -->';

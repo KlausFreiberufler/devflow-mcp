@@ -92,7 +92,7 @@ export function applyDerivedStatus(
   if (toolName === 'flow_update' && args.agentStatus) return;
 
   // Fire-and-forget
-  devFlowClient.updateWorkflow(flowId, {
+  devFlowClient.updateFlow(flowId, {
     agentStatus: derived.agentStatus,
     agentMessage: derived.agentMessage,
   }).catch(() => {});

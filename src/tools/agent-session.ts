@@ -12,7 +12,7 @@ import { withErrorHandling } from '../utils/errors.js';
 
 const agentSessionCreateDef = {
   name: 'agent_session_create',
-  description: `Create a new agent session for a workflow.
+  description: `Create a new agent session for a flow.
 An agent session tracks a unit of work performed by the AI agent.
 Use this at the start of a work session to log what you're doing.
 
@@ -86,9 +86,9 @@ Optionally provide a summary of what was accomplished.`,
 
 const agentSessionListDef = {
   name: 'agent_session_list',
-  description: `List agent sessions for a workflow.
+  description: `List agent sessions for a flow.
 Returns all sessions with their status, timing, and summary.
-Use this to review past work sessions on a workflow.`,
+Use this to review past work sessions on a flow.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -107,7 +107,7 @@ async function handleAgentSessionCreate(args: Record<string, unknown>): Promise<
   const flowId = args.flowId as string;
   const type = args.type as string | undefined;
 
-  const result = await devFlowClient.createAgentSession({ workflowId: flowId, type });
+  const result = await devFlowClient.createAgentSession({ flowId: flowId, type });
 
   if (!result.success || !result.data) {
     return `Error: ${result.error || 'Failed to create agent session'}`;
@@ -156,7 +156,7 @@ async function handleAgentSessionList(args: Record<string, unknown>): Promise<st
   const sessions = result.data as AgentSession[];
 
   if (sessions.length === 0) {
-    return 'No agent sessions found for this workflow.';
+    return 'No agent sessions found for this flow.';
   }
 
   return formatSessionList(sessions);
@@ -204,7 +204,7 @@ function formatSessionDetail(session: AgentSession): string {
     `## Agent Session`,
     '',
     `**ID:** ${session.id}`,
-    `**Workflow:** ${session.workflowId}`,
+    `**Flow:** ${session.flowId}`,
     `**Status:** ${session.status}`,
   ];
 

@@ -2,7 +2,7 @@
  * CLAUDE.md Generator
  *
  * Creates or updates CLAUDE.md in the project working directory
- * with DevFlow workflow rules.
+ * with DevFlow flow rules.
  */
 
 import { readFile, writeFile } from 'fs/promises';
@@ -12,8 +12,8 @@ import { generateClaudeMdContent, MARKER_START, MARKER_END } from '../templates/
 /**
  * Setup CLAUDE.md in the working directory
  *
- * - If no CLAUDE.md exists: creates new file with workflow rules
- * - If CLAUDE.md exists without markers: appends workflow rules
+ * - If no CLAUDE.md exists: creates new file with flow rules
+ * - If CLAUDE.md exists without markers: appends flow rules
  * - If CLAUDE.md exists with markers: updates the rules section
  */
 export async function setupClaudeMd(

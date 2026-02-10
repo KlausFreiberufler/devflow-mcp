@@ -29,7 +29,7 @@ Returns the full project including:
 - Tech stack information
 - Project configuration
 
-Use this to understand the project context before working on workflows.`,
+Use this to understand the project context before working on flows.`,
   inputSchema: {
     type: 'object' as const,
     properties: {

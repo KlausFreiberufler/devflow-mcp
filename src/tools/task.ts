@@ -11,8 +11,8 @@ import { withErrorHandling } from '../utils/errors.js';
 
 const taskListDef = {
   name: 'task_list',
-  description: `List all tasks for a workflow.
-Tasks are sub-items of a workflow that track implementation progress.
+  description: `List all tasks for a flow.
+Tasks are sub-items of a flow that track implementation progress.
 Returns tasks with their completion status and hierarchy.`,
   inputSchema: {
     type: 'object' as const,
@@ -28,8 +28,8 @@ Returns tasks with their completion status and hierarchy.`,
 
 const taskCreateDef = {
   name: 'task_create',
-  description: `Create a new task under a workflow.
-Use this to break down a workflow into smaller, trackable steps.
+  description: `Create a new task under a flow.
+Use this to break down a flow into smaller, trackable steps.
 Tasks can have:
 - Summary (required): Brief description of what to do
 - Description: Detailed implementation notes
@@ -122,7 +122,7 @@ async function handleTaskList(args: Record<string, unknown>): Promise<string> {
   }
 
   if (result.data.length === 0) {
-    return 'No tasks found for this workflow. Use task_create to add tasks.';
+    return 'No tasks found for this flow. Use task_create to add tasks.';
   }
 
   return formatTaskList(result.data);
@@ -136,7 +136,7 @@ async function handleTaskCreate(args: Record<string, unknown>): Promise<string> 
   const acceptanceCriteria = args.acceptanceCriteria as string[] | undefined;
 
   const result = await devFlowClient.createTask({
-    workflowId: flowId,
+    flowId: flowId,
     parentId,
     summary,
     description,
@@ -225,7 +225,7 @@ function formatTaskDetail(task: Task): string {
     '',
     `**ID:** ${task.id}`,
     `**Status:** ${task.isCompleted ? '✅ Completed' : '⬜ Pending'}`,
-    `**Workflow:** ${task.workflowId}`,
+    `**Flow:** ${task.flowId}`,
   ];
 
   if (task.parentId) {

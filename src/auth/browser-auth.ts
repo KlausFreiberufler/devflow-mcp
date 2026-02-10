@@ -210,7 +210,7 @@ export async function authenticateViaBrowser(baseUrl: string, workingDir?: strin
   if (result.projectId && result.projectName) {
     await saveProjectConfig(dir, result.projectId, result.projectName);
 
-    // Setup CLAUDE.md with workflow rules
+    // Setup CLAUDE.md with flow rules
     try {
       const techStack = await fetchProjectTechStack(baseUrl, result.token, result.projectId);
       await setupClaudeMd(dir, result.projectName, techStack);

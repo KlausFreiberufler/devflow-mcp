@@ -3,7 +3,7 @@
  *
  * All tool calls pass through guards and post-processing:
  * 1. Context-Guard: blocks tools without active devflow_init session
- * 2. State-Guard: blocks tools not allowed in the current workflow state
+ * 2. State-Guard: blocks tools not allowed in the current flow state
  * 3. Auto-Logger: logs every tool call to the agent session
  * 4. Auto-Status: derives agentStatus from tool calls
  */
@@ -65,12 +65,12 @@ class ToolRegistry {
       // Guard 2: State-Guard
       if (!sessionContext.isToolAllowed(name)) {
         const ctx = sessionContext.get()!;
-        logToolCall({ toolName: name, args, blocked: true, blockReason: `State '${ctx.workflow.currentState}'` });
+        logToolCall({ toolName: name, args, blocked: true, blockReason: `State '${ctx.flow.currentState}'` });
         return buildStateBlockMessage(
           name,
-          ctx.workflow.summary,
-          ctx.workflow.id,
-          ctx.workflow.currentState,
+          ctx.flow.summary,
+          ctx.flow.id,
+          ctx.flow.currentState,
         );
       }
     }

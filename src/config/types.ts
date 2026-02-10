@@ -48,13 +48,13 @@ export const DEFAULT_CONFIG: RemoteConfig = {
     done: ['flow_get', 'task_list'],
   },
   nextStepGuidance: {
-    idea: 'Wechsle den Workflow zu "planning" mit flow_update({ currentState: "planning" }) und beginne die Analyse.',
+    idea: 'Wechsle den Flow zu "planning" mit flow_update({ currentState: "planning" }) und beginne die Analyse.',
     planning: 'Analysiere die Anforderungen, erstelle einen Implementation-Plan und reiche ihn ein mit flow_update({ implementationPlan: "...", currentState: "plan_review" }).',
     plan_review: 'Warte auf User-Feedback zum Plan. Nutze flow_get_feedback() um zu pruefen ob Feedback vorliegt.',
     progress: 'Erstelle Tasks aus dem Plan und beginne mit der Implementierung. Wenn fertig: flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "code_review" }).',
     code_review: 'Warte auf User-Feedback zum Code. Nutze flow_get_feedback() um zu pruefen ob Feedback vorliegt.',
     testing: 'Warte auf User-Testing-Ergebnis. Nutze flow_get_feedback() um zu pruefen ob Feedback vorliegt.',
-    done: 'Dieser Workflow ist abgeschlossen. Waehle einen anderen Workflow mit flow_list().',
+    done: 'Dieser Flow ist abgeschlossen. Waehle einen anderen Flow mit flow_list().',
   },
   requiredFields: {
     plan_review: {

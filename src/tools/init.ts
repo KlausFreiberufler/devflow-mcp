@@ -2,7 +2,7 @@
  * devflow_init - Init-Gate Tool
  *
  * Must be called before any other tools (except discovery tools).
- * Validates workflow, locks it, creates session, sets context.
+ * Validates flow, locks it, creates session, sets context.
  */
 
 import { devFlowClient } from '../api/client.js';
@@ -13,16 +13,16 @@ import { withErrorHandling } from '../utils/errors.js';
 
 const devflowInitDef = {
   name: 'devflow_init',
-  description: `Initialize a DevFlow work session for a workflow.
+  description: `Initialize a DevFlow work session for a flow.
 
 MUST be called before any other tools (except flow_list and flow_create).
 Without devflow_init, all tools are blocked.
 
 What it does:
-- Validates and loads the workflow
-- Locks the workflow for this agent (exclusive)
+- Validates and loads the flow
+- Locks the flow for this agent (exclusive)
 - Creates an agent session for tracking
-- Returns full context: workflow details, feedback, tasks, allowed actions, next step
+- Returns full context: flow details, feedback, tasks, allowed actions, next step
 
 Call this at the start of every work session.`,
   inputSchema: {
@@ -30,20 +30,20 @@ Call this at the start of every work session.`,
     properties: {
       flowId: {
         type: 'string',
-        description: 'The workflow ID to work on'
+        description: 'The flow ID to work on'
       }
     },
     required: ['flowId']
   }
 };
 
-async function resolveWorkflowId(partialId: string): Promise<string | null> {
-  const exact = await devFlowClient.getWorkflow(partialId);
+async function resolveFlowId(partialId: string): Promise<string | null> {
+  const exact = await devFlowClient.getFlow(partialId);
   if (exact.success && exact.data) {
     return partialId;
   }
 
-  const list = await devFlowClient.listWorkflows();
+  const list = await devFlowClient.listFlows();
   if (!list.success || !list.data) {
     return null;
   }
@@ -56,15 +56,15 @@ async function resolveWorkflowId(partialId: string): Promise<string | null> {
   return null;
 }
 
-function determineFeedback(workflow: {
+function determineFeedback(flow: {
   planFeedback?: string;
   codeFeedback?: string;
 }): SessionFeedback | null {
-  if (workflow.planFeedback) {
-    return { type: 'plan_rejected', message: workflow.planFeedback };
+  if (flow.planFeedback) {
+    return { type: 'plan_rejected', message: flow.planFeedback };
   }
-  if (workflow.codeFeedback) {
-    return { type: 'code_rejected', message: workflow.codeFeedback };
+  if (flow.codeFeedback) {
+    return { type: 'code_rejected', message: flow.codeFeedback };
   }
   return null;
 }
@@ -78,18 +78,18 @@ function determineNextStep(state: string, feedback: SessionFeedback | null): str
       return 'Lies das Code-Feedback und behebe die genannten Punkte. Nutze flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "code_review" }) wenn fertig.';
     }
   }
-  return NEXT_STEP_GUIDANCE[state] || 'Pruefe den Workflow-Status.';
+  return NEXT_STEP_GUIDANCE[state] || 'Pruefe den Flow-Status.';
 }
 
 async function handleDevflowInit(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
 
-  // Release previous context if switching workflows
+  // Release previous context if switching flows
   if (sessionContext.isActive()) {
     const currentId = sessionContext.getFlowId();
     if (currentId && currentId !== flowId) {
       try {
-        await devFlowClient.updateWorkflow(currentId, {
+        await devFlowClient.updateFlow(currentId, {
           agentStatus: 'idle',
         });
       } catch {
@@ -103,13 +103,13 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   if (!sessionContext.isActive()) {
     try {
       const slotResult = await devFlowClient.getAgentSlotStatus();
-      if (slotResult.success && slotResult.data?.active && slotResult.data.workflow) {
-        const slot = slotResult.data.workflow;
+      if (slotResult.success && slotResult.data?.active && slotResult.data.flow) {
+        const slot = slotResult.data.flow;
         return [
           '⛔ Dein Agent-Slot ist bereits belegt.',
           '',
           'Aktiver Agent:',
-          `  Workflow: ${slot.summary} (${slot.id})`,
+          `  Flow: ${slot.summary} (${slot.id})`,
           `  Status: ${slot.agentStatus}`,
           `  Seit: ${new Date(slot.since).toLocaleString()}`,
           '',
@@ -122,30 +122,30 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     }
   }
 
-  // 1. Resolve workflow ID
-  const resolvedId = await resolveWorkflowId(flowId);
+  // 1. Resolve flow ID
+  const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
-    return `⛔ Workflow nicht gefunden: "${flowId}"\n\nNutze flow_list() um verfuegbare Workflows zu sehen.`;
+    return `⛔ Flow nicht gefunden: "${flowId}"\n\nNutze flow_list() um verfuegbare Flows zu sehen.`;
   }
 
-  // 2. Fetch workflow
-  const result = await devFlowClient.getWorkflow(resolvedId);
+  // 2. Fetch flow
+  const result = await devFlowClient.getFlow(resolvedId);
   if (!result.success || !result.data) {
-    return `⛔ Workflow konnte nicht geladen werden: ${result.error || 'Unbekannter Fehler'}`;
+    return `⛔ Flow konnte nicht geladen werden: ${result.error || 'Unbekannter Fehler'}`;
   }
 
-  const workflow = result.data;
+  const flow = result.data;
 
   // 3. Check if locked by another agent
-  if (workflow.agentStatus && workflow.agentStatus !== 'idle') {
+  if (flow.agentStatus && flow.agentStatus !== 'idle') {
     const currentCtx = sessionContext.get();
-    if (!currentCtx || currentCtx.workflow.id !== workflow.id) {
+    if (!currentCtx || currentCtx.flow.id !== flow.id) {
       return [
-        '⛔ Workflow ist bereits in Bearbeitung.',
+        '⛔ Flow ist bereits in Bearbeitung.',
         '',
-        `Workflow: '${workflow.summary}' (${workflow.id})`,
-        `Agent-Status: ${workflow.agentStatus}`,
-        workflow.agentMessage ? `Agent-Message: ${workflow.agentMessage}` : '',
+        `Flow: '${flow.summary}' (${flow.id})`,
+        `Agent-Status: ${flow.agentStatus}`,
+        flow.agentMessage ? `Agent-Message: ${flow.agentMessage}` : '',
         '',
         'Warte bis die aktuelle Session endet oder trenne den Agent in DevFlow → Einstellungen → API-Zugang.',
       ].filter(Boolean).join('\n');
@@ -153,31 +153,31 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   }
 
   // 4. Check done state
-  if (workflow.currentState === 'done') {
+  if (flow.currentState === 'done') {
     return [
-      '⛔ Workflow ist bereits abgeschlossen.',
+      '⛔ Flow ist bereits abgeschlossen.',
       '',
-      `Workflow: '${workflow.summary}' (${workflow.id})`,
+      `Flow: '${flow.summary}' (${flow.id})`,
       '',
-      'Waehle einen anderen Workflow mit flow_list().',
+      'Waehle einen anderen Flow mit flow_list().',
     ].join('\n');
   }
 
-  // 5. Lock workflow
-  const lockResult = await devFlowClient.updateWorkflow(resolvedId, {
+  // 5. Lock flow
+  const lockResult = await devFlowClient.updateFlow(resolvedId, {
     agentStatus: 'analyzing',
     agentMessage: 'Session gestartet',
   });
 
   if (!lockResult.success) {
-    return `⛔ Workflow konnte nicht gesperrt werden: ${lockResult.error || 'Unbekannter Fehler'}`;
+    return `⛔ Flow konnte nicht gesperrt werden: ${lockResult.error || 'Unbekannter Fehler'}`;
   }
 
   // 6. Create agent session
   let sessionId = 'local-session';
   try {
     const sessionResult = await devFlowClient.createAgentSession({
-      workflowId: resolvedId,
+      flowId: resolvedId,
       type: 'enforcement-v3',
     });
     if (sessionResult.success && sessionResult.data) {
@@ -199,13 +199,13 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   }
 
   // 8. Build context
-  const feedback = determineFeedback(workflow);
-  const state = workflow.currentState;
+  const feedback = determineFeedback(flow);
+  const state = flow.currentState;
   const allowedActions = getAllowedTools(state);
   const nextStep = determineNextStep(state, feedback);
 
   const activeContext: ActiveContext = {
-    workflow: lockResult.data || workflow,
+    flow: lockResult.data || flow,
     sessionId,
     startedAt: new Date().toISOString(),
     feedback,
@@ -219,11 +219,11 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
 }
 
 function formatInitResponse(ctx: ActiveContext): string {
-  const w = ctx.workflow;
+  const w = ctx.flow;
   const lines = [
     '# Session gestartet',
     '',
-    `**Workflow:** ${w.summary}`,
+    `**Flow:** ${w.summary}`,
     `**ID:** ${w.id}`,
     `**State:** ${w.currentState}`,
   ];
