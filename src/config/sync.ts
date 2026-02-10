@@ -12,6 +12,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { devFlowClient } from '../api/client.js';
 import { type RemoteConfig, DEFAULT_CONFIG } from './types.js';
+import { setupClaudeMd } from '../setup/claude-md-generator.js';
 
 const CACHE_PATH = join(homedir(), '.devflow', 'config.cache.json');
 
@@ -80,8 +81,11 @@ function parseRemoteConfig(raw: Record<string, unknown>): RemoteConfig {
  * Called once at server startup from index.ts.
  *
  * Precedence: Backend > Cache > Defaults
+ * Also auto-updates CLAUDE.md if config changed.
  */
 export async function syncConfig(): Promise<void> {
+  const previousVersion = activeConfig.version;
+
   // Try backend first
   try {
     const result = await devFlowClient.getProjectConfig();
@@ -89,6 +93,11 @@ export async function syncConfig(): Promise<void> {
       activeConfig = parseRemoteConfig(result.data);
       await saveCache(activeConfig);
       console.error(`Config synced from backend (version: ${activeConfig.version})`);
+
+      // Auto-update CLAUDE.md if config changed
+      if (activeConfig.version !== previousVersion) {
+        await updateClaudeMd();
+      }
       return;
     }
   } catch {
@@ -106,4 +115,20 @@ export async function syncConfig(): Promise<void> {
   // Use defaults
   activeConfig = DEFAULT_CONFIG;
   console.error('Config: using hardcoded defaults');
+}
+
+/**
+ * Auto-update CLAUDE.md in the working directory.
+ * Uses the project name from the linked project config.
+ */
+async function updateClaudeMd(): Promise<void> {
+  const projectName = devFlowClient.getLinkedProjectName();
+  if (!projectName) return;
+
+  try {
+    await setupClaudeMd(process.cwd(), projectName);
+    console.error('CLAUDE.md auto-updated from config');
+  } catch {
+    // Non-critical: CLAUDE.md update failure doesn't block startup
+  }
 }
