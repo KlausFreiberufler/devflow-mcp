@@ -50,10 +50,10 @@ Flow-State ab und werden vom Server erzwungen.
 ## Flow-States
 
 \`\`\`
-idea → planning → plan_review → progress → code_review → testing → done
+idea → planning → approval → ready → in_progress → review → done
 \`\`\`
 
-Review-States (plan_review, code_review, testing) sind Wartezustaende.
+Review-States (approval, review) sind Wartezustaende.
 Der User muss in der DevFlow-UI genehmigen bevor es weitergeht.
 ${MARKER_END}
 `;

@@ -673,7 +673,7 @@ export interface Flow {
   summary: string;
   description?: string;
   acceptanceCriteria?: string[];
-  currentState: 'idea' | 'planning' | 'plan_review' | 'progress' | 'testing' | 'done';
+  currentState: 'idea' | 'planning' | 'approval' | 'ready' | 'in_progress' | 'review' | 'done';
   agentStatus?: string;
   agentMessage?: string;
   implementationPlan?: string;
@@ -713,7 +713,7 @@ export interface FlowCreate {
 }
 
 export interface FlowUpdate {
-  currentState?: 'idea' | 'planning' | 'plan_review' | 'progress' | 'code_review' | 'testing' | 'done';
+  currentState?: 'idea' | 'planning' | 'approval' | 'ready' | 'in_progress' | 'review' | 'done';
   agentStatus?: string;
   agentMessage?: string;
   acceptanceCriteria?: string[];

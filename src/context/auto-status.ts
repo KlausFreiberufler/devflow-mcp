@@ -28,12 +28,12 @@ export function deriveStatus(
       const hasSummary = Boolean(args.agentSummary);
 
       // Transition to review → idle
-      if (targetState === 'plan_review' || targetState === 'code_review') {
+      if (targetState === 'approval' || targetState === 'review') {
         return {
           agentStatus: 'idle',
-          agentMessage: targetState === 'plan_review'
+          agentMessage: targetState === 'approval'
             ? 'Plan eingereicht'
-            : 'Code-Review eingereicht',
+            : 'Review eingereicht',
         };
       }
       // Transition to planning → analyzing

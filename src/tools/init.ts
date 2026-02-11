@@ -99,15 +99,15 @@ function determineFeedback(flow: {
 function determineNextStep(state: string, feedback: SessionFeedback | null, git?: GitContext): string {
   if (feedback) {
     if (feedback.type === 'plan_rejected') {
-      return 'Lies das Feedback und ueberarbeite den Plan. Nutze flow_update({ implementationPlan: "...", currentState: "plan_review" }) wenn fertig.';
+      return 'Lies das Feedback und ueberarbeite den Plan. Nutze flow_update({ implementationPlan: "...", currentState: "approval" }) wenn fertig.';
     }
     if (feedback.type === 'code_rejected') {
-      return 'Lies das Code-Feedback und behebe die genannten Punkte. Fuehre erneut Self-Review durch und nutze flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "testing" }) wenn fertig.';
+      return 'Lies das Code-Feedback und behebe die genannten Punkte. Fuehre erneut Self-Review durch und nutze flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "review" }) wenn fertig.';
     }
   }
 
   // Git workflow guidance
-  if (git?.enabled && state === 'progress') {
+  if (git?.enabled && state === 'in_progress') {
     const baseBranch = git.releaseBranchName || git.defaultBranch;
     if (git.releaseBranchName && !git.releaseBranchCreated) {
       return `Erstelle zuerst den Release-Branch: git checkout -b ${git.releaseBranchName} ${git.defaultBranch}`;
@@ -118,9 +118,9 @@ function determineNextStep(state: string, feedback: SessionFeedback | null, git?
   }
 
   // Enhanced progress guidance with self-review
-  if (state === 'progress' && git?.enabled) {
+  if (state === 'in_progress' && git?.enabled) {
     const commitHint = git.commitMessagePrompt ? ' (nach Commit-Richtlinien)' : '';
-    return `Implementiere die Anforderungen. Wenn fertig: Self-Review durchfuehren (Diff pruefen, Findings fixen, sauber committen${commitHint}). Testing-Instructions erstellen → flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "testing" }).`;
+    return `Implementiere die Anforderungen. Wenn fertig: Self-Review durchfuehren (Diff pruefen, Findings fixen, sauber committen${commitHint}). Testing-Instructions erstellen → flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "review" }).`;
   }
 
   return NEXT_STEP_GUIDANCE[state] || 'Pruefe den Flow-Status.';
