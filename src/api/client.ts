@@ -7,7 +7,7 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { getToken, loadProjectConfig } from '../auth/browser-auth.js';
+import { getToken, authenticateViaBrowser, loadProjectConfig } from '../auth/browser-auth.js';
 
 interface Credentials {
   accessToken: string;
@@ -86,6 +86,18 @@ export class DevFlowClient {
       } catch (error) {
         console.error('Authentication failed:', error);
         // Will show error when tools are called
+      }
+    }
+
+    // If authenticated but no project linked, re-authenticate to select a project
+    if (this.credentials && !this.getLinkedProjectId()) {
+      console.error('No project linked. Opening browser for project selection...');
+      try {
+        const token = await authenticateViaBrowser(this.baseUrl, this.workingDir);
+        this.setToken(token);
+        this.projectConfig = await loadProjectConfig(this.workingDir);
+      } catch (error) {
+        console.error('Project linking failed:', error);
       }
     }
   }
@@ -335,15 +347,15 @@ Or set: export DEVFLOW_TOKEN="your-token"
   // ============ Flow Methods ============
 
   /**
-   * List flows - automatically filtered by linked project if available
+   * List flows - requires a linked project
    */
   async listFlows(projectId?: string): Promise<ApiResponse<Flow[]>> {
-    // Use linked project if no projectId provided and project is linked
     const effectiveProjectId = projectId || this.getLinkedProjectId();
+    if (!effectiveProjectId) {
+      return { success: false, error: 'No project linked. Create a .devflow.json or re-authenticate to link a project.' };
+    }
 
-    const path = effectiveProjectId
-      ? `/api/flows?projectId=${effectiveProjectId}`
-      : '/api/flows';
+    const path = `/api/flows?projectId=${effectiveProjectId}`;
     const result = await this.request<unknown[]>('GET', path);
     if (result.success && result.data) {
       return { success: true, data: result.data.map(transformFlow) };
@@ -496,8 +508,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
 
   async listReleases(projectId?: string): Promise<ApiResponse<Release[]>> {
     const id = projectId || this.getLinkedProjectId();
-    const path = id ? `/api/releases?projectId=${id}` : '/api/releases';
-    return this.request<Release[]>('GET', path);
+    if (!id) {
+      return { success: false, error: 'No project linked. Create a .devflow.json or re-authenticate to link a project.' };
+    }
+    return this.request<Release[]>('GET', `/api/releases?projectId=${id}`);
   }
 
   async getRelease(releaseId: string): Promise<ApiResponse<Release>> {
@@ -557,6 +571,53 @@ Or set: export DEVFLOW_TOKEN="your-token"
       return { success: true, data: { active: false } };
     }
     return result;
+  }
+
+  // ============ Agent Lease Methods ============
+
+  async acquireLease(projectId: string, flowId?: string): Promise<ApiResponse<LeaseAcquireResponse>> {
+    return this.request<LeaseAcquireResponse>('POST', '/api/agent-leases/acquire', {
+      projectId,
+      flowId,
+    });
+  }
+
+  async renewLease(leaseId: string, leaseToken: string): Promise<ApiResponse<{ expiresAt: string }>> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.credentials?.accessToken}`,
+      'X-Lease-Token': leaseToken,
+    };
+
+    try {
+      const response = await fetch(`${this.baseUrl}/api/agent-leases/${leaseId}/renew`, {
+        method: 'PATCH',
+        headers,
+      });
+      return await this.parseResponse<{ expiresAt: string }>(response, `/api/agent-leases/${leaseId}/renew`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: `Lease renewal failed: ${msg}` };
+    }
+  }
+
+  async releaseLease(leaseId: string, leaseToken: string): Promise<ApiResponse<{ released: boolean }>> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.credentials?.accessToken}`,
+      'X-Lease-Token': leaseToken,
+    };
+
+    try {
+      const response = await fetch(`${this.baseUrl}/api/agent-leases/${leaseId}/release`, {
+        method: 'POST',
+        headers,
+      });
+      return await this.parseResponse<{ released: boolean }>(response, `/api/agent-leases/${leaseId}/release`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: `Lease release failed: ${msg}` };
+    }
   }
 
   // ============ Search Methods ============
@@ -719,6 +780,12 @@ export interface AgentSlotStatus {
     agentStatus: string;
     since: string;
   };
+}
+
+export interface LeaseAcquireResponse {
+  leaseId: string;
+  leaseToken: string;
+  expiresAt: string;
 }
 
 // ============ Response Transformers ============

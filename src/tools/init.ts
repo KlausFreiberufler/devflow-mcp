@@ -11,6 +11,33 @@ import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 
+// Lease renewal timer
+let renewalInterval: ReturnType<typeof setInterval> | null = null;
+const RENEW_INTERVAL_MS = parseInt(process.env.LEASE_RENEW_INTERVAL || '30', 10) * 1000;
+
+export function startLeaseRenewal(leaseId: string, leaseToken: string): void {
+  stopLeaseRenewal();
+  renewalInterval = setInterval(async () => {
+    try {
+      const result = await devFlowClient.renewLease(leaseId, leaseToken);
+      if (!result.success) {
+        console.error(`Lease renewal failed: ${result.error}`);
+        stopLeaseRenewal();
+      }
+    } catch (err) {
+      console.error('Lease renewal error:', err);
+      stopLeaseRenewal();
+    }
+  }, RENEW_INTERVAL_MS);
+}
+
+export function stopLeaseRenewal(): void {
+  if (renewalInterval) {
+    clearInterval(renewalInterval);
+    renewalInterval = null;
+  }
+}
+
 const devflowInitDef = {
   name: 'devflow_init',
   description: `Initialize a DevFlow work session for a flow.
@@ -87,38 +114,21 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   // Release previous context if switching flows
   if (sessionContext.isActive()) {
     const currentId = sessionContext.getFlowId();
+    const currentLeaseId = sessionContext.getLeaseId();
+    const currentLeaseToken = sessionContext.getLeaseToken();
     if (currentId && currentId !== flowId) {
       try {
+        if (currentLeaseId && currentLeaseToken) {
+          await devFlowClient.releaseLease(currentLeaseId, currentLeaseToken);
+        }
         await devFlowClient.updateFlow(currentId, {
           agentStatus: 'idle',
         });
       } catch {
         // Best effort
       }
+      stopLeaseRenewal();
       sessionContext.release();
-    }
-  }
-
-  // 0. Agent-Slot check (if not already in a session)
-  if (!sessionContext.isActive()) {
-    try {
-      const slotResult = await devFlowClient.getAgentSlotStatus();
-      if (slotResult.success && slotResult.data?.active && slotResult.data.flow) {
-        const slot = slotResult.data.flow;
-        return [
-          '⛔ Dein Agent-Slot ist bereits belegt.',
-          '',
-          'Aktiver Agent:',
-          `  Flow: ${slot.summary} (${slot.id})`,
-          `  Status: ${slot.agentStatus}`,
-          `  Seit: ${new Date(slot.since).toLocaleString()}`,
-          '',
-          'Trenne den aktiven Agent in DevFlow → Einstellungen → API-Zugang,',
-          'oder warte bis die aktuelle Session endet.',
-        ].join('\n');
-      }
-    } catch {
-      // Slot endpoint not available → continue (no enforcement)
     }
   }
 
@@ -136,23 +146,7 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
 
   const flow = result.data;
 
-  // 3. Check if locked by another agent
-  if (flow.agentStatus && flow.agentStatus !== 'idle') {
-    const currentCtx = sessionContext.get();
-    if (!currentCtx || currentCtx.flow.id !== flow.id) {
-      return [
-        '⛔ Flow ist bereits in Bearbeitung.',
-        '',
-        `Flow: '${flow.summary}' (${flow.id})`,
-        `Agent-Status: ${flow.agentStatus}`,
-        flow.agentMessage ? `Agent-Message: ${flow.agentMessage}` : '',
-        '',
-        'Warte bis die aktuelle Session endet oder trenne den Agent in DevFlow → Einstellungen → API-Zugang.',
-      ].filter(Boolean).join('\n');
-    }
-  }
-
-  // 4. Check done state
+  // 3. Check done state
   if (flow.currentState === 'done') {
     return [
       '⛔ Flow ist bereits abgeschlossen.',
@@ -163,17 +157,58 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     ].join('\n');
   }
 
-  // 5. Lock flow
+  // 5. Acquire lease
+  let leaseId: string | undefined;
+  let leaseToken: string | undefined;
+
+  const projectId = flow.projectId;
+  const leaseResult = await devFlowClient.acquireLease(projectId, resolvedId);
+
+  if (!leaseResult.success || !leaseResult.data) {
+    const errorMsg = leaseResult.error || 'Unbekannter Fehler';
+    // Check for plan limit
+    if (errorMsg.includes('Plan limit')) {
+      return [
+        '⛔ Plan-Limit erreicht.',
+        '',
+        errorMsg,
+        '',
+        'Upgrade deinen Plan oder trenne einen aktiven Agent in DevFlow → Einstellungen → API-Zugang.',
+      ].join('\n');
+    }
+    // Check for flow already locked
+    if (errorMsg.includes('already has an active lease')) {
+      return [
+        '⛔ Flow ist bereits durch einen anderen Agent gesperrt.',
+        '',
+        `Flow: '${flow.summary}' (${flow.id})`,
+        '',
+        'Warte bis die aktuelle Session endet oder trenne den Agent in DevFlow → Einstellungen → API-Zugang.',
+      ].join('\n');
+    }
+    return `⛔ Lease konnte nicht erstellt werden: ${errorMsg}`;
+  }
+
+  leaseId = leaseResult.data.leaseId;
+  leaseToken = leaseResult.data.leaseToken;
+
+  // Start lease renewal timer
+  startLeaseRenewal(leaseId, leaseToken);
+
+  // 6. Lock flow (set status for UI display)
   const lockResult = await devFlowClient.updateFlow(resolvedId, {
     agentStatus: 'analyzing',
     agentMessage: 'Session gestartet',
   });
 
   if (!lockResult.success) {
+    // Release lease if flow lock fails
+    try { await devFlowClient.releaseLease(leaseId, leaseToken); } catch {}
+    stopLeaseRenewal();
     return `⛔ Flow konnte nicht gesperrt werden: ${lockResult.error || 'Unbekannter Fehler'}`;
   }
 
-  // 6. Create agent session
+  // 7. Create agent session
   let sessionId = 'local-session';
   try {
     const sessionResult = await devFlowClient.createAgentSession({
@@ -198,7 +233,7 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     // Continue without tasks
   }
 
-  // 8. Build context
+  // 9. Build context
   const feedback = determineFeedback(flow);
   const state = flow.currentState;
   const allowedActions = getAllowedTools(state);
@@ -212,6 +247,8 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     tasks,
     allowedActions,
     nextStep,
+    leaseId,
+    leaseToken,
   };
   sessionContext.init(activeContext);
 
