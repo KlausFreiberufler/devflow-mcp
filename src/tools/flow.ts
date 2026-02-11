@@ -14,7 +14,7 @@ import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 const flowListDef = {
   name: 'flow_list',
   description: `List all flows, optionally filtered by project.
-Returns flows with their current state (idea, planning, plan_review, progress, code_review, testing, done).
+Returns flows with their current state (idea, planning, plan_review, progress, testing, done).
 Use this to find flows to work on.`,
   inputSchema: {
     type: 'object' as const,
@@ -25,7 +25,7 @@ Use this to find flows to work on.`,
       },
       state: {
         type: 'string',
-        enum: ['idea', 'planning', 'plan_review', 'progress', 'code_review', 'testing', 'done'],
+        enum: ['idea', 'planning', 'plan_review', 'progress', 'testing', 'done'],
         description: 'Optional state filter'
       }
     }
@@ -97,7 +97,7 @@ const flowUpdateDef = {
   name: 'flow_update',
   description: `Update a flow's state or submit deliverables.
 Use this to:
-- Change flow state (idea -> planning -> plan_review -> progress -> code_review -> testing -> done)
+- Change flow state (idea -> planning -> plan_review -> progress -> testing -> done)
 - Submit implementation plan for review
 - Submit agent summary after implementation
 
@@ -105,7 +105,7 @@ agentStatus is automatically derived from your tool calls - you don't need to se
 
 IMPORTANT: Some state transitions require mandatory fields:
 - plan_review requires: implementationPlan
-- code_review requires: agentSummary AND testingInstructions`,
+- testing requires: agentSummary AND testingInstructions`,
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -115,7 +115,7 @@ IMPORTANT: Some state transitions require mandatory fields:
       },
       currentState: {
         type: 'string',
-        enum: ['idea', 'planning', 'plan_review', 'progress', 'code_review', 'testing', 'done'],
+        enum: ['idea', 'planning', 'plan_review', 'progress', 'testing', 'done'],
         description: 'New state for the flow'
       },
       agentStatus: {
@@ -133,11 +133,11 @@ IMPORTANT: Some state transitions require mandatory fields:
       },
       agentSummary: {
         type: 'string',
-        description: 'Agent summary after implementation (required for code_review state)'
+        description: 'Agent summary after implementation (required for testing state)'
       },
       testingInstructions: {
         type: 'string',
-        description: 'Instructions for user testing (required for code_review state). Include what to test, expected behavior, and edge cases.'
+        description: 'Instructions for user testing (required for testing state). Include what to test, expected behavior, and edge cases.'
       },
       commits: {
         type: 'array',
@@ -150,6 +150,19 @@ IMPORTANT: Some state transitions require mandatory fields:
           required: ['hash', 'message']
         },
         description: 'List of git commits to add to this flow. New commits are appended to existing ones.'
+      },
+      prUrl: {
+        type: 'string',
+        description: 'GitHub PR URL for this flow'
+      },
+      prNumber: {
+        type: 'number',
+        description: 'GitHub PR number for this flow'
+      },
+      prState: {
+        type: 'string',
+        enum: ['open', 'closed', 'merged'],
+        description: 'GitHub PR state'
       }
     },
     required: ['flowId']
@@ -161,7 +174,7 @@ const flowGetFeedbackDef = {
   description: `Get user feedback for a flow.
 Use this at the start of a session to check if the user has provided feedback on:
 - The implementation plan (plan_review phase)
-- The code implementation (code_review phase)
+- The code implementation (testing phase, when rejected back to progress)
 
 If feedback exists, you should address it before continuing work.`,
   inputSchema: {
@@ -332,6 +345,9 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   const agentSummary = args.agentSummary as string | undefined;
   const testingInstructions = args.testingInstructions as string | undefined;
   const commits = args.commits as { hash: string; message: string }[] | undefined;
+  const prUrl = args.prUrl as string | undefined;
+  const prNumber = args.prNumber as number | undefined;
+  const prState = args.prState as string | undefined;
 
   const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
@@ -372,6 +388,9 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   if (agentSummary) cleanUpdate.agentSummary = agentSummary.replace(/\\n/g, '\n');
   if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions.replace(/\\n/g, '\n');
   if (commits) cleanUpdate.commits = commits;
+  if (prUrl) cleanUpdate.prUrl = prUrl;
+  if (prNumber) cleanUpdate.prNumber = prNumber;
+  if (prState) cleanUpdate.prState = prState;
 
   const result = await devFlowClient.updateFlow(resolvedId, cleanUpdate);
 
@@ -388,13 +407,12 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
     sessionContext.updateAllowedActions(getAllowedTools(newState));
 
     // Auto-complete session on review/wait/done states
-    if (['plan_review', 'code_review', 'testing', 'done'].includes(newState)) {
+    if (['plan_review', 'testing', 'done'].includes(newState)) {
       const sessionId = sessionContext.get()?.sessionId;
       if (sessionId && sessionId !== 'local-session') {
         const summaryMap: Record<string, string> = {
           plan_review: 'Plan eingereicht, warte auf Review',
-          code_review: 'Implementierung abgeschlossen, warte auf Code-Review',
-          testing: 'Code genehmigt, warte auf Testing',
+          testing: 'Self-Review abgeschlossen, warte auf User-Testing',
           done: 'Flow abgeschlossen',
         };
         devFlowClient.completeAgentSession(sessionId, {
@@ -460,7 +478,7 @@ function formatFlowList(flows: Flow[]): string {
 
   const byState: Record<string, Flow[]> = {
     idea: [], planning: [], plan_review: [], progress: [],
-    code_review: [], testing: [], done: []
+    testing: [], done: []
   };
 
   for (const w of flows) {
@@ -472,11 +490,10 @@ function formatFlowList(flows: Flow[]): string {
 
     const emoji: Record<string, string> = {
       idea: '💡', planning: '📋', plan_review: '📝', progress: '🔨',
-      code_review: '👀', testing: '🧪', done: '✅'
+      testing: '🧪', done: '✅'
     };
 
     const label = state === 'plan_review' ? 'Plan Review'
-               : state === 'code_review' ? 'Code Review'
                : state.charAt(0).toUpperCase() + state.slice(1);
 
     lines.push(`## ${emoji[state] || '📌'} ${label} (${wfs.length})\n`);

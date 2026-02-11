@@ -533,6 +533,26 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<Release>('PATCH', `/api/releases/${releaseId}`, data);
   }
 
+  async activateRelease(releaseId: string): Promise<ApiResponse<Release>> {
+    return this.request<Release>('POST', `/api/releases/${releaseId}/activate`);
+  }
+
+  async deactivateRelease(releaseId: string): Promise<ApiResponse<Release>> {
+    return this.request<Release>('POST', `/api/releases/${releaseId}/deactivate`);
+  }
+
+  async updateReleaseBranch(releaseId: string, data: Record<string, unknown>): Promise<ApiResponse<Release>> {
+    return this.request<Release>('PATCH', `/api/releases/${releaseId}/branch`, data);
+  }
+
+  async getGitSettings(projectId?: string): Promise<ApiResponse<GitSettings | null>> {
+    const id = projectId || this.getLinkedProjectId();
+    if (!id) {
+      return { success: false, error: 'No project ID.' };
+    }
+    return this.request<GitSettings | null>('GET', `/api/projects/${id}/git-settings`);
+  }
+
   // ============ Config Methods ============
 
   /**
@@ -653,7 +673,7 @@ export interface Flow {
   summary: string;
   description?: string;
   acceptanceCriteria?: string[];
-  currentState: 'idea' | 'planning' | 'plan_review' | 'progress' | 'code_review' | 'testing' | 'done';
+  currentState: 'idea' | 'planning' | 'plan_review' | 'progress' | 'testing' | 'done';
   agentStatus?: string;
   agentMessage?: string;
   implementationPlan?: string;
@@ -676,6 +696,12 @@ export interface Flow {
   planApprovedAt?: string;
   codeApprovedBy?: string;
   codeApprovedAt?: string;
+  // Git workflow fields
+  branchName?: string;
+  branchCreated?: boolean;
+  prUrl?: string;
+  prNumber?: number;
+  prState?: string;
 }
 
 export interface FlowCreate {
@@ -695,6 +721,9 @@ export interface FlowUpdate {
   agentSummary?: string;
   testingInstructions?: string;
   commits?: { hash: string; message: string }[];
+  prUrl?: string;
+  prNumber?: number;
+  prState?: string;
 }
 
 export interface FlowFeedback {
@@ -761,7 +790,35 @@ export interface Release {
   description?: string;
   status?: string;
   targetDate?: string;
+  isActive?: boolean;
+  branchName?: string;
+  branchCreated?: boolean;
+  prUrl?: string;
+  prNumber?: number;
+  prState?: string;
+  isLocked?: boolean;
+  releaseFeedback?: string;
+  releasedAt?: string;
   createdAt: string;
+}
+
+export interface GitSettings {
+  id: string;
+  projectId: string;
+  enabled: boolean;
+  defaultBranch: string;
+  branchPrefixFeature: string;
+  branchPrefixHotfix: string;
+  branchPrefixRelease: string;
+  autoPrOnCodeReview: boolean;
+  autoAssignToActiveRelease: boolean;
+  // v2 prompt-based fields
+  flowBranchPrompt?: string;
+  releaseBranchPrompt?: string;
+  commitMessagePrompt?: string;
+  prTemplatePrompt?: string;
+  autoPrOnFlowDone?: boolean;
+  autoPrOnRelease?: boolean;
 }
 
 export interface SearchResult {
@@ -868,6 +925,12 @@ export function transformFlow(raw: unknown): Flow {
     planApprovedAt: w.planApprovedAt as string | undefined,
     codeApprovedBy: w.codeApprovedBy as string | undefined,
     codeApprovedAt: w.codeApprovedAt as string | undefined,
+    // Git workflow fields
+    branchName: w.branchName as string | undefined,
+    branchCreated: Boolean(w.branchCreated),
+    prUrl: w.prUrl as string | undefined,
+    prNumber: w.prNumber as number | undefined,
+    prState: w.prState as string | undefined,
   };
 }
 

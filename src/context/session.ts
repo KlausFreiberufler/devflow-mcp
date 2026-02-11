@@ -14,6 +14,22 @@ export interface SessionFeedback {
   at?: string;
 }
 
+export interface GitContext {
+  enabled: boolean;
+  defaultBranch: string;
+  flowBranchPrompt?: string;
+  releaseBranchPrompt?: string;
+  commitMessagePrompt?: string;
+  prTemplatePrompt?: string;
+  autoPrOnFlowDone: boolean;
+  autoPrOnRelease: boolean;
+  autoAssignToActiveRelease: boolean;
+  flowBranchName?: string;
+  flowBranchCreated: boolean;
+  releaseBranchName?: string;
+  releaseBranchCreated: boolean;
+}
+
 export interface ActiveContext {
   flow: Flow;
   sessionId: string;
@@ -25,6 +41,7 @@ export interface ActiveContext {
   nextStep: string;
   leaseId?: string;
   leaseToken?: string;
+  git?: GitContext;
 }
 
 class SessionContext {

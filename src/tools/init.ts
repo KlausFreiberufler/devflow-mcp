@@ -6,7 +6,7 @@
  */
 
 import { devFlowClient } from '../api/client.js';
-import { sessionContext, type SessionFeedback, type ActiveContext } from '../context/session.js';
+import { sessionContext, type SessionFeedback, type ActiveContext, type GitContext } from '../context/session.js';
 import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
@@ -96,16 +96,64 @@ function determineFeedback(flow: {
   return null;
 }
 
-function determineNextStep(state: string, feedback: SessionFeedback | null): string {
+function determineNextStep(state: string, feedback: SessionFeedback | null, git?: GitContext): string {
   if (feedback) {
     if (feedback.type === 'plan_rejected') {
       return 'Lies das Feedback und ueberarbeite den Plan. Nutze flow_update({ implementationPlan: "...", currentState: "plan_review" }) wenn fertig.';
     }
     if (feedback.type === 'code_rejected') {
-      return 'Lies das Code-Feedback und behebe die genannten Punkte. Nutze flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "code_review" }) wenn fertig.';
+      return 'Lies das Code-Feedback und behebe die genannten Punkte. Fuehre erneut Self-Review durch und nutze flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "testing" }) wenn fertig.';
     }
   }
+
+  // Git workflow guidance
+  if (git?.enabled && state === 'progress') {
+    const baseBranch = git.releaseBranchName || git.defaultBranch;
+    if (git.releaseBranchName && !git.releaseBranchCreated) {
+      return `Erstelle zuerst den Release-Branch: git checkout -b ${git.releaseBranchName} ${git.defaultBranch}`;
+    }
+    if (git.flowBranchName && !git.flowBranchCreated) {
+      return `Erstelle den Feature-Branch: git checkout -b ${git.flowBranchName} ${baseBranch}`;
+    }
+  }
+
+  // Enhanced progress guidance with self-review
+  if (state === 'progress' && git?.enabled) {
+    const commitHint = git.commitMessagePrompt ? ' (nach Commit-Richtlinien)' : '';
+    return `Implementiere die Anforderungen. Wenn fertig: Self-Review durchfuehren (Diff pruefen, Findings fixen, sauber committen${commitHint}). Testing-Instructions erstellen → flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "testing" }).`;
+  }
+
   return NEXT_STEP_GUIDANCE[state] || 'Pruefe den Flow-Status.';
+}
+
+function generateGitGuidelines(git: GitContext, projectName: string): string {
+  const lines = [`# Git-Richtlinien fuer Projekt "${projectName}"`, ''];
+
+  if (git.flowBranchPrompt) {
+    lines.push('## Flow-Branches', git.flowBranchPrompt, '');
+  }
+
+  if (git.releaseBranchPrompt) {
+    lines.push('## Release-Branches', git.releaseBranchPrompt, '');
+  }
+
+  if (git.commitMessagePrompt) {
+    lines.push('## Commit Messages', git.commitMessagePrompt, '');
+  }
+
+  if (git.prTemplatePrompt) {
+    lines.push('## PR-Vorlage', git.prTemplatePrompt, '');
+  }
+
+  lines.push('## Automatisierung');
+  lines.push(`- PR bei Flow-Abschluss: ${git.autoPrOnFlowDone ? 'Ja' : 'Nein'}`);
+  lines.push(`- PR bei Release-Abschluss: ${git.autoPrOnRelease ? 'Ja' : 'Nein'}`);
+
+  const targetBranch = git.releaseBranchName || git.defaultBranch;
+  lines.push(`- Ziel-Branch: \`${targetBranch}\``);
+  lines.push('');
+
+  return lines.join('\n');
 }
 
 async function handleDevflowInit(args: Record<string, unknown>): Promise<string> {
@@ -233,11 +281,41 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     // Continue without tasks
   }
 
+  // 8. Load git settings
+  let gitContext: GitContext | undefined;
+  try {
+    const gitResult = await devFlowClient.getGitSettings(projectId);
+    if (gitResult.success && gitResult.data?.enabled) {
+      const gs = gitResult.data;
+      // Find active release for branch info
+      const releasesResult = await devFlowClient.listReleases(projectId);
+      const activeRelease = releasesResult.data?.find((r: { isActive?: boolean }) => r.isActive);
+
+      gitContext = {
+        enabled: true,
+        defaultBranch: gs.defaultBranch,
+        flowBranchPrompt: gs.flowBranchPrompt,
+        releaseBranchPrompt: gs.releaseBranchPrompt,
+        commitMessagePrompt: gs.commitMessagePrompt,
+        prTemplatePrompt: gs.prTemplatePrompt,
+        autoPrOnFlowDone: gs.autoPrOnFlowDone || false,
+        autoPrOnRelease: gs.autoPrOnRelease || false,
+        autoAssignToActiveRelease: gs.autoAssignToActiveRelease,
+        flowBranchName: flow.branchName,
+        flowBranchCreated: flow.branchCreated || false,
+        releaseBranchName: activeRelease?.branchName,
+        releaseBranchCreated: activeRelease?.branchCreated || false,
+      };
+    }
+  } catch {
+    // Continue without git context
+  }
+
   // 9. Build context
   const feedback = determineFeedback(flow);
   const state = flow.currentState;
   const allowedActions = getAllowedTools(state);
-  const nextStep = determineNextStep(state, feedback);
+  const nextStep = determineNextStep(state, feedback, gitContext);
 
   const activeContext: ActiveContext = {
     flow: lockResult.data || flow,
@@ -249,6 +327,7 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     nextStep,
     leaseId,
     leaseToken,
+    git: gitContext,
   };
   sessionContext.init(activeContext);
 
@@ -292,6 +371,25 @@ function formatInitResponse(ctx: ActiveContext): string {
       const check = t.isCompleted ? '✅' : '⬜';
       lines.push(`${check} ${t.summary}`);
     }
+  }
+
+  // Git workflow section
+  if (ctx.git?.enabled) {
+    const projectName = devFlowClient.getLinkedProjectName() || 'Unbekannt';
+    lines.push('', generateGitGuidelines(ctx.git, projectName));
+
+    // Branch status
+    lines.push('## Branch-Status');
+    const baseBranch = ctx.git.releaseBranchName || ctx.git.defaultBranch;
+    if (ctx.git.releaseBranchName) {
+      const releaseStatus = ctx.git.releaseBranchCreated ? '✅' : '⬜';
+      lines.push(`${releaseStatus} Release-Branch: \`${ctx.git.releaseBranchName}\``);
+    }
+    if (ctx.git.flowBranchName) {
+      const flowStatus = ctx.git.flowBranchCreated ? '✅' : '⬜';
+      lines.push(`${flowStatus} Feature-Branch: \`${ctx.git.flowBranchName}\``);
+    }
+    lines.push(`Basis: \`${baseBranch}\``);
   }
 
   lines.push(
