@@ -6,6 +6,39 @@
  * the config endpoint yet.
  */
 
+// ============ Strictness Config ============
+
+export interface StrictnessConfig {
+  flowRequired: number;   // 1-5
+  planRequired: number;   // 1-5
+  taskTracking: number;   // 1-5
+  gitDiscipline: number;  // 1-5
+  reviewRequired: number; // 1-5
+}
+
+export const DEFAULT_STRICTNESS: StrictnessConfig = {
+  flowRequired: 3,
+  planRequired: 3,
+  taskTracking: 3,
+  gitDiscipline: 3,
+  reviewRequired: 3,
+};
+
+export const STRICTNESS_LABELS: Record<number, { emoji: string; label: string }> = {
+  1: { emoji: '🏖️', label: 'Chill' },
+  2: { emoji: '🤙', label: 'Locker' },
+  3: { emoji: '⚖️', label: 'Balanced' },
+  4: { emoji: '🧑‍✈️', label: 'Streng' },
+  5: { emoji: '🔒', label: 'Paranoid' },
+};
+
+export function formatStrictnessLevel(level: number): string {
+  const info = STRICTNESS_LABELS[level] || STRICTNESS_LABELS[3];
+  return `${info.emoji}${level}`;
+}
+
+// ============ Remote Config ============
+
 export interface RemoteConfig {
   /** Version hash for sync-check */
   version: string;
@@ -27,6 +60,9 @@ export interface RemoteConfig {
     target: string;
     reason: string;
   }[]>;
+
+  /** Strictness configuration (derives requiredFields + blockedTransitions) */
+  strictness: StrictnessConfig;
 }
 
 /**
@@ -57,22 +93,45 @@ export const DEFAULT_CONFIG: RemoteConfig = {
     review: 'Warte auf User-Review-Ergebnis. Nutze flow_get_feedback() um zu pruefen ob Feedback vorliegt.',
     done: 'Dieser Flow ist abgeschlossen. Waehle einen anderen Flow mit flow_list().',
   },
-  requiredFields: {
-    approval: {
-      fields: ['implementationPlan'],
-      message: 'implementationPlan ist Pflicht beim Uebergang zu approval. Schreibe einen Plan bevor du den State wechselst.',
-    },
-    review: {
-      fields: ['agentSummary', 'testingInstructions'],
-      message: 'agentSummary und testingInstructions sind Pflicht beim Uebergang zu review. Beschreibe was implementiert wurde und was der User testen soll.',
-    },
-  },
-  blockedTransitions: {
-    approval: [
-      { target: 'ready', reason: 'Der User muss den Plan zuerst in der UI freigeben. Warte auf Freigabe in approval.' },
-    ],
-    review: [
-      { target: 'done', reason: 'Der User muss das Review zuerst in der UI abschliessen. Warte auf Freigabe in review.' },
-    ],
-  },
+  requiredFields: {},
+  blockedTransitions: {},
+  strictness: DEFAULT_STRICTNESS,
 };
+
+// ============ Strictness → Enforcement Derivation ============
+
+/**
+ * Derive requiredFields and blockedTransitions from strictness levels.
+ * This is the core logic that makes strictness sliders control the process.
+ */
+export function deriveEnforcementFromStrictness(s: StrictnessConfig): {
+  requiredFields: RemoteConfig['requiredFields'];
+  blockedTransitions: RemoteConfig['blockedTransitions'];
+} {
+  const requiredFields: RemoteConfig['requiredFields'] = {};
+  const blockedTransitions: RemoteConfig['blockedTransitions'] = {};
+
+  // --- Plan enforcement ---
+  if (s.planRequired >= 4) {
+    requiredFields.approval = {
+      fields: ['implementationPlan'],
+      message: `⛔ Strictness ${formatStrictnessLevel(s.planRequired)} erfordert einen Plan.\nErstelle einen Plan: flow_update({ implementationPlan: "...", currentState: "approval" }).`,
+    };
+    blockedTransitions.approval = [
+      { target: 'ready', reason: `Der User muss den Plan in der UI genehmigen (Strictness: ${formatStrictnessLevel(s.planRequired)}).` },
+    ];
+  }
+
+  // --- Review enforcement ---
+  if (s.reviewRequired >= 4) {
+    requiredFields.review = {
+      fields: ['agentSummary', 'testingInstructions'],
+      message: `⛔ Strictness ${formatStrictnessLevel(s.reviewRequired)} erfordert agentSummary + testingInstructions.\nBeschreibe was du implementiert hast und wie der User testen soll.`,
+    };
+    blockedTransitions.review = [
+      { target: 'done', reason: `Der User muss das Review in der UI abschliessen (Strictness: ${formatStrictnessLevel(s.reviewRequired)}).` },
+    ];
+  }
+
+  return { requiredFields, blockedTransitions };
+}
