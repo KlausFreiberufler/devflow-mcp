@@ -5,7 +5,8 @@
  * Set via devflow_init, cleared on session end.
  */
 
-import type { Flow, Task } from '../api/client.js';
+import { devFlowClient, type Flow, type Task } from '../api/client.js';
+import { getAllowedTools } from './permissions.js';
 
 export interface SessionFeedback {
   type: 'plan_rejected' | 'code_rejected' | 'testing_failed';
@@ -94,6 +95,34 @@ class SessionContext {
 
   getLeaseToken(): string | null {
     return this.context?.leaseToken ?? null;
+  }
+
+  /**
+   * Refresh flow state from backend when context might be stale.
+   * Called when a tool is about to be blocked - checks if the user
+   * changed the state in the UI since the last check.
+   * Returns true if the state changed (permissions were updated).
+   */
+  async refreshFromBackend(): Promise<boolean> {
+    if (!this.context) return false;
+
+    try {
+      const result = await devFlowClient.getFlow(this.context.flow.id);
+      if (!result.success || !result.data) return false;
+
+      const freshState = result.data.currentState;
+      const cachedState = this.context.flow.currentState;
+
+      if (freshState !== cachedState) {
+        this.context.flow = result.data;
+        this.context.allowedActions = getAllowedTools(freshState);
+        return true;
+      }
+    } catch {
+      // Network error - keep cached state
+    }
+
+    return false;
   }
 }
 

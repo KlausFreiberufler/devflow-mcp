@@ -62,16 +62,20 @@ class ToolRegistry {
         return buildNoContextMessage(name);
       }
 
-      // Guard 2: State-Guard
+      // Guard 2: State-Guard (with stale-context refresh)
       if (!sessionContext.isToolAllowed(name)) {
-        const ctx = sessionContext.get()!;
-        logToolCall({ toolName: name, args, blocked: true, blockReason: `State '${ctx.flow.currentState}'` });
-        return buildStateBlockMessage(
-          name,
-          ctx.flow.summary,
-          ctx.flow.id,
-          ctx.flow.currentState,
-        );
+        // Context might be stale if user changed state in UI - refresh before blocking
+        const stateChanged = await sessionContext.refreshFromBackend();
+        if (!stateChanged || !sessionContext.isToolAllowed(name)) {
+          const ctx = sessionContext.get()!;
+          logToolCall({ toolName: name, args, blocked: true, blockReason: `State '${ctx.flow.currentState}'` });
+          return buildStateBlockMessage(
+            name,
+            ctx.flow.summary,
+            ctx.flow.id,
+            ctx.flow.currentState,
+          );
+        }
       }
     }
 
