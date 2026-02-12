@@ -946,8 +946,8 @@ export function transformTask(raw: unknown): Task {
     summary: (t.text || t.summary) as string,  // API returns 'text', we use 'summary'
     description: t.description as string | undefined,
     acceptanceCriteria: t.acceptanceCriteria as string[] | undefined,
-    isCompleted: Boolean(t.isCompleted),
-    sortOrder: t.sortOrder as number,
+    isCompleted: Boolean(t.checked),
+    sortOrder: (t.orderIndex ?? 0) as number,
     createdAt: t.createdAt as string,
     status: t.status as 'todo' | 'doing' | 'done' | undefined,
   };
