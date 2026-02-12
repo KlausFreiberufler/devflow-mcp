@@ -218,6 +218,7 @@ async function resolveFlowId(partialId: string): Promise<string | null> {
 // ============ State Transition Guardrails (from config) ============
 
 import { getConfig } from '../config/sync.js';
+import { formatStrictnessLevel } from '../config/types.js';
 
 // ============ Tool Handlers ============
 
@@ -354,6 +355,9 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
     return `Error: Flow not found (tried exact and prefix match for "${flowId}")`;
   }
 
+  // Collect non-blocking warnings (shown after successful update)
+  const warnings: string[] = [];
+
   // Guardrail: Check state transitions
   if (currentState) {
     const currentFlow = await devFlowClient.getFlow(resolvedId);
@@ -367,13 +371,52 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
       }
     }
 
-    // Check required fields for target state (from config)
+    // Check required fields for target state (from config, derived from strictness)
     const required = getConfig().requiredFields[currentState];
     if (required) {
       const allArgs = { implementationPlan, agentSummary, testingInstructions };
       const missing = required.fields.filter(f => !allArgs[f as keyof typeof allArgs]);
       if (missing.length > 0) {
         return `⛔ Pflichtfelder fehlen: ${missing.join(', ')}\n\n${required.message}`;
+      }
+    }
+
+    // Strictness-based enforcement (beyond requiredFields/blockedTransitions)
+    const strictness = getConfig().strictness;
+
+    // Task tracking enforcement: check tasks exist before review
+    if (currentState === 'review' && strictness.taskTracking >= 3) {
+      try {
+        const taskResult = await devFlowClient.listTasks(resolvedId);
+        const tasks = taskResult.success ? taskResult.data || [] : [];
+        if (tasks.length === 0) {
+          if (strictness.taskTracking >= 4) {
+            // Strict/Maximum: block transition
+            return `⛔ Strictness ${formatStrictnessLevel(strictness.taskTracking)} erfordert mindestens einen Task.\nErstelle Tasks mit task_create() bevor du zu review wechselst.`;
+          }
+          // Balanced: warn but don't block
+          warnings.push('⚠️ Keine Tasks angelegt. Bei Balanced-Strictness wird empfohlen, Tasks zu erstellen um die Arbeit nachvollziehbar zu machen.');
+        }
+        if (strictness.taskTracking >= 5) {
+          const incomplete = tasks.filter(t => !t.isCompleted);
+          if (incomplete.length > 0) {
+            return `⛔ Strictness ${formatStrictnessLevel(strictness.taskTracking)} erfordert dass alle Tasks abgeschlossen sind.\n${incomplete.length} Task(s) noch offen: ${incomplete.map(t => t.summary).join(', ')}`;
+          }
+        }
+      } catch {
+        // Non-critical: skip task check on error
+      }
+    }
+
+    // Git discipline enforcement: check branch/commits before review
+    if (currentState === 'review' && strictness.gitDiscipline >= 4) {
+      if (currentFlow.success && currentFlow.data) {
+        if (!currentFlow.data.branchName) {
+          return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert einen Branch.\nMelde den Branch mit flow_update({ branchName: "..." }) bevor du zu review wechselst.`;
+        }
+      }
+      if (strictness.gitDiscipline >= 5 && !prUrl) {
+        return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert eine PR-URL.\nErstelle eine PR und melde sie mit flow_update({ prUrl: "...", currentState: "review" }).`;
       }
     }
   }
@@ -421,11 +464,13 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
       }
 
       const guidance = NEXT_STEP_GUIDANCE[newState] || '';
-      return `Flow updated successfully.\n\n${formatFlowDetail(updatedFlow)}\n\n---\n**Naechster Schritt:** ${guidance}`;
+      const warningBlock = warnings.length > 0 ? `\n\n${warnings.join('\n')}` : '';
+      return `Flow updated successfully.\n\n${formatFlowDetail(updatedFlow)}\n\n---\n**Naechster Schritt:** ${guidance}${warningBlock}`;
     }
   }
 
-  return `Flow updated successfully.\n\n${formatFlowDetail(result.data)}`;
+  const warningBlock = warnings.length > 0 ? `\n\n${warnings.join('\n')}` : '';
+  return `Flow updated successfully.\n\n${formatFlowDetail(result.data)}${warningBlock}`;
 }
 
 async function handleFlowGetFeedback(args: Record<string, unknown>): Promise<string> {

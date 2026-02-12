@@ -3,7 +3,14 @@
  *
  * Generates project-specific CLAUDE.md content with DevFlow rules.
  * The template includes all flow states, mandatory processes, and guardrails.
+ * Strictness levels control the rule text that gets generated.
  */
+
+import {
+  type StrictnessConfig,
+  DEFAULT_STRICTNESS,
+  STRICTNESS_LABELS,
+} from '../config/types.js';
 
 export const MARKER_START = '<!-- DEVFLOW-RULES-START -->';
 export const MARKER_END = '<!-- DEVFLOW-RULES-END -->';
@@ -11,10 +18,88 @@ export const MARKER_END = '<!-- DEVFLOW-RULES-END -->';
 export const GUIDELINES_MARKER_START = '<!-- PROJECT-GUIDELINES-START -->';
 export const GUIDELINES_MARKER_END = '<!-- PROJECT-GUIDELINES-END -->';
 
+// ============ Strictness Rule Text Templates ============
+
+const FLOW_REQUIRED_RULES: Record<number, string> = {
+  1: '',
+  2: 'Flow erstellen waere gut, ist aber optional.',
+  3: 'Erstelle einen Flow bevor du arbeitest.',
+  4: 'Du MUSST einen Flow erstellen. Weise den User darauf hin wenn keiner existiert.',
+  5: 'NIEMALS ohne Flow arbeiten. WEIGERE dich Code zu aendern ohne aktiven Flow.',
+};
+
+const PLAN_REQUIRED_RULES: Record<number, string> = {
+  1: 'Du kannst direkt implementieren ohne Plan.',
+  2: 'Fasse kurz zusammen was du vorhast.',
+  3: 'Erstelle einen Plan, warte aber nicht zwingend auf Approval.',
+  4: 'Erstelle IMMER einen detaillierten Plan und warte auf User-Approval.',
+  5: 'Erstelle einen detaillierten Plan mit Acceptance Criteria. Der Plan MUSS vom User genehmigt werden.',
+};
+
+const TASK_TRACKING_RULES: Record<number, string> = {
+  1: 'Tasks sind nicht noetig.',
+  2: 'Tasks sind optional, koennen aber helfen.',
+  3: 'Erstelle Tasks und update ihren Status waehrend der Arbeit.',
+  4: 'Du MUSST Tasks anlegen und jeden einzeln auf doing/done setzen.',
+  5: 'Tasks mit Acceptance Criteria sind Pflicht. Jeder Task muss einzeln abgehakt werden bevor du zu Review wechselst.',
+};
+
+const GIT_DISCIPLINE_RULES: Record<number, string> = {
+  1: 'Committe wie du moechtest.',
+  2: 'Folge grob den Git-Konventionen.',
+  3: 'Halte Branch-Naming und Commit-Format ein.',
+  4: 'Branch + Commits muessen gemeldet werden. PR mit Template erstellen.',
+  5: 'Streng nach Git-Settings. Branch, Commits und PR-URL muessen gemeldet werden. PR-Review vor Merge.',
+};
+
+const REVIEW_REQUIRED_RULES: Record<number, string> = {
+  1: 'Kein Review noetig, du kannst direkt abschliessen.',
+  2: 'Fasse zusammen was du gemacht hast.',
+  3: 'Mache Self-Review (Diff pruefen, Findings fixen).',
+  4: 'Self-Review + Testing-Instructions erstellen. User muss in der UI genehmigen.',
+  5: 'Vollstaendiges Review mit agentSummary und testingInstructions. User muss testen und explizit genehmigen.',
+};
+
+function formatLevel(level: number): string {
+  const info = STRICTNESS_LABELS[level] || STRICTNESS_LABELS[3];
+  return `${info.emoji} ${info.label}`;
+}
+
+/**
+ * Generate strictness rules block for CLAUDE.md
+ */
+function generateStrictnessRules(s: StrictnessConfig): string {
+  const rules: string[] = ['## Regeln (Strictness-Level)', ''];
+
+  const sections: { title: string; key: keyof StrictnessConfig; rules: Record<number, string> }[] = [
+    { title: 'Flow-Pflicht', key: 'flowRequired', rules: FLOW_REQUIRED_RULES },
+    { title: 'Planungs-Pflicht', key: 'planRequired', rules: PLAN_REQUIRED_RULES },
+    { title: 'Task-Tracking', key: 'taskTracking', rules: TASK_TRACKING_RULES },
+    { title: 'Git-Disziplin', key: 'gitDiscipline', rules: GIT_DISCIPLINE_RULES },
+    { title: 'Review-Pflicht', key: 'reviewRequired', rules: REVIEW_REQUIRED_RULES },
+  ];
+
+  for (const section of sections) {
+    const level = s[section.key];
+    const ruleText = section.rules[level] || section.rules[3];
+    if (!ruleText) continue; // Skip empty rules (e.g., flowRequired level 1)
+    rules.push(`### ${section.title}: ${formatLevel(level)}`);
+    rules.push(ruleText);
+    rules.push('');
+  }
+
+  return rules.join('\n');
+}
+
 /**
  * Generate CLAUDE.md content with project-specific information
  */
-export function generateClaudeMdContent(projectName: string, techStack?: string): string {
+export function generateClaudeMdContent(
+  projectName: string,
+  techStack?: string,
+  strictness?: StrictnessConfig,
+): string {
+  const s = strictness || DEFAULT_STRICTNESS;
   const techStackLine = techStack
     ? `**Tech-Stack:** ${techStack}\n`
     : '';
@@ -55,7 +140,8 @@ idea → planning → approval → ready → in_progress → review → done
 
 Review-States (approval, review) sind Wartezustaende.
 Der User muss in der DevFlow-UI genehmigen bevor es weitergeht.
-${MARKER_END}
+
+${generateStrictnessRules(s)}${MARKER_END}
 `;
 }
 

@@ -15,6 +15,7 @@ import {
   GUIDELINES_MARKER_START,
   GUIDELINES_MARKER_END,
 } from '../templates/claude-md.js';
+import type { StrictnessConfig } from '../config/types.js';
 
 /**
  * Setup CLAUDE.md in the working directory
@@ -26,10 +27,11 @@ import {
 export async function setupClaudeMd(
   workingDir: string,
   projectName: string,
-  techStack?: string
+  techStack?: string,
+  strictness?: StrictnessConfig
 ): Promise<void> {
   const claudeMdPath = join(workingDir, 'CLAUDE.md');
-  const rulesContent = generateClaudeMdContent(projectName, techStack);
+  const rulesContent = generateClaudeMdContent(projectName, techStack, strictness);
 
   let existingContent: string | null = null;
   try {

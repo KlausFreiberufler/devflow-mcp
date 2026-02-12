@@ -8,6 +8,8 @@
 import { devFlowClient } from '../api/client.js';
 import { sessionContext, type SessionFeedback, type ActiveContext, type GitContext } from '../context/session.js';
 import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
+import { getConfig } from '../config/sync.js';
+import { formatStrictnessLevel } from '../config/types.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 
@@ -355,6 +357,10 @@ function formatInitResponse(ctx: ActiveContext): string {
     `**ID:** ${w.id}`,
     `**State:** ${w.currentState}`,
   ];
+
+  // Show strictness levels
+  const s = getConfig().strictness;
+  lines.push(`**Strictness:** Flow ${formatStrictnessLevel(s.flowRequired)} | Plan ${formatStrictnessLevel(s.planRequired)} | Tasks ${formatStrictnessLevel(s.taskTracking)} | Git ${formatStrictnessLevel(s.gitDiscipline)} | Review ${formatStrictnessLevel(s.reviewRequired)}`);
 
   if (ctx.previousState) {
     lines.push(`**Auto-Advance:** ${ctx.previousState} → ${w.currentState}`);

@@ -11,7 +11,7 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { devFlowClient } from '../api/client.js';
-import { type RemoteConfig, DEFAULT_CONFIG } from './types.js';
+import { type RemoteConfig, type StrictnessConfig, DEFAULT_CONFIG, DEFAULT_STRICTNESS, deriveEnforcementFromStrictness } from './types.js';
 import { setupClaudeMd, syncProjectGuidelines } from '../setup/claude-md-generator.js';
 
 const CACHE_PATH = join(homedir(), '.devflow', 'config.cache.json');
@@ -52,7 +52,8 @@ async function saveCache(config: RemoteConfig): Promise<void> {
 
 /**
  * Transform raw API response to RemoteConfig.
- * Merges with defaults for missing fields.
+ * If strictness is present, derives enforcement from it.
+ * Otherwise falls back to explicit config fields.
  */
 function parseRemoteConfig(raw: Record<string, unknown>): RemoteConfig {
   const config = { ...DEFAULT_CONFIG };
@@ -60,17 +61,30 @@ function parseRemoteConfig(raw: Record<string, unknown>): RemoteConfig {
   if (raw.version && typeof raw.version === 'string') {
     config.version = raw.version;
   }
+
+  // Always parse statePermissions and nextStepGuidance (not strictness-derived)
   if (raw.statePermissions && typeof raw.statePermissions === 'object') {
     config.statePermissions = raw.statePermissions as Record<string, string[]>;
   }
   if (raw.nextStepGuidance && typeof raw.nextStepGuidance === 'object') {
     config.nextStepGuidance = raw.nextStepGuidance as Record<string, string>;
   }
-  if (raw.requiredFields && typeof raw.requiredFields === 'object') {
-    config.requiredFields = raw.requiredFields as RemoteConfig['requiredFields'];
-  }
-  if (raw.blockedTransitions && typeof raw.blockedTransitions === 'object') {
-    config.blockedTransitions = raw.blockedTransitions as RemoteConfig['blockedTransitions'];
+
+  // Parse strictness - if present, derive enforcement from it
+  if (raw.strictness && typeof raw.strictness === 'object') {
+    config.strictness = { ...DEFAULT_STRICTNESS, ...(raw.strictness as Partial<StrictnessConfig>) };
+    const derived = deriveEnforcementFromStrictness(config.strictness);
+    config.requiredFields = derived.requiredFields;
+    config.blockedTransitions = derived.blockedTransitions;
+    console.error(`Strictness loaded: flow=${config.strictness.flowRequired} plan=${config.strictness.planRequired} tasks=${config.strictness.taskTracking} git=${config.strictness.gitDiscipline} review=${config.strictness.reviewRequired}`);
+  } else {
+    // Legacy: use explicit config fields
+    if (raw.requiredFields && typeof raw.requiredFields === 'object') {
+      config.requiredFields = raw.requiredFields as RemoteConfig['requiredFields'];
+    }
+    if (raw.blockedTransitions && typeof raw.blockedTransitions === 'object') {
+      config.blockedTransitions = raw.blockedTransitions as RemoteConfig['blockedTransitions'];
+    }
   }
 
   return config;
@@ -144,7 +158,7 @@ async function updateClaudeMd(): Promise<void> {
   if (!projectName) return;
 
   try {
-    await setupClaudeMd(process.cwd(), projectName);
+    await setupClaudeMd(process.cwd(), projectName, undefined, activeConfig.strictness);
     console.error('CLAUDE.md auto-updated from config');
   } catch {
     // Non-critical: CLAUDE.md update failure doesn't block startup
