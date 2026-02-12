@@ -243,11 +243,21 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   // Start lease renewal timer
   startLeaseRenewal(leaseId, leaseToken);
 
-  // 6. Lock flow (set status for UI display)
-  const lockResult = await devFlowClient.updateFlow(resolvedId, {
+  // 6. Auto-advance state for visibility (idea → planning, ready → in_progress)
+  const AUTO_ADVANCE: Record<string, string> = {
+    idea: 'planning',
+    ready: 'in_progress',
+  };
+  const advanceTo = AUTO_ADVANCE[flow.currentState];
+  const lockUpdate: Record<string, unknown> = {
     agentStatus: 'analyzing',
     agentMessage: 'Session gestartet',
-  });
+  };
+  if (advanceTo) {
+    lockUpdate.currentState = advanceTo;
+  }
+
+  const lockResult = await devFlowClient.updateFlow(resolvedId, lockUpdate);
 
   if (!lockResult.success) {
     // Release lease if flow lock fails
@@ -311,14 +321,16 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     // Continue without git context
   }
 
-  // 9. Build context
+  // 9. Build context (use advanced state if auto-advanced)
+  const activeFlow = lockResult.data || flow;
   const feedback = determineFeedback(flow);
-  const state = flow.currentState;
+  const state = activeFlow.currentState;
   const allowedActions = getAllowedTools(state);
   const nextStep = determineNextStep(state, feedback, gitContext);
 
   const activeContext: ActiveContext = {
-    flow: lockResult.data || flow,
+    flow: activeFlow,
+    previousState: advanceTo ? flow.currentState : undefined,
     sessionId,
     startedAt: new Date().toISOString(),
     feedback,
@@ -343,6 +355,10 @@ function formatInitResponse(ctx: ActiveContext): string {
     `**ID:** ${w.id}`,
     `**State:** ${w.currentState}`,
   ];
+
+  if (ctx.previousState) {
+    lines.push(`**Auto-Advance:** ${ctx.previousState} → ${w.currentState}`);
+  }
 
   if (w.description) {
     lines.push('', '## Beschreibung', w.description);
