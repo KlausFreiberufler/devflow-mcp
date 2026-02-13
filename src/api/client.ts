@@ -696,6 +696,8 @@ export interface Flow {
   planApprovedAt?: string;
   codeApprovedBy?: string;
   codeApprovedAt?: string;
+  // Assignment
+  assigneeName?: string;
   // Git workflow fields
   branchName?: string;
   branchCreated?: boolean;
@@ -925,6 +927,8 @@ export function transformFlow(raw: unknown): Flow {
     planApprovedAt: w.planApprovedAt as string | undefined,
     codeApprovedBy: w.codeApprovedBy as string | undefined,
     codeApprovedAt: w.codeApprovedAt as string | undefined,
+    // Assignment
+    assigneeName: w.assigneeName as string | undefined,
     // Git workflow fields
     branchName: w.branchName as string | undefined,
     branchCreated: Boolean(w.branchCreated),

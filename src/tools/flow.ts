@@ -547,11 +547,13 @@ function formatFlowList(flows: Flow[]): string {
     lines.push(`## ${emoji[state] || '📌'} ${label} (${wfs.length})\n`);
 
     for (const w of wfs) {
+      const displayId = w.displayId ? `**${w.displayId}**` : `**${w.id}**`;
       const ticket = w.ticketKey ? `[${w.ticketKey}] ` : '';
+      const assignee = w.assigneeName ? ` → @${w.assigneeName}` : '';
       const lockInfo = (w.agentStatus && w.agentStatus !== 'idle')
         ? ` [🔒 ${w.agentStatus}]`
         : ' (frei)';
-      lines.push(`- **${w.id}**: ${ticket}${w.summary}${lockInfo}`);
+      lines.push(`- ${displayId}: ${ticket}${w.summary}${assignee}${lockInfo}`);
       if (w.agentMessage) {
         lines.push(`  └─ ${w.agentMessage}`);
       }
@@ -567,8 +569,17 @@ function formatFlowDetail(flow: Flow): string {
     `# Flow: ${flow.summary}`,
     '',
     `**ID:** ${flow.id}`,
-    `**State:** ${flow.currentState}`,
   ];
+
+  if (flow.displayId) {
+    lines.push(`**Display-ID:** ${flow.displayId}`);
+  }
+
+  lines.push(`**State:** ${flow.currentState}`);
+
+  if (flow.assigneeName) {
+    lines.push(`**Assignee:** @${flow.assigneeName}`);
+  }
 
   if (flow.ticketKey) {
     lines.push(`**Ticket:** ${flow.ticketKey}`);
