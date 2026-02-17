@@ -2,7 +2,7 @@
   "name": "devflow-mcp",
   "version": "3.0.0",
   "description": "MCP Server for DevFlow - Claude Code Integration",
-  "private": true,
+  "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "files": [
