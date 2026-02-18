@@ -192,16 +192,30 @@ If feedback exists, you should address it before continuing work.`,
 // ============ Helpers ============
 
 /**
- * Resolve a partial flow ID to a full ID by prefix matching.
+ * Resolve a partial flow ID to a full ID.
+ * Supports display IDs (e.g., "WF-21"), internal IDs, and prefix matching.
  */
 async function resolveFlowId(partialId: string): Promise<string | null> {
-  // Try exact match first
+  // Check if input looks like a display ID (e.g., "WF-21", "DF-5")
+  const isDisplayId = /^[A-Za-z]+-\d+$/i.test(partialId);
+
+  if (isDisplayId) {
+    const list = await devFlowClient.listFlows();
+    if (!list.success || !list.data) {
+      return null;
+    }
+    const normalizedInput = partialId.toUpperCase();
+    const match = list.data.find(w => w.displayId?.toUpperCase() === normalizedInput);
+    return match ? match.id : null;
+  }
+
+  // Try exact match with internal ID
   const exact = await devFlowClient.getFlow(partialId);
   if (exact.success && exact.data) {
     return partialId;
   }
 
-  // Fallback: list all flows and find by prefix
+  // Fallback: prefix match on internal ID
   const list = await devFlowClient.listFlows();
   if (!list.success || !list.data) {
     return null;
