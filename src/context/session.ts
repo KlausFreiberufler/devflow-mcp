@@ -40,8 +40,6 @@ export interface ActiveContext {
   tasks: Task[];
   allowedActions: string[];
   nextStep: string;
-  leaseId?: string;
-  leaseToken?: string;
   git?: GitContext;
 }
 
@@ -87,14 +85,6 @@ class SessionContext {
     if (this.context) {
       this.context.allowedActions = actions;
     }
-  }
-
-  getLeaseId(): string | null {
-    return this.context?.leaseId ?? null;
-  }
-
-  getLeaseToken(): string | null {
-    return this.context?.leaseToken ?? null;
   }
 
   /**

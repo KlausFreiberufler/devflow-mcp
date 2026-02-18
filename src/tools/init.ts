@@ -2,7 +2,7 @@
  * devflow_init - Init-Gate Tool
  *
  * Must be called before any other tools (except discovery tools).
- * Validates flow, locks it, creates session, sets context.
+ * Validates flow, creates session via backend init endpoint, sets context.
  */
 
 import { devFlowClient } from '../api/client.js';
@@ -12,33 +12,6 @@ import { getConfig } from '../config/sync.js';
 import { formatStrictnessLevel } from '../config/types.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
-
-// Lease renewal timer
-let renewalInterval: ReturnType<typeof setInterval> | null = null;
-const RENEW_INTERVAL_MS = parseInt(process.env.LEASE_RENEW_INTERVAL || '30', 10) * 1000;
-
-export function startLeaseRenewal(leaseId: string, leaseToken: string): void {
-  stopLeaseRenewal();
-  renewalInterval = setInterval(async () => {
-    try {
-      const result = await devFlowClient.renewLease(leaseId, leaseToken);
-      if (!result.success) {
-        console.error(`Lease renewal failed: ${result.error}`);
-        stopLeaseRenewal();
-      }
-    } catch (err) {
-      console.error('Lease renewal error:', err);
-      stopLeaseRenewal();
-    }
-  }, RENEW_INTERVAL_MS);
-}
-
-export function stopLeaseRenewal(): void {
-  if (renewalInterval) {
-    clearInterval(renewalInterval);
-    renewalInterval = null;
-  }
-}
 
 const devflowInitDef = {
   name: 'devflow_init',
@@ -67,11 +40,26 @@ Call this at the start of every work session.`,
 };
 
 async function resolveFlowId(partialId: string): Promise<string | null> {
+  // Check if input looks like a display ID (e.g., "WF-21", "DF-5")
+  const isDisplayId = /^[A-Za-z]+-\d+$/i.test(partialId);
+
+  if (isDisplayId) {
+    const list = await devFlowClient.listFlows();
+    if (!list.success || !list.data) {
+      return null;
+    }
+    const normalizedInput = partialId.toUpperCase();
+    const match = list.data.find(w => w.displayId?.toUpperCase() === normalizedInput);
+    return match ? match.id : null;
+  }
+
+  // Try exact match with internal ID
   const exact = await devFlowClient.getFlow(partialId);
   if (exact.success && exact.data) {
     return partialId;
   }
 
+  // Fallback: prefix match on internal ID
   const list = await devFlowClient.listFlows();
   if (!list.success || !list.data) {
     return null;
@@ -161,61 +149,34 @@ function generateGitGuidelines(git: GitContext, projectName: string): string {
 async function handleDevflowInit(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
 
-  // Release previous context if switching flows
+  // 1. Release previous context if switching flows
   if (sessionContext.isActive()) {
-    const currentId = sessionContext.getFlowId();
-    const currentLeaseId = sessionContext.getLeaseId();
-    const currentLeaseToken = sessionContext.getLeaseToken();
-    if (currentId && currentId !== flowId) {
+    const ctx = sessionContext.get();
+    if (ctx && ctx.flow.id !== flowId) {
       try {
-        if (currentLeaseId && currentLeaseToken) {
-          await devFlowClient.releaseLease(currentLeaseId, currentLeaseToken);
+        if (ctx.sessionId) {
+          await devFlowClient.completeAgentSession(ctx.sessionId);
         }
-        await devFlowClient.updateFlow(currentId, {
+        await devFlowClient.updateFlow(ctx.flow.id, {
           agentStatus: 'idle',
         });
       } catch {
-        // Best effort
+        // Best effort cleanup
       }
-      stopLeaseRenewal();
       sessionContext.release();
     }
   }
 
-  // 1. Resolve flow ID
+  // 2. Resolve flow ID (supports partial IDs)
   const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
     return `⛔ Flow nicht gefunden: "${flowId}"\n\nNutze flow_list() um verfuegbare Flows zu sehen.`;
   }
 
-  // 2. Fetch flow
-  const result = await devFlowClient.getFlow(resolvedId);
-  if (!result.success || !result.data) {
-    return `⛔ Flow konnte nicht geladen werden: ${result.error || 'Unbekannter Fehler'}`;
-  }
-
-  const flow = result.data;
-
-  // 3. Check done state
-  if (flow.currentState === 'done') {
-    return [
-      '⛔ Flow ist bereits abgeschlossen.',
-      '',
-      `Flow: '${flow.summary}' (${flow.id})`,
-      '',
-      'Waehle einen anderen Flow mit flow_list().',
-    ].join('\n');
-  }
-
-  // 5. Acquire lease
-  let leaseId: string | undefined;
-  let leaseToken: string | undefined;
-
-  const projectId = flow.projectId;
-  const leaseResult = await devFlowClient.acquireLease(projectId, resolvedId);
-
-  if (!leaseResult.success || !leaseResult.data) {
-    const errorMsg = leaseResult.error || 'Unbekannter Fehler';
+  // 3. Call init endpoint (creates session, returns flow + tasks + permissions)
+  const initResult = await devFlowClient.initSession(resolvedId);
+  if (!initResult.success || !initResult.data) {
+    const errorMsg = initResult.error || 'Unbekannter Fehler';
     // Check for plan limit
     if (errorMsg.includes('Plan limit')) {
       return [
@@ -227,75 +188,59 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
       ].join('\n');
     }
     // Check for flow already locked
-    if (errorMsg.includes('already has an active lease')) {
+    if (errorMsg.includes('already has an active') || errorMsg.includes('already locked')) {
       return [
         '⛔ Flow ist bereits durch einen anderen Agent gesperrt.',
         '',
-        `Flow: '${flow.summary}' (${flow.id})`,
+        `Flow ID: ${resolvedId}`,
         '',
         'Warte bis die aktuelle Session endet oder trenne den Agent in DevFlow → Einstellungen → API-Zugang.',
       ].join('\n');
     }
-    return `⛔ Lease konnte nicht erstellt werden: ${errorMsg}`;
+    return `⛔ Init fehlgeschlagen: ${errorMsg}`;
   }
 
-  leaseId = leaseResult.data.leaseId;
-  leaseToken = leaseResult.data.leaseToken;
+  const { session, flow: initFlow, tasks: initTasks, warning } = initResult.data;
 
-  // Start lease renewal timer
-  startLeaseRenewal(leaseId, leaseToken);
+  // 4. Fetch full flow details (init endpoint returns minimal flow data)
+  const fullFlowResult = await devFlowClient.getFlow(resolvedId);
+  if (!fullFlowResult.success || !fullFlowResult.data) {
+    return `⛔ Flow konnte nicht geladen werden: ${fullFlowResult.error || 'Unbekannter Fehler'}`;
+  }
+  const flow = fullFlowResult.data;
 
-  // 6. Auto-advance state for visibility (idea → planning, ready → in_progress)
+  // 5. Auto-advance state for visibility (idea → planning, ready → in_progress)
   const AUTO_ADVANCE: Record<string, string> = {
     idea: 'planning',
     ready: 'in_progress',
   };
   const advanceTo = AUTO_ADVANCE[flow.currentState];
-  const lockUpdate: Record<string, unknown> = {
-    agentStatus: 'analyzing',
-    agentMessage: 'Session gestartet',
-  };
   if (advanceTo) {
-    lockUpdate.currentState = advanceTo;
-  }
-
-  const lockResult = await devFlowClient.updateFlow(resolvedId, lockUpdate);
-
-  if (!lockResult.success) {
-    // Release lease if flow lock fails
-    try { await devFlowClient.releaseLease(leaseId, leaseToken); } catch {}
-    stopLeaseRenewal();
-    return `⛔ Flow konnte nicht gesperrt werden: ${lockResult.error || 'Unbekannter Fehler'}`;
-  }
-
-  // 7. Create agent session
-  let sessionId = 'local-session';
-  try {
-    const sessionResult = await devFlowClient.createAgentSession({
-      flowId: resolvedId,
-      type: 'enforcement-v3',
-    });
-    if (sessionResult.success && sessionResult.data) {
-      sessionId = sessionResult.data.id;
+    const advanceUpdate: Record<string, unknown> = {
+      currentState: advanceTo,
+      agentStatus: advanceTo === 'planning' ? 'analyzing' : 'implementing',
+      agentMessage: 'Session gestartet',
+    };
+    const advanceResult = await devFlowClient.updateFlow(resolvedId, advanceUpdate);
+    if (advanceResult.success && advanceResult.data) {
+      // Use the updated flow
+      Object.assign(flow, advanceResult.data);
     }
-  } catch {
-    // Continue with local tracking
+  } else {
+    // Set agent status even without state advance
+    await devFlowClient.updateFlow(resolvedId, {
+      agentStatus: 'analyzing',
+      agentMessage: 'Session gestartet',
+    }).catch(() => {});
   }
 
-  // 7. Load tasks
-  let tasks: import('../api/client.js').Task[] = [];
-  try {
-    const taskResult = await devFlowClient.listTasks(resolvedId);
-    if (taskResult.success && taskResult.data) {
-      tasks = taskResult.data;
-    }
-  } catch {
-    // Continue without tasks
-  }
+  // 6. Check for feedback
+  const feedback = determineFeedback(flow);
 
-  // 8. Load git settings
+  // 7. Load git settings
   let gitContext: GitContext | undefined;
   try {
+    const projectId = flow.projectId;
     const gitResult = await devFlowClient.getGitSettings(projectId);
     if (gitResult.success && gitResult.data?.enabled) {
       const gs = gitResult.data;
@@ -323,32 +268,49 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     // Continue without git context
   }
 
-  // 9. Build context (use advanced state if auto-advanced)
-  const activeFlow = lockResult.data || flow;
-  const feedback = determineFeedback(flow);
-  const state = activeFlow.currentState;
+  // 8. Transform tasks from init response to full Task format
+  const tasks = initTasks.map(t => ({
+    id: t.id,
+    flowId: resolvedId,
+    summary: t.summary,
+    isCompleted: t.isCompleted,
+    sortOrder: 0,
+    createdAt: '',
+    status: t.status as 'todo' | 'doing' | 'done' | undefined,
+  }));
+
+  // 9. Build context
+  const state = flow.currentState;
   const allowedActions = getAllowedTools(state);
   const nextStep = determineNextStep(state, feedback, gitContext);
 
   const activeContext: ActiveContext = {
-    flow: activeFlow,
-    previousState: advanceTo ? flow.currentState : undefined,
-    sessionId,
+    flow,
+    previousState: advanceTo ? AUTO_ADVANCE[advanceTo] ? undefined : flow.currentState : undefined,
+    sessionId: session.id,
     startedAt: new Date().toISOString(),
     feedback,
     tasks,
     allowedActions,
     nextStep,
-    leaseId,
-    leaseToken,
     git: gitContext,
   };
+
+  // Track the previous state correctly for auto-advance display
+  if (advanceTo) {
+    // The original state before auto-advance
+    const originalState = Object.entries(AUTO_ADVANCE).find(([, v]) => v === flow.currentState)?.[0];
+    if (originalState) {
+      activeContext.previousState = originalState;
+    }
+  }
+
   sessionContext.init(activeContext);
 
-  return formatInitResponse(activeContext);
+  return formatInitResponse(activeContext, warning);
 }
 
-function formatInitResponse(ctx: ActiveContext): string {
+function formatInitResponse(ctx: ActiveContext, warning?: string): string {
   const w = ctx.flow;
   const lines = [
     '# Session gestartet',
@@ -364,6 +326,10 @@ function formatInitResponse(ctx: ActiveContext): string {
 
   if (ctx.previousState) {
     lines.push(`**Auto-Advance:** ${ctx.previousState} → ${w.currentState}`);
+  }
+
+  if (warning) {
+    lines.push('', `⚠️ **Warnung:** ${warning}`);
   }
 
   if (w.description) {

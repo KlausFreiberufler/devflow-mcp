@@ -9,6 +9,7 @@
  */
 
 import { sessionContext } from '../context/session.js';
+import { devFlowClient } from '../api/client.js';
 import {
   DISCOVERY_TOOLS,
   buildNoContextMessage,
@@ -90,6 +91,14 @@ class ToolRegistry {
     // Auto-Status (fire-and-forget, skip devflow_init - it sets its own status)
     if (name !== 'devflow_init') {
       applyDerivedStatus(name, args);
+    }
+
+    // Auto-Activity: update last_activity_at on every tool call
+    if (name !== 'devflow_init' && sessionContext.isActive()) {
+      const ctx = sessionContext.get();
+      if (ctx?.sessionId) {
+        devFlowClient.touchSessionActivity(ctx.sessionId).catch(() => {});
+      }
     }
 
     return result;
