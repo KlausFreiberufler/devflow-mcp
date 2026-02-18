@@ -27,7 +27,7 @@ import { sessionContext } from './context/session.js';
 import { syncConfig } from './config/sync.js';
 
 // Register tool modules
-import { tools as initTools, stopLeaseRenewal } from './tools/init.js';
+import { tools as initTools } from './tools/init.js';
 import { tools as flowTools } from './tools/flow.js';
 import { tools as taskTools } from './tools/task.js';
 import { tools as agentSessionTools } from './tools/agent-session.js';
@@ -80,23 +80,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-// Graceful shutdown: release lease + flow lock
+// Graceful shutdown: complete session + reset flow status
 function cleanup() {
-  stopLeaseRenewal();
   if (sessionContext.isActive()) {
-    const flowId = sessionContext.getFlowId();
-    const leaseId = sessionContext.getLeaseId();
-    const leaseToken = sessionContext.getLeaseToken();
-
-    // Release lease first (this also resets flow status in backend)
-    if (leaseId && leaseToken) {
-      devFlowClient.releaseLease(leaseId, leaseToken).catch(() => {});
-    }
-    // Fallback: reset flow status directly
-    if (flowId) {
-      devFlowClient.updateFlow(flowId, {
-        agentStatus: 'idle',
-      }).catch(() => {});
+    const ctx = sessionContext.get();
+    try {
+      if (ctx?.sessionId) {
+        devFlowClient.completeAgentSession(ctx.sessionId).catch(() => {});
+      }
+      if (ctx?.flow.id) {
+        devFlowClient.updateFlow(ctx.flow.id, {
+          agentStatus: 'idle',
+        }).catch(() => {});
+      }
+    } catch {
+      // Best-effort
     }
     sessionContext.release();
   }

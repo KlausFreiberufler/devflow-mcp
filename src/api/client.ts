@@ -593,51 +593,21 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return result;
   }
 
-  // ============ Agent Lease Methods ============
+  // ============ Session Init Methods ============
 
-  async acquireLease(projectId: string, flowId?: string): Promise<ApiResponse<LeaseAcquireResponse>> {
-    return this.request<LeaseAcquireResponse>('POST', '/api/agent-leases/acquire', {
-      projectId,
-      flowId,
-    });
+  async initSession(flowId: string): Promise<ApiResponse<{
+    session: { id: string; flowId: string; status: string; agentType: string; createdAt: string; updatedAt: string; lastActivityAt: string };
+    flow: { id: string; displayId: string; summary: string; description: string; currentState: string; projectId: string };
+    tasks: Array<{ id: string; summary: string; isCompleted: boolean; status: string }>;
+    allowedActions: string[];
+    nextStep: string;
+    warning?: string;
+  }>> {
+    return this.request('POST', '/api/agent-sessions/init', { flowId });
   }
 
-  async renewLease(leaseId: string, leaseToken: string): Promise<ApiResponse<{ expiresAt: string }>> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.credentials?.accessToken}`,
-      'X-Lease-Token': leaseToken,
-    };
-
-    try {
-      const response = await fetch(`${this.baseUrl}/api/agent-leases/${leaseId}/renew`, {
-        method: 'PATCH',
-        headers,
-      });
-      return await this.parseResponse<{ expiresAt: string }>(response, `/api/agent-leases/${leaseId}/renew`);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: `Lease renewal failed: ${msg}` };
-    }
-  }
-
-  async releaseLease(leaseId: string, leaseToken: string): Promise<ApiResponse<{ released: boolean }>> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.credentials?.accessToken}`,
-      'X-Lease-Token': leaseToken,
-    };
-
-    try {
-      const response = await fetch(`${this.baseUrl}/api/agent-leases/${leaseId}/release`, {
-        method: 'POST',
-        headers,
-      });
-      return await this.parseResponse<{ released: boolean }>(response, `/api/agent-leases/${leaseId}/release`);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: `Lease release failed: ${msg}` };
-    }
+  async touchSessionActivity(sessionId: string): Promise<ApiResponse<unknown>> {
+    return this.request('PATCH', `/api/agent-sessions/${sessionId}/activity`);
   }
 
   // ============ Search Methods ============
@@ -839,12 +809,6 @@ export interface AgentSlotStatus {
     agentStatus: string;
     since: string;
   };
-}
-
-export interface LeaseAcquireResponse {
-  leaseId: string;
-  leaseToken: string;
-  expiresAt: string;
 }
 
 // ============ Response Transformers ============
