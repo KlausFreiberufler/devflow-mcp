@@ -17,7 +17,8 @@
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "setup": "node dist/setup/setup.js",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "publish:devflow": "bash /Users/klaus/Documents/devflow/scripts/build-mcp-package.sh"
   },
   "repository": {
     "type": "git",
