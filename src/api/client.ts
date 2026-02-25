@@ -372,7 +372,7 @@ Or set: export DEVFLOW_TOKEN="your-token"
       flowType: flow.flowType || 'feature',
     };
     if (flow.acceptanceCriteria) {
-      apiFlow.acceptanceCriteria = JSON.stringify(flow.acceptanceCriteria);
+      apiFlow.acceptanceCriteria = flow.acceptanceCriteria;
     }
 
     const result = await this.request<unknown>('POST', '/api/flows', apiFlow);

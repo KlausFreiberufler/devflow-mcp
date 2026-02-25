@@ -8,6 +8,7 @@ import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
 import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
+import { resolveFlowId } from '../utils/resolve-flow-id.js';
 
 // ============ Tool Definitions ============
 
@@ -127,6 +128,11 @@ IMPORTANT: Some state transitions require mandatory fields:
         type: 'string',
         description: 'Override for agent message (normally auto-derived, only set if needed)'
       },
+      acceptanceCriteria: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'List of acceptance criteria'
+      },
       implementationPlan: {
         type: 'string',
         description: 'Markdown content of the implementation plan (required for approval state)'
@@ -188,46 +194,6 @@ If feedback exists, you should address it before continuing work.`,
     required: ['flowId']
   }
 };
-
-// ============ Helpers ============
-
-/**
- * Resolve a partial flow ID to a full ID.
- * Supports display IDs (e.g., "WF-21"), internal IDs, and prefix matching.
- */
-async function resolveFlowId(partialId: string): Promise<string | null> {
-  // Check if input looks like a display ID (e.g., "WF-21", "DF-5")
-  const isDisplayId = /^[A-Za-z]+-\d+$/i.test(partialId);
-
-  if (isDisplayId) {
-    const list = await devFlowClient.listFlows();
-    if (!list.success || !list.data) {
-      return null;
-    }
-    const normalizedInput = partialId.toUpperCase();
-    const match = list.data.find(w => w.displayId?.toUpperCase() === normalizedInput);
-    return match ? match.id : null;
-  }
-
-  // Try exact match with internal ID
-  const exact = await devFlowClient.getFlow(partialId);
-  if (exact.success && exact.data) {
-    return partialId;
-  }
-
-  // Fallback: prefix match on internal ID
-  const list = await devFlowClient.listFlows();
-  if (!list.success || !list.data) {
-    return null;
-  }
-
-  const matches = list.data.filter(w => w.id.startsWith(partialId));
-  if (matches.length === 1) {
-    return matches[0].id;
-  }
-
-  return null;
-}
 
 // ============ State Transition Guardrails (from config) ============
 
@@ -356,6 +322,7 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   const currentState = args.currentState as Flow['currentState'] | undefined;
   const agentStatus = args.agentStatus as string | undefined;
   const agentMessage = args.agentMessage as string | undefined;
+  const acceptanceCriteria = args.acceptanceCriteria as string[] | undefined;
   const implementationPlan = args.implementationPlan as string | undefined;
   const agentSummary = args.agentSummary as string | undefined;
   const testingInstructions = args.testingInstructions as string | undefined;
@@ -450,6 +417,7 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   if (currentState) cleanUpdate.currentState = currentState;
   if (agentStatus) cleanUpdate.agentStatus = agentStatus;
   if (agentMessage) cleanUpdate.agentMessage = agentMessage;
+  if (acceptanceCriteria) cleanUpdate.acceptanceCriteria = acceptanceCriteria;
   if (implementationPlan) cleanUpdate.implementationPlan = implementationPlan.replace(/\\n/g, '\n');
   if (agentSummary) cleanUpdate.agentSummary = agentSummary.replace(/\\n/g, '\n');
   if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions.replace(/\\n/g, '\n');
