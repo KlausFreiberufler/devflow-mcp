@@ -127,6 +127,11 @@ IMPORTANT: Some state transitions require mandatory fields:
         type: 'string',
         description: 'Override for agent message (normally auto-derived, only set if needed)'
       },
+      acceptanceCriteria: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'List of acceptance criteria'
+      },
       implementationPlan: {
         type: 'string',
         description: 'Markdown content of the implementation plan (required for approval state)'
@@ -356,6 +361,7 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   const currentState = args.currentState as Flow['currentState'] | undefined;
   const agentStatus = args.agentStatus as string | undefined;
   const agentMessage = args.agentMessage as string | undefined;
+  const acceptanceCriteria = args.acceptanceCriteria as string[] | undefined;
   const implementationPlan = args.implementationPlan as string | undefined;
   const agentSummary = args.agentSummary as string | undefined;
   const testingInstructions = args.testingInstructions as string | undefined;
@@ -450,6 +456,7 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   if (currentState) cleanUpdate.currentState = currentState;
   if (agentStatus) cleanUpdate.agentStatus = agentStatus;
   if (agentMessage) cleanUpdate.agentMessage = agentMessage;
+  if (acceptanceCriteria) cleanUpdate.acceptanceCriteria = acceptanceCriteria;
   if (implementationPlan) cleanUpdate.implementationPlan = implementationPlan.replace(/\\n/g, '\n');
   if (agentSummary) cleanUpdate.agentSummary = agentSummary.replace(/\\n/g, '\n');
   if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions.replace(/\\n/g, '\n');
