@@ -422,6 +422,15 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
       }
     }
 
+    // Docs update reminder when transitioning to review
+    if (currentState === 'review' && strictness.docsUpdate >= 3) {
+      if (strictness.docsUpdate >= 5) {
+        warnings.push('📖 DOCS-PFLICHT: Stelle sicher dass du alle relevanten Docs geprueft und aktualisiert hast (EN + DE). Nutze GET /api/docs/relevant?flowId=<id> um betroffene Seiten zu finden.');
+      } else {
+        warnings.push('📖 Docs-Hinweis: Pruefe ob Dokumentation aktualisiert werden muss. Nutze GET /api/docs/relevant?flowId=<id>.');
+      }
+    }
+
     // Git discipline enforcement: check branch/commits before review
     if (currentState === 'review' && strictness.gitDiscipline >= 4) {
       if (currentFlow.success && currentFlow.data) {

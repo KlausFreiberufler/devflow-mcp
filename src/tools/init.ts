@@ -108,9 +108,19 @@ function determineNextStep(state: string, feedback: SessionFeedback | null, git?
   }
 
   // Enhanced progress guidance with self-review
-  if (state === 'in_progress' && git?.enabled) {
-    const commitHint = git.commitMessagePrompt ? ' (nach Commit-Richtlinien)' : '';
-    return `Implementiere die Anforderungen. Wenn fertig: Self-Review durchfuehren (Diff pruefen, Findings fixen, sauber committen${commitHint}). Testing-Instructions erstellen → flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "review" }).`;
+  if (state === 'in_progress') {
+    const commitHint = git?.enabled && git.commitMessagePrompt ? ' (nach Commit-Richtlinien)' : '';
+    let guidance = `Implementiere die Anforderungen. Wenn fertig: Self-Review durchfuehren (Diff pruefen, Findings fixen, sauber committen${commitHint}). Testing-Instructions erstellen → flow_update({ agentSummary: "...", testingInstructions: "...", currentState: "review" }).`;
+
+    // Add docs update guidance based on docsUpdate strictness level
+    const docsLevel = getConfig().strictness.docsUpdate;
+    if (docsLevel >= 5) {
+      guidance += '\n\n⚠️ DOCS-UPDATE PFLICHT: Vor dem Review MUSST du alle relevanten Docs pruefen und aktualisieren. Nutze GET /api/docs/relevant?flowId=<flowId> um betroffene Seiten zu finden. Aktualisiere EN + DE Versionen. Docs-Commit ist Pflicht.';
+    } else if (docsLevel >= 3) {
+      guidance += '\n\nDOCS-UPDATE: Bevor du zu Review wechselst, pruefe ob Dokumentation aktualisiert werden muss: GET /api/docs/relevant?flowId=<flowId>. Aktualisiere betroffene Docs (EN + DE) und committe die Aenderungen.';
+    }
+
+    return guidance;
   }
 
   return NEXT_STEP_GUIDANCE[state] || 'Pruefe den Flow-Status.';
