@@ -60,6 +60,14 @@ const REVIEW_REQUIRED_RULES: Record<number, string> = {
   5: 'Vollstaendiges Review mit agentSummary und testingInstructions. User muss testen und explizit genehmigen.',
 };
 
+const DOCS_UPDATE_RULES: Record<number, string> = {
+  1: '',
+  2: 'Pruefe bei Review ob Docs betroffen sind.',
+  3: 'Pruefe relevante Docs und aktualisiere sie bei Bedarf.',
+  4: 'Du MUSST relevante Docs pruefen. Nutze GET /api/docs/relevant um betroffene Seiten zu finden.',
+  5: 'Vor jedem Review MUSST du alle relevanten Docs pruefen und aktualisieren (EN + DE). Docs-Commit ist Pflicht.',
+};
+
 function formatLevel(level: number): string {
   const info = STRICTNESS_LABELS[level] || STRICTNESS_LABELS[3];
   return `${info.emoji} ${info.label}`;
@@ -77,6 +85,7 @@ function generateStrictnessRules(s: StrictnessConfig): string {
     { title: 'Task-Tracking', key: 'taskTracking', rules: TASK_TRACKING_RULES },
     { title: 'Git-Disziplin', key: 'gitDiscipline', rules: GIT_DISCIPLINE_RULES },
     { title: 'Review-Pflicht', key: 'reviewRequired', rules: REVIEW_REQUIRED_RULES },
+    { title: 'Docs-Update', key: 'docsUpdate', rules: DOCS_UPDATE_RULES },
   ];
 
   for (const section of sections) {

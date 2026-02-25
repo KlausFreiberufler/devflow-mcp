@@ -322,7 +322,7 @@ function formatInitResponse(ctx: ActiveContext, warning?: string): string {
 
   // Show strictness levels
   const s = getConfig().strictness;
-  lines.push(`**Strictness:** Flow ${formatStrictnessLevel(s.flowRequired)} | Plan ${formatStrictnessLevel(s.planRequired)} | Tasks ${formatStrictnessLevel(s.taskTracking)} | Git ${formatStrictnessLevel(s.gitDiscipline)} | Review ${formatStrictnessLevel(s.reviewRequired)}`);
+  lines.push(`**Strictness:** Flow ${formatStrictnessLevel(s.flowRequired)} | Plan ${formatStrictnessLevel(s.planRequired)} | Tasks ${formatStrictnessLevel(s.taskTracking)} | Git ${formatStrictnessLevel(s.gitDiscipline)} | Review ${formatStrictnessLevel(s.reviewRequired)} | Docs ${formatStrictnessLevel(s.docsUpdate)}`);
 
   if (ctx.previousState) {
     lines.push(`**Auto-Advance:** ${ctx.previousState} → ${w.currentState}`);

@@ -14,6 +14,7 @@ export interface StrictnessConfig {
   taskTracking: number;   // 1-5
   gitDiscipline: number;  // 1-5
   reviewRequired: number; // 1-5
+  docsUpdate: number;     // 1-5
 }
 
 export const DEFAULT_STRICTNESS: StrictnessConfig = {
@@ -22,6 +23,7 @@ export const DEFAULT_STRICTNESS: StrictnessConfig = {
   taskTracking: 3,
   gitDiscipline: 3,
   reviewRequired: 3,
+  docsUpdate: 1,
 };
 
 export const STRICTNESS_LABELS: Record<number, { emoji: string; label: string }> = {
