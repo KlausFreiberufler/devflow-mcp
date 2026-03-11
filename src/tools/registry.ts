@@ -64,17 +64,38 @@ class ToolRegistry {
       }
 
       // Guard 2: State-Guard (with stale-context refresh)
-      if (!sessionContext.isToolAllowed(name)) {
+      // Pipeline allowedActions take precedence over config-based permissions
+      const ctx = sessionContext.get();
+      const pipelineActions = ctx?.pipelineStep ? ctx.allowedActions : null;
+      const isAllowed = pipelineActions
+        ? pipelineActions.includes(name)
+        : sessionContext.isToolAllowed(name);
+
+      if (!isAllowed) {
         // Context might be stale if user changed state in UI - refresh before blocking
-        const stateChanged = await sessionContext.refreshFromBackend();
-        if (!stateChanged || !sessionContext.isToolAllowed(name)) {
-          const ctx = sessionContext.get()!;
-          logToolCall({ toolName: name, args, blocked: true, blockReason: `State '${ctx.flow.currentState}'` });
+        // (only for config-based permissions; pipeline actions are authoritative)
+        if (!pipelineActions) {
+          const stateChanged = await sessionContext.refreshFromBackend();
+          if (stateChanged && sessionContext.isToolAllowed(name)) {
+            // State changed and tool is now allowed - proceed
+          } else {
+            const freshCtx = sessionContext.get()!;
+            logToolCall({ toolName: name, args, blocked: true, blockReason: `State '${freshCtx.flow.currentState}'` });
+            return buildStateBlockMessage(
+              name,
+              freshCtx.flow.summary,
+              freshCtx.flow.id,
+              freshCtx.flow.currentState,
+            );
+          }
+        } else {
+          const blockedCtx = sessionContext.get()!;
+          logToolCall({ toolName: name, args, blocked: true, blockReason: `Pipeline step '${blockedCtx.pipelineStep}'` });
           return buildStateBlockMessage(
             name,
-            ctx.flow.summary,
-            ctx.flow.id,
-            ctx.flow.currentState,
+            blockedCtx.flow.summary,
+            blockedCtx.flow.id,
+            blockedCtx.flow.currentState,
           );
         }
       }
