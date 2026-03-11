@@ -25,6 +25,7 @@ import { devFlowClient } from './api/client.js';
 import { registry } from './tools/registry.js';
 import { sessionContext } from './context/session.js';
 import { syncConfig } from './config/sync.js';
+import { MCP_VERSION } from './config/version.js';
 
 // Register tool modules
 import { tools as initTools } from './tools/init.js';
@@ -55,7 +56,7 @@ registry.register(searchTools);
 registry.register(guidelinesTools);
 
 const server = new Server(
-  { name: 'devflow', version: '3.0.0' },
+  { name: 'devflow', version: MCP_VERSION },
   { capabilities: { tools: {} } }
 );
 
@@ -113,7 +114,7 @@ async function main() {
   await server.connect(transport);
 
   const projectName = devFlowClient.getLinkedProjectName();
-  console.error(`DevFlow MCP Server v3.0.0 (${registry.size} tools, enforcement active)`);
+  console.error(`DevFlow MCP Server v${MCP_VERSION} (${registry.size} tools, enforcement active)`);
   if (projectName) {
     console.error(`Linked to project: ${projectName}`);
   }
