@@ -178,6 +178,7 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   }
 
   const { session, flow: initFlow, tasks: initTasks, warning } = initResult.data;
+  const initData = initResult.data as Record<string, unknown>;
 
   // 4. Fetch full flow details (init endpoint returns minimal flow data)
   const fullFlowResult = await devFlowClient.getFlow(resolvedId);
@@ -284,6 +285,19 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
 
   sessionContext.init(activeContext);
 
+  // 10. Store pipeline info if present (Phase 2 init response)
+  if (initData.pipelineStep) {
+    const gate = initData.gate as { blocked?: boolean } | undefined;
+    sessionContext.update({
+      pipelineStep: initData.pipelineStep as string,
+      skill: (initData.skill as { slug: string; name: string; description?: string }) || null,
+      gateBlocked: gate?.blocked || false,
+      retryCount: (initData.retryCount as number) || 0,
+      previousFeedback: (initData.previousFeedback as string) || null,
+      allowedActions: (initData.allowedActions as string[]) || null,
+    });
+  }
+
   return formatInitResponse(activeContext, warning);
 }
 
@@ -355,6 +369,22 @@ function formatInitResponse(ctx: ActiveContext, warning?: string): string {
       lines.push(`${flowStatus} Feature-Branch: \`${ctx.git.flowBranchName}\``);
     }
     lines.push(`Basis: \`${baseBranch}\``);
+  }
+
+  // Pipeline section (Phase 2)
+  if (ctx.pipelineStep) {
+    const executor = (ctx.skill?.slug) || 'agent';
+    lines.push('', '## Pipeline');
+    lines.push(`**Current step:** ${ctx.pipelineStep} (${executor})`);
+    if (ctx.skill) {
+      lines.push(`**Skill:** ${ctx.skill.name}${ctx.skill.description ? ` — ${ctx.skill.description}` : ''}`);
+    }
+    if (ctx.gateBlocked) {
+      lines.push('', `⚠️ **Gate blocked:** Step '${ctx.pipelineStep}' requires human action. Wait for user in DevFlow UI.`);
+    }
+    if (ctx.retryCount && ctx.retryCount > 0 && ctx.previousFeedback) {
+      lines.push('', `🔄 **Retry #${ctx.retryCount}** — Previous feedback:`, ctx.previousFeedback);
+    }
   }
 
   lines.push(
