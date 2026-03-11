@@ -52,18 +52,38 @@ Das Setup erkennt vorhandene Registrierungen und aktualisiert sie.
 ## Flow-Prozess
 
 ```
-idea → planning → plan_review → progress → code_review → testing → done
+idea → planning → approval → ready → in_progress → review → done
 ```
 
-Review-States (`plan_review`, `code_review`, `testing`) sind Wartezustände.
+Review-States (`approval`, `review`) sind Wartezustände.
 Der User muss in der DevFlow-UI genehmigen bevor es weitergeht.
 
 ### Pflichtfelder bei State-Transitions
 
 | Transition | Pflichtfelder |
 |------------|--------------|
-| → `plan_review` | `implementationPlan` |
-| → `code_review` | `agentSummary`, `testingInstructions` |
+| → `approval` | `implementationPlan` |
+| → `review` | `agentSummary`, `testingInstructions` |
+
+## Pipeline Integration (v3.0)
+
+Projekte mit Pipeline-Konfiguration erhalten erweiterte Features:
+
+### Pipeline-Kontext bei Init
+
+`devflow_init` zeigt automatisch:
+- **Aktueller Pipeline-Step** (z.B. "Code Review")
+- **Zugewiesener Skill** (z.B. "Code Reviewer")
+- **Gate-Warnung** wenn der Step auf menschliche Aktion wartet
+- **Retry-Info** bei Ablehnungen (Feedback vom letzten Review)
+
+### Erlaubte Aktionen
+
+Wenn eine Pipeline konfiguriert ist, bestimmt der **Pipeline-Orchestrator** welche Tools erlaubt sind (`allowedActions`). Ohne Pipeline gelten die Standard-Permissions basierend auf dem Flow-State.
+
+### Gate-Handling
+
+Versucht der Agent eine State-Transition die einen Human-Gate erfordert, gibt das Backend einen 403-Fehler zurück. Der MCP-Server erkennt dies und zeigt eine klare Meldung — ohne Retry-Versuche.
 
 ## Verfügbare MCP-Tools
 
