@@ -10,6 +10,7 @@ import { sessionContext, type SessionFeedback, type ActiveContext, type GitConte
 import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import { getConfig } from '../config/sync.js';
 import { formatStrictnessLevel } from '../config/types.js';
+import { checkForUpdate } from '../config/version-check.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
@@ -298,10 +299,18 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     });
   }
 
-  return formatInitResponse(activeContext, warning);
+  // Version check (non-blocking, cached)
+  const baseUrl = devFlowClient.getBaseUrl();
+  const updateInfo = await checkForUpdate(baseUrl);
+
+  return formatInitResponse(activeContext, warning, updateInfo);
 }
 
-function formatInitResponse(ctx: ActiveContext, warning?: string): string {
+function formatInitResponse(
+  ctx: ActiveContext,
+  warning?: string,
+  updateAvailable?: { currentVersion: string; latestVersion: string } | null,
+): string {
   const w = ctx.flow;
   const lines = [
     '# Session gestartet',
@@ -393,6 +402,13 @@ function formatInitResponse(ctx: ActiveContext, warning?: string): string {
     `**Erlaubte Aktionen:** ${ctx.allowedActions.join(', ')}`,
     `**Naechster Schritt:** ${ctx.nextStep}`,
   );
+
+  if (updateAvailable) {
+    lines.push('');
+    lines.push('---');
+    lines.push(`**⚠️ Update available:** v${updateAvailable.currentVersion} → v${updateAvailable.latestVersion}`);
+    lines.push('Run: `npx github:KlausFreiberufler/devflow-mcp setup`');
+  }
 
   return lines.join('\n');
 }
