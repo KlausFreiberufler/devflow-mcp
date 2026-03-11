@@ -81,7 +81,7 @@ Requires a projectId (use project_list to find it) and a summary.`,
       },
       flowType: {
         type: 'string',
-        enum: ['feature', 'bug', 'chore'],
+        enum: ['feature', 'hotfix'],
         description: 'Type of flow (default: feature)'
       },
       acceptanceCriteria: {
@@ -429,6 +429,18 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   const result = await devFlowClient.updateFlow(resolvedId, cleanUpdate);
 
   if (!result.success || !result.data) {
+    // Handle 403 gate blocked response
+    if (result.statusCode === 403 && result.gate) {
+      return [
+        `⛔ Gate blocked: Step '${result.gate.pipelineStep}' requires human action.`,
+        '',
+        `Executor: ${result.gate.executor}`,
+        result.gate.reason || '',
+        '',
+        'Wait for the user to proceed in DevFlow UI.',
+        'Do NOT retry this transition.',
+      ].filter(Boolean).join('\n');
+    }
     return `Error: ${result.error || 'Failed to update flow'}`;
   }
 
