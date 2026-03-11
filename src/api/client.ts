@@ -25,6 +25,8 @@ interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  gate?: { pipelineStep: string; executor: string; reason?: string };
+  statusCode?: number;
 }
 
 export class DevFlowClient {
@@ -223,15 +225,21 @@ Or set: export DEVFLOW_TOKEN="your-token"
     // Handle HTTP error status codes
     if (!response.ok) {
       try {
-        const errorData = await response.json() as { error?: string; message?: string };
-        return {
+        const errorData = await response.json() as { error?: string; message?: string; gate?: { pipelineStep: string; executor: string; reason?: string } };
+        const result: ApiResponse<T> = {
           success: false,
-          error: errorData.error || errorData.message || `HTTP ${response.status}`
+          error: errorData.error || errorData.message || `HTTP ${response.status}`,
+          statusCode: response.status,
         };
+        if (errorData.gate) {
+          result.gate = errorData.gate;
+        }
+        return result;
       } catch {
         return {
           success: false,
-          error: `HTTP ${response.status}: ${response.statusText}`
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          statusCode: response.status,
         };
       }
     }
