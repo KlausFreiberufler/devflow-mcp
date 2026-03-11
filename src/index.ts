@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * DevFlow MCP Server v3.0.0
+ * DevFlow MCP Server — version defined in config/version.ts
  *
  * Enforced flow development with Init-Gate.
  * Tools are gated: devflow_init must be called first.
