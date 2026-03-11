@@ -41,6 +41,11 @@ export interface ActiveContext {
   allowedActions: string[];
   nextStep: string;
   git?: GitContext;
+  pipelineStep?: string | null;
+  skill?: { slug: string; name: string; description?: string } | null;
+  gateBlocked?: boolean;
+  retryCount?: number;
+  previousFeedback?: string | null;
 }
 
 class SessionContext {
@@ -73,6 +78,12 @@ class SessionContext {
   isToolAllowed(toolName: string): boolean {
     if (!this.context) return false;
     return this.context.allowedActions.includes(toolName);
+  }
+
+  update(partial: Partial<ActiveContext>): void {
+    if (this.context) {
+      Object.assign(this.context, partial);
+    }
   }
 
   updateFlow(flow: Flow): void {
