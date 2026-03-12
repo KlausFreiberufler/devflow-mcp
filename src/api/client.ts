@@ -35,6 +35,7 @@ export class DevFlowClient {
   private credentialsPath: string;
   private projectConfig: ProjectConfig | null = null;
   private workingDir: string;
+  private agentSessionId: string | null = null;
   private scopedProjectId: string | null = null;
 
   constructor(baseUrl?: string, workingDir?: string) {
@@ -270,8 +271,11 @@ Or set: export DEVFLOW_TOKEN="your-token"
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.credentials.accessToken}`
+      'Authorization': `Bearer ${this.credentials.accessToken}`,
     };
+    if (this.agentSessionId) {
+      headers['X-Agent-Session'] = this.agentSessionId;
+    }
 
     const options: RequestInit = { method, headers };
     if (body) {
@@ -568,6 +572,14 @@ Or set: export DEVFLOW_TOKEN="your-token"
    */
   getBaseUrl(): string {
     return this.baseUrl;
+  }
+
+  setAgentSessionId(sessionId: string | null): void {
+    this.agentSessionId = sessionId;
+  }
+
+  getAgentSessionId(): string | null {
+    return this.agentSessionId;
   }
 
   /**

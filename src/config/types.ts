@@ -119,9 +119,9 @@ export function deriveEnforcementFromStrictness(s: StrictnessConfig): {
       fields: ['implementationPlan'],
       message: `⛔ Strictness ${formatStrictnessLevel(s.planRequired)} erfordert einen Plan.\nErstelle einen Plan: flow_update({ implementationPlan: "...", currentState: "approval" }).`,
     };
-    blockedTransitions.approval = [
-      { target: 'ready', reason: `Der User muss den Plan in der UI genehmigen (Strictness: ${formatStrictnessLevel(s.planRequired)}).` },
-    ];
+    // Note: approval→ready and review→done transitions are enforced by the backend
+    // pipeline gate system, which respects the executor config (human vs agent).
+    // No client-side blockedTransitions needed — backend is the single source of truth.
   }
 
   // --- Review enforcement ---
@@ -130,9 +130,6 @@ export function deriveEnforcementFromStrictness(s: StrictnessConfig): {
       fields: ['agentSummary', 'testingInstructions'],
       message: `⛔ Strictness ${formatStrictnessLevel(s.reviewRequired)} erfordert agentSummary + testingInstructions.\nBeschreibe was du implementiert hast und wie der User testen soll.`,
     };
-    blockedTransitions.review = [
-      { target: 'done', reason: `Der User muss das Review in der UI abschliessen (Strictness: ${formatStrictnessLevel(s.reviewRequired)}).` },
-    ];
   }
 
   return { requiredFields, blockedTransitions };
