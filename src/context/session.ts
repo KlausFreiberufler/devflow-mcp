@@ -116,7 +116,17 @@ class SessionContext {
 
       if (freshState !== cachedState) {
         this.context.flow = result.data;
-        this.context.allowedActions = getAllowedTools(freshState);
+        // Re-init session to get pipeline-aware allowedActions from backend
+        try {
+          const initResult = await devFlowClient.initSession(this.context.flow.id);
+          if (initResult.success && initResult.data?.allowedActions) {
+            this.context.allowedActions = initResult.data.allowedActions as string[];
+          } else {
+            this.context.allowedActions = getAllowedTools(freshState);
+          }
+        } catch {
+          this.context.allowedActions = getAllowedTools(freshState);
+        }
         return true;
       }
     } catch {

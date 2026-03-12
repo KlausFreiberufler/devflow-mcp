@@ -181,6 +181,9 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   const { session, flow: initFlow, tasks: initTasks, warning } = initResult.data;
   const initData = initResult.data as Record<string, unknown>;
 
+  // Store session ID on client for X-Agent-Session header
+  devFlowClient.setAgentSessionId(session.id);
+
   // 4. Fetch full flow details (init endpoint returns minimal flow data)
   const fullFlowResult = await devFlowClient.getFlow(resolvedId);
   if (!fullFlowResult.success || !fullFlowResult.data) {
