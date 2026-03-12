@@ -151,6 +151,12 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     return `⛔ Flow nicht gefunden: "${flowId}"\n\nNutze flow_list() um verfuegbare Flows zu sehen.`;
   }
 
+  // 2b. Check if flow is archived
+  const preCheck = await devFlowClient.getFlow(resolvedId);
+  if (preCheck.success && preCheck.data && (preCheck.data as unknown as Record<string, unknown>).archivedAt) {
+    return '⛔ Dieser Flow ist archiviert. Archivierte Flows koennen nicht bearbeitet werden.\n\nNutze die DevFlow-UI um den Flow zuerst wiederherzustellen.';
+  }
+
   // 3. Call init endpoint (creates session, returns flow + tasks + permissions)
   const initResult = await devFlowClient.initSession(resolvedId);
   if (!initResult.success || !initResult.data) {
