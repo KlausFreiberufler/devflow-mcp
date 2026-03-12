@@ -290,16 +290,23 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   sessionContext.init(activeContext);
 
   // 10. Store pipeline info if present (Phase 2 init response)
+  // Note: Only override allowedActions from pipeline when NO auto-advance happened.
+  // The backend init response reflects the pre-advance state, so its allowedActions
+  // would be stale after auto-advance (e.g. 'ready' actions instead of 'in_progress').
   if (initData.pipelineStep) {
     const gate = initData.gate as { blocked?: boolean } | undefined;
-    sessionContext.update({
+    const pipelineUpdate: Partial<ActiveContext> = {
       pipelineStep: initData.pipelineStep as string,
       skill: (initData.skill as { slug: string; name: string; description?: string }) || null,
       gateBlocked: gate?.blocked || false,
       retryCount: (initData.retryCount as number) || 0,
       previousFeedback: (initData.previousFeedback as string) || null,
-      allowedActions: (initData.allowedActions as string[]) || null,
-    });
+    };
+    // Only use pipeline allowedActions if: (a) it's a real array, and (b) no auto-advance
+    if (!advanceTo && Array.isArray(initData.allowedActions)) {
+      pipelineUpdate.allowedActions = initData.allowedActions as string[];
+    }
+    sessionContext.update(pipelineUpdate);
   }
 
   // Version check (non-blocking, cached)

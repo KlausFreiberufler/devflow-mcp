@@ -76,14 +76,14 @@ export const DEFAULT_CONFIG: RemoteConfig = {
   statePermissions: {
     idea: ['flow_update', 'flow_get'],
     planning: ['flow_update', 'flow_get', 'flow_get_feedback', 'project_guidelines_get'],
-    approval: ['flow_get', 'flow_get_feedback'],
+    approval: ['flow_update', 'flow_get', 'flow_get_feedback'],
     ready: ['flow_update', 'flow_get', 'task_list', 'project_guidelines_get'],
     in_progress: [
       'flow_update', 'flow_get', 'task_list', 'task_create', 'task_update',
       'project_knowledge_get', 'project_knowledge_update',
       'project_guidelines_get', 'project_guidelines_update',
     ],
-    review: ['flow_get', 'flow_get_feedback', 'task_list', 'project_guidelines_get'],
+    review: ['flow_update', 'flow_get', 'flow_get_feedback', 'task_list', 'project_guidelines_get'],
     done: ['flow_get', 'task_list', 'project_guidelines_get'],
   },
   nextStepGuidance: {
