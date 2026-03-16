@@ -7,7 +7,7 @@ import { devFlowClient, type Flow } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
-import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
+import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
 
 // ============ Tool Definitions ============
@@ -273,7 +273,6 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
 
   // Auto-init: set session context for the newly created flow
   const newFlow = result.data;
-  const allowedActions = getAllowedTools(newFlow.currentState);
   const nextStep = NEXT_STEP_GUIDANCE[newFlow.currentState] || 'Beginne mit der Planung.';
 
   // Lock the flow
@@ -294,6 +293,21 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
     }
   } catch {
     // Continue with local tracking
+  }
+
+  // Fetch allowedActions from backend (sole source of truth)
+  let allowedActions: string[] = [];
+  try {
+    const nextStepResult = await devFlowClient.getNextStep(newFlow.id);
+    if (nextStepResult.success && nextStepResult.data && Array.isArray(nextStepResult.data.allowedActions)) {
+      allowedActions = nextStepResult.data.allowedActions as string[];
+    }
+  } catch {
+    // Fall back to init response if next-step not available
+  }
+  if (allowedActions.length === 0) {
+    // Minimal fallback: at least allow flow_update and flow_get for new flows
+    allowedActions = ['flow_update', 'flow_get'];
   }
 
   sessionContext.init({
@@ -342,15 +356,8 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   // Guardrail: Check state transitions
   if (currentState) {
     const currentFlow = await devFlowClient.getFlow(resolvedId);
-    if (currentFlow.success && currentFlow.data) {
-      const fromState = currentFlow.data.currentState;
-
-      // Check blocked transitions (user-only, from config)
-      const blocked = getConfig().blockedTransitions[fromState]?.find(b => b.target === currentState);
-      if (blocked) {
-        return `⛔ Blockiert: ${blocked.reason}\n\nAktueller State: ${fromState} → Gewünschter State: ${currentState}\n\nDiese Transition kann nur vom User über die DevFlow UI ausgelöst werden.`;
-      }
-    }
+    // Note: blocked transitions are enforced by the backend pipeline gate system.
+    // The MCP no longer maintains its own blockedTransitions map.
 
     // Check required fields for target state (from config, derived from strictness)
     const required = getConfig().requiredFields[currentState];
@@ -362,7 +369,7 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
       }
     }
 
-    // Strictness-based enforcement (beyond requiredFields/blockedTransitions)
+    // Strictness-based enforcement (beyond requiredFields)
     const strictness = getConfig().strictness;
 
     // Task tracking enforcement: check tasks exist before review
@@ -449,8 +456,22 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
     const updatedFlow = result.data!;
     sessionContext.updateFlow(updatedFlow);
 
+    // Re-fetch allowedActions from backend after state change
+    try {
+      const nextStepResult = await devFlowClient.getNextStep(resolvedId);
+      if (nextStepResult.success && nextStepResult.data && Array.isArray(nextStepResult.data.allowedActions)) {
+        sessionContext.updateAllowedActions(nextStepResult.data.allowedActions as string[]);
+        sessionContext.update({
+          stepKind: (nextStepResult.data.kind as string) || null,
+          transitionPolicy: (nextStepResult.data.transitionPolicy as string) || null,
+          pipelineStep: (nextStepResult.data.pipelineStep as string) || null,
+        });
+      }
+    } catch {
+      // Non-critical: keep existing allowedActions if refresh fails
+    }
+
     const newState = updatedFlow.currentState;
-    sessionContext.updateAllowedActions(getAllowedTools(newState));
 
     // Auto-complete session on review/wait/done states
     if (['approval', 'review', 'done'].includes(newState)) {

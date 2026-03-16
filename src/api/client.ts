@@ -630,6 +630,14 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('PATCH', `/api/agent-sessions/${sessionId}/activity`);
   }
 
+  /**
+   * Get the next pipeline step for a flow.
+   * Returns allowedActions, pipelineStep, kind, transitionPolicy, etc.
+   */
+  async getNextStep(flowId: string): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request<Record<string, unknown>>('GET', `/api/flows/${flowId}/next-step`);
+  }
+
   // ============ Search Methods ============
 
   async search(query: string, type?: string): Promise<ApiResponse<SearchResult[]>> {

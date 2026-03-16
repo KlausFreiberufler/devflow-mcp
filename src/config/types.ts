@@ -45,9 +45,6 @@ export interface RemoteConfig {
   /** Version hash for sync-check */
   version: string;
 
-  /** State-permission map: state -> allowed tool names */
-  statePermissions: Record<string, string[]>;
-
   /** Next step guidance per state */
   nextStepGuidance: Record<string, string>;
 
@@ -57,13 +54,7 @@ export interface RemoteConfig {
     message: string;
   }>;
 
-  /** Blocked transitions (user-only via UI) */
-  blockedTransitions: Record<string, {
-    target: string;
-    reason: string;
-  }[]>;
-
-  /** Strictness configuration (derives requiredFields + blockedTransitions) */
+  /** Strictness configuration (derives requiredFields) */
   strictness: StrictnessConfig;
 }
 
@@ -73,19 +64,6 @@ export interface RemoteConfig {
  */
 export const DEFAULT_CONFIG: RemoteConfig = {
   version: 'hardcoded-v5.0',
-  statePermissions: {
-    idea: ['flow_update', 'flow_get'],
-    planning: ['flow_update', 'flow_get', 'flow_get_feedback', 'project_guidelines_get'],
-    approval: ['flow_update', 'flow_get', 'flow_get_feedback'],
-    ready: ['flow_update', 'flow_get', 'task_list', 'project_guidelines_get'],
-    in_progress: [
-      'flow_update', 'flow_get', 'task_list', 'task_create', 'task_update',
-      'project_knowledge_get', 'project_knowledge_update',
-      'project_guidelines_get', 'project_guidelines_update',
-    ],
-    review: ['flow_update', 'flow_get', 'flow_get_feedback', 'task_list', 'project_guidelines_get'],
-    done: ['flow_get', 'task_list', 'project_guidelines_get'],
-  },
   nextStepGuidance: {
     idea: 'Wechsle den Flow zu "planning" mit flow_update({ currentState: "planning" }) und beginne die Analyse.',
     planning: 'Analysiere die Anforderungen, erstelle einen Implementation-Plan und reiche ihn ein mit flow_update({ implementationPlan: "...", currentState: "approval" }).',
@@ -96,22 +74,22 @@ export const DEFAULT_CONFIG: RemoteConfig = {
     done: 'Dieser Flow ist abgeschlossen. Waehle einen anderen Flow mit flow_list().',
   },
   requiredFields: {},
-  blockedTransitions: {},
   strictness: DEFAULT_STRICTNESS,
 };
 
 // ============ Strictness → Enforcement Derivation ============
 
 /**
- * Derive requiredFields and blockedTransitions from strictness levels.
+ * Derive requiredFields from strictness levels.
  * This is the core logic that makes strictness sliders control the process.
+ *
+ * Note: blockedTransitions have been removed — the backend pipeline gate
+ * system is the sole authority for transition blocking.
  */
 export function deriveEnforcementFromStrictness(s: StrictnessConfig): {
   requiredFields: RemoteConfig['requiredFields'];
-  blockedTransitions: RemoteConfig['blockedTransitions'];
 } {
   const requiredFields: RemoteConfig['requiredFields'] = {};
-  const blockedTransitions: RemoteConfig['blockedTransitions'] = {};
 
   // --- Plan enforcement ---
   if (s.planRequired >= 4) {
@@ -119,9 +97,6 @@ export function deriveEnforcementFromStrictness(s: StrictnessConfig): {
       fields: ['implementationPlan'],
       message: `⛔ Strictness ${formatStrictnessLevel(s.planRequired)} erfordert einen Plan.\nErstelle einen Plan: flow_update({ implementationPlan: "...", currentState: "approval" }).`,
     };
-    // Note: approval→ready and review→done transitions are enforced by the backend
-    // pipeline gate system, which respects the executor config (human vs agent).
-    // No client-side blockedTransitions needed — backend is the single source of truth.
   }
 
   // --- Review enforcement ---
@@ -132,5 +107,5 @@ export function deriveEnforcementFromStrictness(s: StrictnessConfig): {
     };
   }
 
-  return { requiredFields, blockedTransitions };
+  return { requiredFields };
 }

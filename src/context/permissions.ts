@@ -1,10 +1,10 @@
 /**
  * State-Permission Map
  *
- * Defines which tools are allowed in which flow state,
- * which tools work without init (discovery), and block messages.
+ * Defines which tools work without init (discovery) and block messages.
  *
- * Uses remote config when available, falls back to hardcoded defaults.
+ * Permissions are now solely determined by the backend via `allowedActions`
+ * returned during session init and next-step resolution.
  */
 
 import { getConfig } from '../config/sync.js';
@@ -63,10 +63,10 @@ export function buildStateBlockMessage(
   flowSummary: string,
   flowId: string,
   currentState: string,
+  allowedActions?: string[],
 ): string {
-  const config = getConfig();
-  const allowed = config.statePermissions[currentState] || [];
-  const nextStep = config.nextStepGuidance[currentState] || 'Pruefe den Flow-Status.';
+  const allowed = allowedActions || [];
+  const nextStep = getConfig().nextStepGuidance[currentState] || 'Pruefe den Flow-Status.';
 
   return [
     `⛔ Aktion '${toolName}' nicht erlaubt im State '${currentState}'.`,
@@ -77,9 +77,4 @@ export function buildStateBlockMessage(
     '',
     `Naechster Schritt: ${nextStep}`,
   ].join('\n');
-}
-
-export function getAllowedTools(state: string): string[] {
-  const config = getConfig();
-  return [...(config.statePermissions[state] || [])];
 }

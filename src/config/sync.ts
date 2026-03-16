@@ -62,10 +62,7 @@ function parseRemoteConfig(raw: Record<string, unknown>): RemoteConfig {
     config.version = raw.version;
   }
 
-  // Always parse statePermissions and nextStepGuidance (not strictness-derived)
-  if (raw.statePermissions && typeof raw.statePermissions === 'object') {
-    config.statePermissions = raw.statePermissions as Record<string, string[]>;
-  }
+  // Parse nextStepGuidance (statePermissions removed — backend is sole authority via allowedActions)
   if (raw.nextStepGuidance && typeof raw.nextStepGuidance === 'object') {
     config.nextStepGuidance = raw.nextStepGuidance as Record<string, string>;
   }
@@ -75,15 +72,11 @@ function parseRemoteConfig(raw: Record<string, unknown>): RemoteConfig {
     config.strictness = { ...DEFAULT_STRICTNESS, ...(raw.strictness as Partial<StrictnessConfig>) };
     const derived = deriveEnforcementFromStrictness(config.strictness);
     config.requiredFields = derived.requiredFields;
-    config.blockedTransitions = derived.blockedTransitions;
     console.error(`Strictness loaded: flow=${config.strictness.flowRequired} plan=${config.strictness.planRequired} tasks=${config.strictness.taskTracking} git=${config.strictness.gitDiscipline} review=${config.strictness.reviewRequired}`);
   } else {
     // Legacy: use explicit config fields
     if (raw.requiredFields && typeof raw.requiredFields === 'object') {
       config.requiredFields = raw.requiredFields as RemoteConfig['requiredFields'];
-    }
-    if (raw.blockedTransitions && typeof raw.blockedTransitions === 'object') {
-      config.blockedTransitions = raw.blockedTransitions as RemoteConfig['blockedTransitions'];
     }
   }
 

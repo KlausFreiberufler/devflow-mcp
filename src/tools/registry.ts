@@ -63,39 +63,30 @@ class ToolRegistry {
         return buildNoContextMessage(name);
       }
 
-      // Guard 2: State-Guard (with stale-context refresh)
-      // Pipeline allowedActions take precedence over config-based permissions
+      // Guard 2: State-Guard — backend allowedActions is the sole source of truth
       const ctx = sessionContext.get();
-      const pipelineActions = ctx?.pipelineStep ? ctx.allowedActions : null;
-      const isAllowed = pipelineActions
-        ? pipelineActions.includes(name)
-        : sessionContext.isToolAllowed(name);
+      if (!ctx || !ctx.allowedActions) {
+        logToolCall({ toolName: name, args, blocked: true, blockReason: 'No allowedActions — call devflow_init first' });
+        return buildNoContextMessage(name);
+      }
 
-      if (!isAllowed) {
-        // Context might be stale if user changed state in UI - refresh before blocking
-        // (only for config-based permissions; pipeline actions are authoritative)
-        if (!pipelineActions) {
-          const stateChanged = await sessionContext.refreshFromBackend();
-          if (stateChanged && sessionContext.isToolAllowed(name)) {
-            // State changed and tool is now allowed - proceed
-          } else {
-            const freshCtx = sessionContext.get()!;
-            logToolCall({ toolName: name, args, blocked: true, blockReason: `State '${freshCtx.flow.currentState}'` });
-            return buildStateBlockMessage(
-              name,
-              freshCtx.flow.summary,
-              freshCtx.flow.id,
-              freshCtx.flow.currentState,
-            );
-          }
+      if (!ctx.allowedActions.includes(name)) {
+        // Context might be stale if user changed state in UI — refresh before blocking
+        const stateChanged = await sessionContext.refreshFromBackend();
+        if (stateChanged && sessionContext.isToolAllowed(name)) {
+          // State changed and tool is now allowed — proceed
         } else {
-          const blockedCtx = sessionContext.get()!;
-          logToolCall({ toolName: name, args, blocked: true, blockReason: `Pipeline step '${blockedCtx.pipelineStep}'` });
+          const freshCtx = sessionContext.get()!;
+          const reason = freshCtx.pipelineStep
+            ? `Pipeline step '${freshCtx.pipelineStep}'`
+            : `State '${freshCtx.flow.currentState}'`;
+          logToolCall({ toolName: name, args, blocked: true, blockReason: reason });
           return buildStateBlockMessage(
             name,
-            blockedCtx.flow.summary,
-            blockedCtx.flow.id,
-            blockedCtx.flow.currentState,
+            freshCtx.flow.summary,
+            freshCtx.flow.id,
+            freshCtx.flow.currentState,
+            freshCtx.allowedActions,
           );
         }
       }

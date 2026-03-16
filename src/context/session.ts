@@ -6,7 +6,6 @@
  */
 
 import { devFlowClient, type Flow, type Task } from '../api/client.js';
-import { getAllowedTools } from './permissions.js';
 
 export interface SessionFeedback {
   type: 'plan_rejected' | 'code_rejected' | 'testing_failed';
@@ -42,6 +41,8 @@ export interface ActiveContext {
   nextStep: string;
   git?: GitContext;
   pipelineStep?: string | null;
+  stepKind?: string | null;
+  transitionPolicy?: string | null;
   skill?: { slug: string; name: string; description?: string } | null;
   gateBlocked?: boolean;
   retryCount?: number;
@@ -116,16 +117,20 @@ class SessionContext {
 
       if (freshState !== cachedState) {
         this.context.flow = result.data;
-        // Re-init session to get pipeline-aware allowedActions from backend
+        // Re-fetch allowedActions from backend (sole source of truth)
         try {
-          const initResult = await devFlowClient.initSession(this.context.flow.id);
-          if (initResult.success && initResult.data?.allowedActions) {
-            this.context.allowedActions = initResult.data.allowedActions as string[];
-          } else {
-            this.context.allowedActions = getAllowedTools(freshState);
+          const nextStepResult = await devFlowClient.getNextStep(this.context.flow.id);
+          if (nextStepResult.success && nextStepResult.data?.allowedActions) {
+            this.context.allowedActions = nextStepResult.data.allowedActions as string[];
+            if (nextStepResult.data.kind) {
+              this.context.stepKind = nextStepResult.data.kind as string;
+            }
+            if (nextStepResult.data.transitionPolicy) {
+              this.context.transitionPolicy = nextStepResult.data.transitionPolicy as string;
+            }
           }
         } catch {
-          this.context.allowedActions = getAllowedTools(freshState);
+          // Network error during refresh - keep stale allowedActions
         }
         return true;
       }

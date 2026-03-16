@@ -7,7 +7,7 @@
 
 import { devFlowClient } from '../api/client.js';
 import { sessionContext, type SessionFeedback, type ActiveContext, type GitContext } from '../context/session.js';
-import { getAllowedTools, NEXT_STEP_GUIDANCE } from '../context/permissions.js';
+import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import { getConfig } from '../config/sync.js';
 import { formatStrictnessLevel } from '../config/types.js';
 import { checkForUpdate } from '../config/version-check.js';
@@ -267,9 +267,55 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     status: t.status as 'todo' | 'doing' | 'done' | undefined,
   }));
 
-  // 9. Build context
+  // 9. Fetch allowedActions from backend (sole source of truth)
+  // After auto-advance, the init response's allowedActions may be stale,
+  // so we always re-fetch from the next-step endpoint.
   const state = flow.currentState;
-  const allowedActions = getAllowedTools(state);
+  let allowedActions: string[] = [];
+  let stepKind: string | null = null;
+  let transitionPolicy: string | null = null;
+  let pipelineStep: string | null = null;
+  let pipelineSkill: { slug: string; name: string; description?: string } | null = null;
+  let gateBlocked = false;
+  let retryCount = 0;
+  let previousFeedback: string | null = null;
+
+  // Try next-step endpoint first (authoritative for pipeline-aware projects)
+  try {
+    const nextStepResult = await devFlowClient.getNextStep(resolvedId);
+    if (nextStepResult.success && nextStepResult.data) {
+      const nsd = nextStepResult.data;
+      if (Array.isArray(nsd.allowedActions)) {
+        allowedActions = nsd.allowedActions as string[];
+      }
+      stepKind = (nsd.kind as string) || null;
+      transitionPolicy = (nsd.transitionPolicy as string) || null;
+      pipelineStep = (nsd.pipelineStep as string) || null;
+      pipelineSkill = (nsd.skill as { slug: string; name: string; description?: string }) || null;
+      const gate = nsd.gate as { blocked?: boolean } | undefined;
+      gateBlocked = gate?.blocked || false;
+      retryCount = (nsd.retryCount as number) || 0;
+      previousFeedback = (nsd.previousFeedback as string) || null;
+    }
+  } catch {
+    // next-step endpoint may not exist (no pipeline configured) — fall back to init data
+  }
+
+  // Fall back to init response data if next-step didn't provide allowedActions
+  if (allowedActions.length === 0 && Array.isArray(initData.allowedActions)) {
+    allowedActions = initData.allowedActions as string[];
+  }
+
+  // Fall back to init response pipeline data if next-step didn't provide it
+  if (!pipelineStep && initData.pipelineStep) {
+    pipelineStep = initData.pipelineStep as string;
+    pipelineSkill = (initData.skill as { slug: string; name: string; description?: string }) || null;
+    const gate = initData.gate as { blocked?: boolean } | undefined;
+    gateBlocked = gate?.blocked || false;
+    retryCount = (initData.retryCount as number) || 0;
+    previousFeedback = (initData.previousFeedback as string) || null;
+  }
+
   const nextStep = determineNextStep(state, feedback, gitContext);
 
   const activeContext: ActiveContext = {
@@ -282,6 +328,13 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     allowedActions,
     nextStep,
     git: gitContext,
+    pipelineStep,
+    stepKind,
+    transitionPolicy,
+    skill: pipelineSkill,
+    gateBlocked,
+    retryCount,
+    previousFeedback,
   };
 
   // Track the previous state correctly for auto-advance display
@@ -294,26 +347,6 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   }
 
   sessionContext.init(activeContext);
-
-  // 10. Store pipeline info if present (Phase 2 init response)
-  // Note: Only override allowedActions from pipeline when NO auto-advance happened.
-  // The backend init response reflects the pre-advance state, so its allowedActions
-  // would be stale after auto-advance (e.g. 'ready' actions instead of 'in_progress').
-  if (initData.pipelineStep) {
-    const gate = initData.gate as { blocked?: boolean } | undefined;
-    const pipelineUpdate: Partial<ActiveContext> = {
-      pipelineStep: initData.pipelineStep as string,
-      skill: (initData.skill as { slug: string; name: string; description?: string }) || null,
-      gateBlocked: gate?.blocked || false,
-      retryCount: (initData.retryCount as number) || 0,
-      previousFeedback: (initData.previousFeedback as string) || null,
-    };
-    // Only use pipeline allowedActions if: (a) it's a real array, and (b) no auto-advance
-    if (!advanceTo && Array.isArray(initData.allowedActions)) {
-      pipelineUpdate.allowedActions = initData.allowedActions as string[];
-    }
-    sessionContext.update(pipelineUpdate);
-  }
 
   // Version check (non-blocking, cached)
   const baseUrl = devFlowClient.getBaseUrl();
