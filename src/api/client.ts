@@ -480,22 +480,26 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<unknown>('POST', `/api/agent-sessions/${sessionId}/complete`, data || {});
   }
 
-  // ============ Knowledge Methods ============
+  // ============ Docs Methods (DF-157) ============
 
-  async getProjectKnowledge(projectId?: string): Promise<ApiResponse<ProjectKnowledge>> {
-    const id = projectId || this.getLinkedProjectId();
-    if (!id) {
-      return { success: false, error: 'No project ID. Use project_list or set DEVFLOW_PROJECT_ID.' };
-    }
-    return this.request<ProjectKnowledge>('GET', `/api/projects/${id}/knowledge`);
+  async getProjectDocs(projectId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/docs`);
   }
 
-  async updateProjectKnowledge(knowledge: string, projectId?: string): Promise<ApiResponse<ProjectKnowledge>> {
-    const id = projectId || this.getLinkedProjectId();
-    if (!id) {
-      return { success: false, error: 'No project ID. Use project_list or set DEVFLOW_PROJECT_ID.' };
-    }
-    return this.request<ProjectKnowledge>('PATCH', `/api/projects/${id}/knowledge`, { knowledge });
+  async getDocPage(projectId: string, docId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/docs/${docId}`);
+  }
+
+  async createDocPage(projectId: string, data: { title: string; section: string; content: string }): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/projects/${projectId}/docs`, data);
+  }
+
+  async updateDocPage(projectId: string, docId: string, data: Record<string, unknown>): Promise<ApiResponse<unknown>> {
+    return this.request('PATCH', `/api/projects/${projectId}/docs/${docId}`, data);
+  }
+
+  async deleteDocPage(projectId: string, docId: string): Promise<ApiResponse<unknown>> {
+    return this.request('DELETE', `/api/projects/${projectId}/docs/${docId}`);
   }
 
   // ============ Guidelines Methods ============
