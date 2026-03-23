@@ -8,6 +8,8 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { getToken, authenticateViaBrowser, loadProjectConfig } from '../auth/browser-auth.js';
+import { detectClientType } from '../context/client-detect.js';
+import { MCP_VERSION } from '../config/version.js';
 
 interface Credentials {
   accessToken: string;
@@ -37,6 +39,7 @@ export class DevFlowClient {
   private workingDir: string;
   private agentSessionId: string | null = null;
   private scopedProjectId: string | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(baseUrl?: string, workingDir?: string) {
     this.baseUrl = baseUrl || process.env.DEVFLOW_URL || 'https://api.flow.dev';
@@ -103,6 +106,10 @@ export class DevFlowClient {
         console.error('Project linking failed:', error);
       }
     }
+
+    // Send initial heartbeat and start periodic heartbeat
+    await this.sendHeartbeat();
+    this.startHeartbeat();
   }
 
   /**
@@ -569,6 +576,36 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<GitSettings | null>('GET', `/api/projects/${id}/git-settings`);
   }
 
+  // ============ Heartbeat Methods ============
+
+  async sendHeartbeat(): Promise<void> {
+    const projectId = this.getLinkedProjectId();
+    if (!projectId) return;
+    const clientType = detectClientType();
+    try {
+      await this.request('POST', '/api/mcp/heartbeat', {
+        clientType,
+        projectId,
+        mcpVersion: MCP_VERSION,
+        sessionId: this.getAgentSessionId() || undefined,
+      });
+    } catch {
+      // Heartbeat failure is non-critical, don't crash
+    }
+  }
+
+  startHeartbeat(): void {
+    const intervalMs = parseInt(process.env.DEVFLOW_HEARTBEAT_INTERVAL || '300000', 10);
+    this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), intervalMs);
+  }
+
+  stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
   // ============ Config Methods ============
 
   /**
@@ -661,7 +698,6 @@ Or set: export DEVFLOW_TOKEN="your-token"
 export interface Project {
   id: string;
   name: string;
-  jiraKey?: string;
   description?: string;
   techStack?: string;
   isActive: boolean;
@@ -881,7 +917,6 @@ export function transformProject(raw: unknown): Project {
   return {
     id: p.id as string,
     name: p.name as string,
-    jiraKey: p.jiraProjectKey as string | undefined,
     description: p.description as string | undefined,
     techStack: p.techStack as string | undefined,
     isActive: Boolean(p.isActive),

@@ -83,6 +83,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Graceful shutdown: complete session + reset flow status
 function cleanup() {
+  devFlowClient.stopHeartbeat();
   if (sessionContext.isActive()) {
     const ctx = sessionContext.get();
     try {
