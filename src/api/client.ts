@@ -7,7 +7,7 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { getToken, authenticateViaBrowser, loadProjectConfig } from '../auth/browser-auth.js';
+import { getToken, loadProjectConfig } from '../auth/browser-auth.js';
 import { detectClientType } from '../context/client-detect.js';
 import { MCP_VERSION } from '../config/version.js';
 
@@ -92,18 +92,6 @@ export class DevFlowClient {
       } catch (error) {
         console.error('Authentication failed:', error);
         // Will show error when tools are called
-      }
-    }
-
-    // If authenticated but no project linked, re-authenticate to select a project
-    if (this.credentials && !this.getLinkedProjectId()) {
-      console.error('No project linked. Opening browser for project selection...');
-      try {
-        const token = await authenticateViaBrowser(this.baseUrl, this.workingDir);
-        this.setToken(token);
-        this.projectConfig = await loadProjectConfig(this.workingDir);
-      } catch (error) {
-        console.error('Project linking failed:', error);
       }
     }
 

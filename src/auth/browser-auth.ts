@@ -113,7 +113,7 @@ async function saveCredentials(token: string): Promise<void> {
 /**
  * Save project configuration to working directory
  */
-async function saveProjectConfig(workingDir: string, projectId: string, projectName: string): Promise<void> {
+export async function saveProjectConfig(workingDir: string, projectId: string, projectName: string): Promise<void> {
   const configPath = join(workingDir, '.devflow.json');
   const config: ProjectConfig = {
     projectId,

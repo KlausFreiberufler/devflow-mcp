@@ -14,6 +14,7 @@ import { checkForUpdate } from '../config/version-check.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
+import { saveProjectConfig } from '../auth/browser-auth.js';
 
 const devflowInitDef = {
   name: 'devflow_init',
@@ -127,6 +128,16 @@ function generateGitGuidelines(git: GitContext, projectName: string): string {
 async function handleDevflowInit(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
 
+  // 0. Check if project is linked — if not, show project list
+  if (!devFlowClient.hasLinkedProject()) {
+    const projectsResult = await devFlowClient.listProjects();
+    if (!projectsResult.success || !projectsResult.data || projectsResult.data.length === 0) {
+      return 'No projects found. Create a project in DevFlow first.';
+    }
+    const projectList = projectsResult.data.map((p, i) => `${i + 1}. **${p.name}** (${p.id})`).join('\n');
+    return `No project linked for this directory. Please call devflow_init with a flowId from one of these projects:\n\n${projectList}\n\nUse flow_list with the projectId to see available flows.`;
+  }
+
   // 1. Release previous context if switching flows
   if (sessionContext.isActive()) {
     const ctx = sessionContext.get();
@@ -196,6 +207,17 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     return `⛔ Flow konnte nicht geladen werden: ${fullFlowResult.error || 'Unbekannter Fehler'}`;
   }
   const flow = fullFlowResult.data;
+
+  // 4b. Auto-link project if .devflow.json doesn't exist yet
+  if (!devFlowClient.hasLinkedProject() && flow.projectId) {
+    try {
+      const projectResult = await devFlowClient.getProject(flow.projectId);
+      const projectName = projectResult.data?.name || 'Unknown';
+      await saveProjectConfig(process.cwd(), flow.projectId, projectName);
+    } catch {
+      // Non-critical — continue without auto-linking
+    }
+  }
 
   // 5. Auto-advance state for visibility (idea → planning, ready → in_progress)
   const AUTO_ADVANCE: Record<string, string> = {
