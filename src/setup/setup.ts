@@ -15,6 +15,7 @@ import { execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readlinkSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { installWrapper } from './wrapper.js';
 
 const DEFAULT_URL = 'https://api.app.dev-flow.tech';
 const SUPPORTED_CLIENTS = ['claude', 'cursor', 'codex', 'gemini', 'windsurf'] as const;
@@ -65,19 +66,20 @@ function writeJsonFile(filePath: string, data: Record<string, unknown>): void {
   writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
 }
 
-function getMcpServerEntry(distFile: string, devflowUrl: string) {
+function getMcpServerEntry(wrapperPath: string, devflowUrl: string, client: ClientType) {
   return {
-    command: 'node',
-    args: [distFile],
+    command: wrapperPath,
+    args: [] as string[],
     env: {
       DEVFLOW_URL: devflowUrl,
+      DEVFLOW_CLIENT: client,
     },
   };
 }
 
 // ─── Client-specific setup functions ────────────────────────────
 
-function setupClaude(distFile: string, devflowUrl: string): void {
+function setupClaude(wrapperPath: string, devflowUrl: string): void {
   log('[3/3] Configuring Claude Code MCP server...');
 
   try {
@@ -94,7 +96,7 @@ function setupClaude(distFile: string, devflowUrl: string): void {
     // Doesn't exist yet
   }
 
-  const addCmd = `claude mcp add --scope user devflow --transport stdio -e DEVFLOW_URL="${devflowUrl}" -- node "${distFile}"`;
+  const addCmd = `npx @anthropic-ai/claude-code mcp add devflow --scope user "${wrapperPath}" -e DEVFLOW_URL=${devflowUrl} -e DEVFLOW_CLIENT=claude`;
   try {
     execSync(addCmd, { encoding: 'utf-8', stdio: 'inherit' });
   } catch (error) {
@@ -119,20 +121,20 @@ function setupClaude(distFile: string, devflowUrl: string): void {
   }
 }
 
-function setupCursor(distFile: string, devflowUrl: string): void {
+function setupCursor(wrapperPath: string, devflowUrl: string): void {
   log('[3/3] Configuring Cursor MCP server...');
 
   const configPath = join(homedir(), '.cursor', 'mcp.json');
   const config = readJsonFile(configPath);
 
   if (!config.mcpServers) config.mcpServers = {};
-  (config.mcpServers as Record<string, unknown>).devflow = getMcpServerEntry(distFile, devflowUrl);
+  (config.mcpServers as Record<string, unknown>).devflow = getMcpServerEntry(wrapperPath, devflowUrl, 'cursor');
 
   writeJsonFile(configPath, config);
   log(`      Config written to: ${configPath}`);
 }
 
-function setupCodex(distFile: string, devflowUrl: string): void {
+function setupCodex(wrapperPath: string, devflowUrl: string): void {
   log('[3/3] Configuring Codex MCP server...');
 
   const configPath = join(homedir(), '.codex', 'config.toml');
@@ -153,11 +155,12 @@ function setupCodex(distFile: string, devflowUrl: string): void {
   const tomlBlock = `
 
 [mcp_servers.devflow]
-command = "node"
-args = ["${distFile}"]
+command = "${wrapperPath}"
+args = []
 
 [mcp_servers.devflow.env]
 DEVFLOW_URL = "${devflowUrl}"
+DEVFLOW_CLIENT = "codex"
 `;
 
   content += tomlBlock;
@@ -165,7 +168,7 @@ DEVFLOW_URL = "${devflowUrl}"
   log(`      Config written to: ${configPath}`);
 }
 
-function setupGemini(distFile: string, devflowUrl: string): void {
+function setupGemini(wrapperPath: string, devflowUrl: string): void {
   log('[3/3] Configuring Gemini CLI MCP server...');
 
   const configPath = join(homedir(), '.gemini', 'settings.json');
@@ -173,7 +176,7 @@ function setupGemini(distFile: string, devflowUrl: string): void {
 
   if (!config.mcpServers) config.mcpServers = {};
   (config.mcpServers as Record<string, unknown>).devflow = {
-    ...getMcpServerEntry(distFile, devflowUrl),
+    ...getMcpServerEntry(wrapperPath, devflowUrl, 'gemini'),
     timeout: 600000,
   };
 
@@ -181,14 +184,14 @@ function setupGemini(distFile: string, devflowUrl: string): void {
   log(`      Config written to: ${configPath}`);
 }
 
-function setupWindsurf(distFile: string, devflowUrl: string): void {
+function setupWindsurf(wrapperPath: string, devflowUrl: string): void {
   log('[3/3] Configuring Windsurf MCP server...');
 
   const configPath = join(homedir(), '.codeium', 'windsurf', 'mcp_config.json');
   const config = readJsonFile(configPath);
 
   if (!config.mcpServers) config.mcpServers = {};
-  (config.mcpServers as Record<string, unknown>).devflow = getMcpServerEntry(distFile, devflowUrl);
+  (config.mcpServers as Record<string, unknown>).devflow = getMcpServerEntry(wrapperPath, devflowUrl, 'windsurf');
 
   writeJsonFile(configPath, config);
   log(`      Config written to: ${configPath}`);
@@ -204,7 +207,7 @@ const CLIENT_LABELS: Record<ClientType, string> = {
   windsurf: 'Windsurf',
 };
 
-const CLIENT_SETUP: Record<ClientType, (distFile: string, url: string) => void> = {
+const CLIENT_SETUP: Record<ClientType, (wrapperPath: string, url: string) => void> = {
   claude: setupClaude,
   cursor: setupCursor,
   codex: setupCodex,
@@ -265,16 +268,19 @@ async function setup(): Promise<void> {
   }
   log('      Build OK.');
 
-  // Step 2: DevFlow URL
+  // Step 2: Install wrapper + DevFlow URL
   log('');
   log(`[2/3] DevFlow URL: ${devflowUrl}`);
   if (devflowUrl !== DEFAULT_URL) {
     log('      (custom URL via --url flag)');
   }
 
+  const wrapperPath = installWrapper(distFile);
+  log(`      Wrapper installed: ${wrapperPath}`);
+
   // Step 3: Client-specific setup
   log('');
-  CLIENT_SETUP[client](distFile, devflowUrl);
+  CLIENT_SETUP[client](wrapperPath, devflowUrl);
 
   log('');
   log('=== Setup complete! ===');
