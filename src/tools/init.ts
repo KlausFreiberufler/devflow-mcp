@@ -35,10 +35,10 @@ Call this at the start of every work session.`,
     properties: {
       flowId: {
         type: 'string',
-        description: 'The flow ID to work on'
+        description: 'The flow ID to work on. If omitted, shows available projects and flows.'
       }
     },
-    required: ['flowId']
+    required: []
   }
 };
 
@@ -126,16 +126,34 @@ function generateGitGuidelines(git: GitContext, projectName: string): string {
 }
 
 async function handleDevflowInit(args: Record<string, unknown>): Promise<string> {
-  const flowId = args.flowId as string;
+  const flowId = args.flowId as string | undefined;
 
   // 0. Check if project is linked — if not, show project list
   if (!devFlowClient.hasLinkedProject()) {
     const projectsResult = await devFlowClient.listProjects();
     if (!projectsResult.success || !projectsResult.data || projectsResult.data.length === 0) {
-      return 'No projects found. Create a project in DevFlow first.';
+      return 'No projects found. Create a project in DevFlow first at ' + devFlowClient.getBaseUrl();
     }
     const projectList = projectsResult.data.map((p, i) => `${i + 1}. **${p.name}** (${p.id})`).join('\n');
-    return `No project linked for this directory. Please call devflow_init with a flowId from one of these projects:\n\n${projectList}\n\nUse flow_list with the projectId to see available flows.`;
+    return `No project linked for this directory. Please call devflow_init with a flowId from one of these projects:\n\n${projectList}\n\nUse flow_list({ projectId: "<id>" }) to see available flows, then call devflow_init({ flowId: "<flowId>" }) to start working.`;
+  }
+
+  // 0b. No flowId provided — show available flows for linked project
+  if (!flowId) {
+    const projectId = devFlowClient.getLinkedProjectId()!;
+    const projectName = devFlowClient.getLinkedProjectName() || projectId;
+    const flowsResult = await devFlowClient.listFlows(projectId);
+    if (!flowsResult.success || !flowsResult.data || flowsResult.data.length === 0) {
+      return `Project **${projectName}** has no flows yet. Create one with flow_create({ summary: "..." }).`;
+    }
+    const openFlows = flowsResult.data.filter((f: any) => f.currentState !== 'done');
+    if (openFlows.length === 0) {
+      return `All flows in **${projectName}** are done. Create a new one with flow_create({ summary: "..." }).`;
+    }
+    const flowList = openFlows.slice(0, 15).map((f: any) =>
+      `- **${f.displayId}**: ${f.summary} [${f.currentState}]`
+    ).join('\n');
+    return `Project: **${projectName}**\n\nOpen flows:\n${flowList}\n\nCall devflow_init({ flowId: "<displayId>" }) to start working on a flow.`;
   }
 
   // 1. Release previous context if switching flows
