@@ -568,12 +568,11 @@ Or set: export DEVFLOW_TOKEN="your-token"
 
   async sendHeartbeat(): Promise<void> {
     const projectId = this.getLinkedProjectId();
-    if (!projectId) return;
     const clientType = detectClientType();
     try {
       await this.request('POST', '/api/mcp/heartbeat', {
         clientType,
-        projectId,
+        projectId: projectId || undefined,
         mcpVersion: MCP_VERSION,
         sessionId: this.getAgentSessionId() || undefined,
       });
