@@ -282,12 +282,31 @@ Or set: export DEVFLOW_TOKEN="your-token"
       try {
         const response = await fetch(`${this.baseUrl}${path}`, options);
 
-        // Handle 401 - try to refresh token
-        if (response.status === 401 && this.credentials.refreshToken) {
-          await this.refreshTokens();
-          headers['Authorization'] = `Bearer ${this.credentials.accessToken}`;
-          const retryResponse = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
-          return await this.parseResponse<T>(retryResponse, path);
+        // Handle 401 - try to refresh or re-authenticate
+        if (response.status === 401) {
+          if (this.credentials?.refreshToken) {
+            // Try refresh token first
+            try {
+              await this.refreshTokens();
+              headers['Authorization'] = `Bearer ${this.credentials.accessToken}`;
+              const retryResponse = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
+              return await this.parseResponse<T>(retryResponse, path);
+            } catch {
+              // Refresh failed - fall through to browser auth
+            }
+          }
+          // No refresh token or refresh failed - re-authenticate via browser
+          try {
+            const token = await getToken(this.baseUrl, this.workingDir);
+            this.setToken(token);
+            await this.saveCredentials();
+            headers['Authorization'] = `Bearer ${this.credentials!.accessToken}`;
+            const retryResponse = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
+            return await this.parseResponse<T>(retryResponse, path);
+          } catch (authError) {
+            // Auth failed - return original 401 response
+            return await this.parseResponse<T>(response, path);
+          }
         }
 
         // Retry on 5xx server errors
