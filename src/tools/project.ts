@@ -25,7 +25,6 @@ const projectGetDef = {
   description: `Get detailed information about a specific project.
 Returns the full project including:
 - Name and description
-- Jira key (if connected)
 - Tech stack information
 - Project configuration
 
@@ -99,10 +98,6 @@ function formatProjectDetail(project: Project): string {
     `**ID:** ${project.id}`,
     `**Status:** ${project.isActive ? 'Active' : 'Archived'}`,
   ];
-
-  if (project.jiraKey) {
-    lines.push(`**Jira Key:** ${project.jiraKey}`);
-  }
 
   if (project.description) {
     lines.push('');

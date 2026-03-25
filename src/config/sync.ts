@@ -62,6 +62,11 @@ function parseRemoteConfig(raw: Record<string, unknown>): RemoteConfig {
     config.version = raw.version;
   }
 
+  // Parse gitEnabled
+  if (typeof raw.gitEnabled === 'boolean') {
+    config.gitEnabled = raw.gitEnabled;
+  }
+
   // Parse nextStepGuidance (statePermissions removed — backend is sole authority via allowedActions)
   if (raw.nextStepGuidance && typeof raw.nextStepGuidance === 'object') {
     config.nextStepGuidance = raw.nextStepGuidance as Record<string, string>;

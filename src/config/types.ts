@@ -45,6 +45,9 @@ export interface RemoteConfig {
   /** Version hash for sync-check */
   version: string;
 
+  /** Whether git workflow is enabled for this project */
+  gitEnabled: boolean;
+
   /** Next step guidance per state */
   nextStepGuidance: Record<string, string>;
 
@@ -64,6 +67,7 @@ export interface RemoteConfig {
  */
 export const DEFAULT_CONFIG: RemoteConfig = {
   version: 'hardcoded-v5.0',
+  gitEnabled: false,
   nextStepGuidance: {
     idea: 'Wechsle den Flow zu "planning" mit flow_update({ currentState: "planning" }) und beginne die Analyse.',
     planning: 'Analysiere die Anforderungen, erstelle einen Implementation-Plan und reiche ihn ein mit flow_update({ implementationPlan: "...", currentState: "approval" }).',

@@ -21,6 +21,11 @@ const DEFAULT_URL = 'https://api.app.dev-flow.tech';
 const SUPPORTED_CLIENTS = ['claude', 'cursor', 'codex', 'gemini', 'windsurf'] as const;
 type ClientType = typeof SUPPORTED_CLIENTS[number];
 
+// Normalize aliases to canonical setup names
+const CLIENT_ALIASES: Record<string, ClientType> = {
+  'claude-code': 'claude',
+};
+
 function log(msg: string): void {
   process.stderr.write(msg + '\n');
 }
@@ -36,10 +41,11 @@ function parseArgs(): { url: string; client: ClientType } {
       i++;
     } else if (args[i] === '--client' && args[i + 1]) {
       const c = args[i + 1].toLowerCase();
-      if (SUPPORTED_CLIENTS.includes(c as ClientType)) {
-        client = c as ClientType;
+      const resolved = CLIENT_ALIASES[c] || c;
+      if (SUPPORTED_CLIENTS.includes(resolved as ClientType)) {
+        client = resolved as ClientType;
       } else {
-        log(`ERROR: Unknown client "${c}". Supported: ${SUPPORTED_CLIENTS.join(', ')}`);
+        log(`ERROR: Unknown client "${c}". Supported: ${SUPPORTED_CLIENTS.join(', ')}, claude-code`);
         process.exit(1);
       }
       i++;

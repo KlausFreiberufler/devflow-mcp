@@ -5,8 +5,9 @@ export type ClientType = 'claude-code' | 'cursor' | 'codex' | 'gemini' | 'windsu
 export function detectClientType(): ClientType {
   // Primary: DEVFLOW_CLIENT env var (set by setup command, always reliable)
   const envClient = process.env.DEVFLOW_CLIENT?.toLowerCase();
-  if (envClient && isValidClientType(envClient)) {
-    return envClient as ClientType;
+  if (envClient) {
+    const normalized = normalizeClientType(envClient);
+    if (normalized) return normalized;
   }
 
   // Secondary: auto-detection via client-specific env vars
@@ -17,6 +18,14 @@ export function detectClientType(): ClientType {
   return 'unknown';
 }
 
-function isValidClientType(value: string): boolean {
-  return ['claude-code', 'cursor', 'codex', 'gemini', 'windsurf'].includes(value);
+// Maps env var values to canonical client types
+const CLIENT_ALIASES: Record<string, ClientType> = {
+  'claude': 'claude-code',
+};
+
+function normalizeClientType(value: string): ClientType | null {
+  if (['claude-code', 'cursor', 'codex', 'gemini', 'windsurf'].includes(value)) {
+    return value as ClientType;
+  }
+  return CLIENT_ALIASES[value] || null;
 }

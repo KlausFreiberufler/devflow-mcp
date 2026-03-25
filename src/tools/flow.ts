@@ -157,6 +157,10 @@ IMPORTANT: Some state transitions require mandatory fields:
         },
         description: 'List of git commits to add to this flow. New commits are appended to existing ones.'
       },
+      branchName: {
+        type: 'string',
+        description: 'Git branch name for this flow (required at strictness 4+ when git is enabled)'
+      },
       prUrl: {
         type: 'string',
         description: 'GitHub PR URL for this flow'
@@ -341,6 +345,7 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   const agentSummary = args.agentSummary as string | undefined;
   const testingInstructions = args.testingInstructions as string | undefined;
   const commits = args.commits as { hash: string; message: string }[] | undefined;
+  const branchName = args.branchName as string | undefined;
   const prUrl = args.prUrl as string | undefined;
   const prNumber = args.prNumber as number | undefined;
   const prState = args.prState as string | undefined;
@@ -396,24 +401,30 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
       }
     }
 
-    // Docs update reminder when transitioning to review
+    // Docs update enforcement when transitioning to review
     if (currentState === 'review' && strictness.docsUpdate >= 3) {
       if (strictness.docsUpdate >= 5) {
-        warnings.push('📖 DOCS-PFLICHT: Stelle sicher dass du alle relevanten Docs geprueft und aktualisiert hast (EN + DE). Nutze GET /api/docs/relevant?flowId=<id> um betroffene Seiten zu finden.');
-      } else {
-        warnings.push('📖 Docs-Hinweis: Pruefe ob Dokumentation aktualisiert werden muss. Nutze GET /api/docs/relevant?flowId=<id>.');
+        return `⛔ Strictness ${formatStrictnessLevel(strictness.docsUpdate)} erfordert Docs-Update vor Review.\nPruefe und aktualisiere alle relevanten Docs (EN + DE). Nutze doc_page_list() und doc_page_update() um betroffene Seiten zu finden und zu aktualisieren.`;
       }
+      warnings.push('📖 Docs-Hinweis: Pruefe ob Dokumentation aktualisiert werden muss. Nutze GET /api/docs/relevant?flowId=<id>.');
     }
 
-    // Git discipline enforcement: check branch/commits before review
-    if (currentState === 'review' && strictness.gitDiscipline >= 4) {
+    // Git discipline enforcement: check branch/commits before review (only when git is enabled)
+    const gitEnabled = getConfig().gitEnabled;
+    if (currentState === 'review' && gitEnabled && strictness.gitDiscipline >= 4) {
       if (currentFlow.success && currentFlow.data) {
-        if (!currentFlow.data.branchName) {
+        if (!currentFlow.data.branchName && !branchName) {
           return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert einen Branch.\nMelde den Branch mit flow_update({ branchName: "..." }) bevor du zu review wechselst.`;
         }
       }
-      if (strictness.gitDiscipline >= 5 && !prUrl) {
-        return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert eine PR-URL.\nErstelle eine PR und melde sie mit flow_update({ prUrl: "...", currentState: "review" }).`;
+      if (strictness.gitDiscipline >= 5) {
+        if (!prUrl) {
+          return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert eine PR-URL.\nErstelle eine PR und melde sie mit flow_update({ prUrl: "...", currentState: "review" }).`;
+        }
+        // Check that commits are being reported with this review transition
+        if (!commits || commits.length === 0) {
+          return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert Commits.\nMelde Commits mit flow_update({ commits: [{ hash: "...", message: "..." }], currentState: "review" }).`;
+        }
       }
     }
   }
@@ -428,6 +439,7 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
   if (implementationPlan) cleanUpdate.implementationPlan = implementationPlan.replace(/\\n/g, '\n');
   if (agentSummary) cleanUpdate.agentSummary = agentSummary.replace(/\\n/g, '\n');
   if (testingInstructions) cleanUpdate.testingInstructions = testingInstructions.replace(/\\n/g, '\n');
+  if (branchName) cleanUpdate.branchName = branchName;
   if (commits) cleanUpdate.commits = commits;
   if (prUrl) cleanUpdate.prUrl = prUrl;
   if (prNumber) cleanUpdate.prNumber = prNumber;
