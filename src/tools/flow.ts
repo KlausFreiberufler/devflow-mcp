@@ -403,10 +403,22 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
 
     // Docs update enforcement when transitioning to review
     if (currentState === 'review' && strictness.docsUpdate >= 3) {
-      if (strictness.docsUpdate >= 5) {
-        return `⛔ Strictness ${formatStrictnessLevel(strictness.docsUpdate)} erfordert Docs-Update vor Review.\nPruefe und aktualisiere alle relevanten Docs (EN + DE). Nutze doc_page_list() und doc_page_update() um betroffene Seiten zu finden und zu aktualisieren.`;
+      // Check if docs were already updated: commits with 'docs' in message, or doc_page_update in session logs
+      const flowData = currentFlow.success ? currentFlow.data as unknown as Record<string, unknown> : null;
+      const existingCommits = flowData?.commits
+        ? (typeof flowData.commits === 'string' ? JSON.parse(flowData.commits as string) : flowData.commits) as { message: string }[]
+        : [];
+      const allCommits = [...existingCommits, ...(commits || [])];
+      const hasDocsCommit = allCommits.some((c) =>
+        /\bdocs?\b/i.test(c.message)
+      );
+
+      if (strictness.docsUpdate >= 5 && !hasDocsCommit) {
+        return `⛔ Strictness ${formatStrictnessLevel(strictness.docsUpdate)} erfordert Docs-Update vor Review.\nPruefe und aktualisiere alle relevanten Docs (EN + DE). Nutze doc_page_list() und doc_page_update() um betroffene Seiten zu finden und zu aktualisieren.\nAlternativ: Committe Docs-Aenderungen mit 'docs' im Commit-Message.`;
       }
-      warnings.push('📖 Docs-Hinweis: Pruefe ob Dokumentation aktualisiert werden muss. Nutze GET /api/docs/relevant?flowId=<id>.');
+      if (!hasDocsCommit) {
+        warnings.push('📖 Docs-Hinweis: Pruefe ob Dokumentation aktualisiert werden muss. Nutze doc_page_list() oder committe Docs-Aenderungen.');
+      }
     }
 
     // Git discipline enforcement: check branch/commits before review (only when git is enabled)
