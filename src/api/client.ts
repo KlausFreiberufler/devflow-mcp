@@ -82,7 +82,15 @@ export class DevFlowClient {
       this.credentials = null;
     }
 
-    // If no valid credentials, authenticate via browser
+    // If no valid credentials and no project linked, run in passive mode
+    // (no browser auth popup, no heartbeat — just register tools silently)
+    if (!this.credentials && !this.projectConfig) {
+      console.error('No project linked and no credentials — running in passive mode.');
+      console.error('Use devflow_init or flow_create to activate.');
+      return;
+    }
+
+    // If no valid credentials but project is linked, authenticate via browser
     if (!this.credentials) {
       try {
         const token = await getToken(this.baseUrl, this.workingDir);
@@ -95,9 +103,11 @@ export class DevFlowClient {
       }
     }
 
-    // Send initial heartbeat and start periodic heartbeat
-    await this.sendHeartbeat();
-    this.startHeartbeat();
+    // Send initial heartbeat and start periodic heartbeat (only when authenticated)
+    if (this.credentials) {
+      await this.sendHeartbeat();
+      this.startHeartbeat();
+    }
   }
 
   /**

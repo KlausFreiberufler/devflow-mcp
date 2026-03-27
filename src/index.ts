@@ -108,14 +108,17 @@ process.on('SIGTERM', () => { cleanup(); process.exit(0); });
 async function main() {
   await devFlowClient.init();
 
-  // Sync config from backend (falls back to cache or defaults)
-  await syncConfig();
+  // Only sync config if authenticated (skip in passive mode)
+  if (devFlowClient.isAuthenticated()) {
+    await syncConfig();
+  }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
   const projectName = devFlowClient.getLinkedProjectName();
-  console.error(`DevFlow MCP Server v${MCP_VERSION} (${registry.size} tools, enforcement active)`);
+  const mode = devFlowClient.isAuthenticated() ? 'enforcement active' : 'passive mode';
+  console.error(`DevFlow MCP Server v${MCP_VERSION} (${registry.size} tools, ${mode})`);
   if (projectName) {
     console.error(`Linked to project: ${projectName}`);
   }

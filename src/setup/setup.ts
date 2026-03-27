@@ -30,10 +30,13 @@ function log(msg: string): void {
   process.stderr.write(msg + '\n');
 }
 
-function parseArgs(): { url: string; client: ClientType } {
+type Scope = 'project' | 'global';
+
+function parseArgs(): { url: string; client: ClientType; scope: Scope } {
   const args = process.argv.slice(2);
   let url = DEFAULT_URL;
   let client: ClientType = 'claude';
+  let scope: Scope | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--url' && args[i + 1]) {
@@ -49,10 +52,24 @@ function parseArgs(): { url: string; client: ClientType } {
         process.exit(1);
       }
       i++;
+    } else if (args[i] === '--scope' && args[i + 1]) {
+      const s = args[i + 1].toLowerCase();
+      if (s === 'project' || s === 'global') {
+        scope = s;
+      } else {
+        log(`ERROR: Unknown scope "${s}". Use "project" or "global".`);
+        process.exit(1);
+      }
+      i++;
     }
   }
 
-  return { url, client };
+  // Default scope: project for cursor/windsurf/codex/gemini, global for claude
+  if (!scope) {
+    scope = client === 'claude' ? 'global' : 'project';
+  }
+
+  return { url, client, scope };
 }
 
 function readJsonFile(filePath: string): Record<string, unknown> {
@@ -85,7 +102,7 @@ function getMcpServerEntry(wrapperPath: string, devflowUrl: string, client: Clie
 
 // ─── Client-specific setup functions ────────────────────────────
 
-function setupClaude(wrapperPath: string, devflowUrl: string): void {
+function setupClaude(wrapperPath: string, devflowUrl: string, _scope: Scope = 'global'): void {
   log('[3/3] Configuring Claude Code MCP server...');
 
   try {
@@ -127,10 +144,13 @@ function setupClaude(wrapperPath: string, devflowUrl: string): void {
   }
 }
 
-function setupCursor(wrapperPath: string, devflowUrl: string): void {
+function setupCursor(wrapperPath: string, devflowUrl: string, scope: Scope = 'project'): void {
   log('[3/3] Configuring Cursor MCP server...');
 
-  const configPath = join(homedir(), '.cursor', 'mcp.json');
+  const configPath = scope === 'project'
+    ? join(process.cwd(), '.cursor', 'mcp.json')
+    : join(homedir(), '.cursor', 'mcp.json');
+
   const config = readJsonFile(configPath);
 
   if (!config.mcpServers) config.mcpServers = {};
@@ -138,9 +158,14 @@ function setupCursor(wrapperPath: string, devflowUrl: string): void {
 
   writeJsonFile(configPath, config);
   log(`      Config written to: ${configPath}`);
+  if (scope === 'project') {
+    log('      Scope: This project only. Add .cursor/mcp.json to .gitignore.');
+  } else {
+    log('      Scope: All Cursor projects (global).');
+  }
 }
 
-function setupCodex(wrapperPath: string, devflowUrl: string): void {
+function setupCodex(wrapperPath: string, devflowUrl: string, _scope: Scope = 'project'): void {
   log('[3/3] Configuring Codex MCP server...');
 
   const configPath = join(homedir(), '.codex', 'config.toml');
@@ -174,7 +199,7 @@ DEVFLOW_CLIENT = "codex"
   log(`      Config written to: ${configPath}`);
 }
 
-function setupGemini(wrapperPath: string, devflowUrl: string): void {
+function setupGemini(wrapperPath: string, devflowUrl: string, _scope: Scope = 'project'): void {
   log('[3/3] Configuring Gemini CLI MCP server...');
 
   const configPath = join(homedir(), '.gemini', 'settings.json');
@@ -190,10 +215,13 @@ function setupGemini(wrapperPath: string, devflowUrl: string): void {
   log(`      Config written to: ${configPath}`);
 }
 
-function setupWindsurf(wrapperPath: string, devflowUrl: string): void {
+function setupWindsurf(wrapperPath: string, devflowUrl: string, scope: Scope = 'project'): void {
   log('[3/3] Configuring Windsurf MCP server...');
 
-  const configPath = join(homedir(), '.codeium', 'windsurf', 'mcp_config.json');
+  const configPath = scope === 'project'
+    ? join(process.cwd(), '.windsurf', 'mcp.json')
+    : join(homedir(), '.codeium', 'windsurf', 'mcp_config.json');
+
   const config = readJsonFile(configPath);
 
   if (!config.mcpServers) config.mcpServers = {};
@@ -201,6 +229,9 @@ function setupWindsurf(wrapperPath: string, devflowUrl: string): void {
 
   writeJsonFile(configPath, config);
   log(`      Config written to: ${configPath}`);
+  if (scope === 'project') {
+    log('      Scope: This project only.');
+  }
 }
 
 // ─── Main setup ─────────────────────────────────────────────────
@@ -213,7 +244,7 @@ const CLIENT_LABELS: Record<ClientType, string> = {
   windsurf: 'Windsurf',
 };
 
-const CLIENT_SETUP: Record<ClientType, (wrapperPath: string, url: string) => void> = {
+const CLIENT_SETUP: Record<ClientType, (wrapperPath: string, url: string, scope: Scope) => void> = {
   claude: setupClaude,
   cursor: setupCursor,
   codex: setupCodex,
@@ -252,9 +283,9 @@ const CLIENT_NEXT_STEPS: Record<ClientType, string[]> = {
 async function setup(): Promise<void> {
   const scriptDir = join(import.meta.url.replace('file://', ''), '..', '..', '..');
   const distFile = join(scriptDir, 'dist', 'index.js');
-  const { url: devflowUrl, client } = parseArgs();
+  const { url: devflowUrl, client, scope } = parseArgs();
 
-  log(`=== DevFlow MCP Server Setup (${CLIENT_LABELS[client]}) ===`);
+  log(`=== DevFlow MCP Server Setup (${CLIENT_LABELS[client]}, ${scope}) ===`);
   log('');
 
   // Step 1: Build
@@ -286,7 +317,7 @@ async function setup(): Promise<void> {
 
   // Step 3: Client-specific setup
   log('');
-  CLIENT_SETUP[client](wrapperPath, devflowUrl);
+  CLIENT_SETUP[client](wrapperPath, devflowUrl, scope);
 
   log('');
   log('=== Setup complete! ===');
