@@ -15,6 +15,8 @@ import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
 import { saveProjectConfig } from '../auth/browser-auth.js';
+import { detectGitRemoteUrl } from '../utils/git.js';
+import { isIgnored } from '../utils/ignore-list.js';
 
 const devflowInitDef = {
   name: 'devflow_init',
@@ -128,8 +130,44 @@ function generateGitGuidelines(git: GitContext, projectName: string): string {
 async function handleDevflowInit(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string | undefined;
 
-  // 0. Check if project is linked — if not, show project list
+  // 0. Check if project is linked — if not, try auto-discovery then show project list
   if (!devFlowClient.hasLinkedProject()) {
+    // Auto-discovery: detect git remote and check ignore list / project match
+    if (!flowId) {
+      const gitRemote = await detectGitRemoteUrl(process.cwd());
+
+      if (gitRemote && isIgnored(gitRemote)) {
+        return [
+          '⚠️ DevFlow is disabled for this project.',
+          '',
+          'This directory is on the ignore list. To re-enable DevFlow, use:',
+          '→ devflow_connect',
+        ].join('\n');
+      }
+
+      if (gitRemote) {
+        try {
+          const discovery = await devFlowClient.discoverProject(gitRemote);
+          if (discovery.found && discovery.project) {
+            const projectsResult = await devFlowClient.listProjects();
+            const projectList = projectsResult.success && projectsResult.data && projectsResult.data.length > 0
+              ? '\n\nAll projects:\n' + projectsResult.data.map((p, i) => `${i + 1}. **${p.name}** (${p.id})`).join('\n')
+              : '';
+            return [
+              `📁 DevFlow project discovered: "${discovery.project.name}"`,
+              '',
+              'This directory\'s git remote matches an existing DevFlow project.',
+              `→ Use devflow_connect({ projectId: "${discovery.project.id}" }) to link it`,
+              '→ Use devflow_disconnect to ignore this project',
+              projectList,
+            ].join('\n');
+          }
+        } catch {
+          // Discovery failed — fall through to generic project list
+        }
+      }
+    }
+
     const projectsResult = await devFlowClient.listProjects();
     if (!projectsResult.success || !projectsResult.data || projectsResult.data.length === 0) {
       return 'No projects found. Create a project in DevFlow first at ' + devFlowClient.getBaseUrl();

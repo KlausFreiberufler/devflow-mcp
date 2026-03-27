@@ -15,6 +15,8 @@ export const DISCOVERY_TOOLS: ReadonlySet<string> = new Set([
   'flow_create',
   'devflow_init',
   'devflow_status',
+  'devflow_connect',
+  'devflow_disconnect',
   'project_guidelines_get',
 ]);
 

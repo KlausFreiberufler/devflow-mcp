@@ -380,6 +380,22 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.getProject(projectId);
   }
 
+  async createProject(data: { name: string; repoUrl?: string }): Promise<ApiResponse<Project>> {
+    const result = await this.request<unknown>('POST', '/api/projects', data);
+    if (result.success && result.data) {
+      return { success: true, data: transformProject(result.data) };
+    }
+    return result as ApiResponse<Project>;
+  }
+
+  async updateProject(projectId: string, data: Record<string, unknown>): Promise<ApiResponse<Project>> {
+    const result = await this.request<unknown>('PATCH', `/api/projects/${projectId}`, data);
+    if (result.success && result.data) {
+      return { success: true, data: transformProject(result.data) };
+    }
+    return result as ApiResponse<Project>;
+  }
+
   // ============ Flow Methods ============
 
   /**
@@ -742,6 +758,18 @@ Or set: export DEVFLOW_TOKEN="your-token"
    */
   async getNextStep(flowId: string): Promise<ApiResponse<Record<string, unknown>>> {
     return this.request<Record<string, unknown>>('GET', `/api/flows/${flowId}/next-step`);
+  }
+
+  // ============ Discovery Methods ============
+
+  async discoverProject(repoUrl: string): Promise<{ found: boolean; project?: { id: string; name: string; repoUrl: string } }> {
+    const result = await this.request<{ found: boolean; project?: { id: string; name: string; repoUrl: string } }>(
+      'GET', `/api/projects/discover?repoUrl=${encodeURIComponent(repoUrl)}`
+    );
+    if (result.success && result.data) {
+      return result.data;
+    }
+    return { found: false };
   }
 
   // ============ Search Methods ============

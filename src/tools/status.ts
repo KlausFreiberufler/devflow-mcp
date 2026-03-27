@@ -12,6 +12,8 @@ import { devFlowClient } from '../api/client.js';
 import { detectClientType } from '../context/client-detect.js';
 import { syncConfig } from '../config/sync.js';
 import { MCP_VERSION } from '../config/version.js';
+import { detectGitRemoteUrl } from '../utils/git.js';
+import { isIgnored } from '../utils/ignore-list.js';
 
 export const tools: ToolModule = {
   devflow_status: {
@@ -46,7 +48,7 @@ export const tools: ToolModule = {
 
       switch (action) {
         case 'status':
-          return handleStatus();
+          return await handleStatus();
         case 'reconnect':
           return handleReconnect();
         case 'link':
@@ -62,17 +64,59 @@ export const tools: ToolModule = {
   },
 };
 
-function handleStatus(): string {
+async function handleStatus(): Promise<string> {
   const authenticated = devFlowClient.isAuthenticated();
   const projectName = devFlowClient.getLinkedProjectName();
   const projectId = devFlowClient.getLinkedProjectId();
   const clientType = detectClientType();
   const baseUrl = process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
   const hasHeartbeat = devFlowClient.hasActiveHeartbeat();
+  const workingDir = process.cwd();
+
+  // Auto-discovery: detect git remote and check project status
+  const discoveryLines: string[] = [];
+  const gitRemote = await detectGitRemoteUrl(workingDir);
+
+  if (gitRemote && isIgnored(gitRemote)) {
+    discoveryLines.push('📁 Project: Ignored (DevFlow disabled for this directory)');
+    discoveryLines.push('💡 Use devflow_connect to re-enable DevFlow here.');
+  } else if (devFlowClient.hasLinkedProject()) {
+    discoveryLines.push(`📁 Project: ${projectName} (managed)`);
+  } else if (gitRemote) {
+    // Not linked, not ignored — try to discover
+    if (authenticated) {
+      try {
+        const discovery = await devFlowClient.discoverProject(gitRemote);
+        if (discovery.found && discovery.project) {
+          discoveryLines.push(`📁 Project discovered: "${discovery.project.name}"`);
+          discoveryLines.push('💡 This directory\'s git remote matches a DevFlow project.');
+          discoveryLines.push('→ Use devflow_connect to link it, or devflow_disconnect to ignore.');
+        } else {
+          discoveryLines.push(`📁 Unknown project (git remote: ${gitRemote})`);
+          discoveryLines.push('💡 This directory is not linked to DevFlow.');
+          discoveryLines.push('→ Use devflow_connect to link or create a project, or devflow_disconnect to ignore.');
+        }
+      } catch {
+        // Discovery failed — show git remote info without discovery
+        discoveryLines.push(`📁 Unknown project (git remote: ${gitRemote})`);
+        discoveryLines.push('💡 This directory is not linked to DevFlow.');
+        discoveryLines.push('→ Use devflow_connect to link or create a project, or devflow_disconnect to ignore.');
+      }
+    } else {
+      discoveryLines.push(`📁 Unknown project (git remote: ${gitRemote})`);
+      discoveryLines.push('💡 This directory is not linked to DevFlow.');
+      discoveryLines.push('→ Use devflow_connect to link or create a project, or devflow_disconnect to ignore.');
+    }
+  } else {
+    discoveryLines.push('📁 No git remote detected');
+    discoveryLines.push('💡 Use devflow_status({ action: "link", projectId: "..." }) to link manually.');
+  }
 
   const lines = [
     `DevFlow MCP v${MCP_VERSION}`,
     '─'.repeat(30),
+    ...discoveryLines,
+    '',
     `Server:     ${baseUrl}`,
     `Auth:       ${authenticated ? '✅ Authenticated' : '❌ Not authenticated'}`,
     `Project:    ${projectName ? `${projectName} (${projectId})` : 'None (passive mode)'}`,
