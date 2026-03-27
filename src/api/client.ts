@@ -654,6 +654,55 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<Record<string, unknown>>('GET', `/api/projects/${id}/config`);
   }
 
+  // ============ Connection Management Methods ============
+
+  /**
+   * Check if heartbeat is currently running
+   */
+  hasActiveHeartbeat(): boolean {
+    return this.heartbeatInterval !== null;
+  }
+
+  /**
+   * Reconnect: refresh token (or re-authenticate), restart heartbeat
+   */
+  async reconnect(): Promise<void> {
+    this.stopHeartbeat();
+
+    if (this.credentials?.refreshToken) {
+      try {
+        await this.refreshTokens();
+        await this.saveCredentials();
+        return;
+      } catch {
+        // Refresh failed, try browser auth
+      }
+    }
+
+    // Re-authenticate via browser
+    const { getToken } = await import('../auth/browser-auth.js');
+    const token = await getToken(this.baseUrl, this.workingDir);
+    this.setToken(token);
+    await this.saveCredentials();
+
+    // Reload project config
+    this.projectConfig = await loadProjectConfig(this.workingDir);
+  }
+
+  /**
+   * Reload project config from .devflow.json in working directory
+   */
+  async reloadProjectConfig(): Promise<void> {
+    this.projectConfig = await loadProjectConfig(this.workingDir);
+  }
+
+  /**
+   * Clear project config (for unlink)
+   */
+  clearProjectConfig(): void {
+    this.projectConfig = null;
+  }
+
   // ============ Agent Slot Methods ============
 
   /**
