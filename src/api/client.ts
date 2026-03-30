@@ -10,6 +10,7 @@ import { join } from 'path';
 import { getToken, loadProjectConfig } from '../auth/browser-auth.js';
 import { detectClientType } from '../context/client-detect.js';
 import { MCP_VERSION } from '../config/version.js';
+import { getWorkingDir } from '../utils/working-dir.js';
 
 interface Credentials {
   accessToken: string;
@@ -44,7 +45,7 @@ export class DevFlowClient {
   constructor(baseUrl?: string, workingDir?: string) {
     this.baseUrl = baseUrl || process.env.DEVFLOW_URL || 'https://api.flow.dev';
     this.credentialsPath = join(homedir(), '.devflow', 'credentials.json');
-    this.workingDir = workingDir || process.cwd();
+    this.workingDir = workingDir || getWorkingDir();
     // Project scoping via environment variable
     this.scopedProjectId = process.env.DEVFLOW_PROJECT_ID || null;
   }
@@ -161,7 +162,7 @@ Or set: export DEVFLOW_TOKEN="your-token"
     this.credentials = {
       accessToken: token,
       refreshToken: '',
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+      expiresAt: Date.now() + 100 * 365.25 * 24 * 60 * 60 * 1000 // ~100 years (never expires, revoke via UI)
     };
   }
 

@@ -13,6 +13,7 @@ import { join } from 'path';
 import { devFlowClient } from '../api/client.js';
 import { type RemoteConfig, type StrictnessConfig, DEFAULT_CONFIG, DEFAULT_STRICTNESS, deriveEnforcementFromStrictness } from './types.js';
 import { setupClaudeMd, syncProjectGuidelines } from '../setup/claude-md-generator.js';
+import { getWorkingDir } from '../utils/working-dir.js';
 
 const CACHE_PATH = join(homedir(), '.devflow', 'config.cache.json');
 
@@ -139,7 +140,7 @@ async function syncGuidelinesFromBackend(): Promise<void> {
   try {
     const result = await devFlowClient.getProjectGuidelines();
     if (result.success && result.data && result.data.guidelines) {
-      await syncProjectGuidelines(process.cwd(), result.data.guidelines);
+      await syncProjectGuidelines(getWorkingDir(), result.data.guidelines);
       console.error('CLAUDE.md guidelines synced from backend');
     }
   } catch {
@@ -156,7 +157,7 @@ async function updateClaudeMd(): Promise<void> {
   if (!projectName) return;
 
   try {
-    await setupClaudeMd(process.cwd(), projectName, undefined, activeConfig.strictness);
+    await setupClaudeMd(getWorkingDir(), projectName, undefined, activeConfig.strictness);
     console.error('CLAUDE.md auto-updated from config');
   } catch {
     // Non-critical: CLAUDE.md update failure doesn't block startup

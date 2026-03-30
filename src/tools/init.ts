@@ -16,7 +16,7 @@ import { withErrorHandling } from '../utils/errors.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
 import { saveProjectConfig } from '../auth/browser-auth.js';
 import { detectGitRemoteUrl } from '../utils/git.js';
-import { isIgnored } from '../utils/ignore-list.js';
+import { getWorkingDir } from '../utils/working-dir.js';
 
 const devflowInitDef = {
   name: 'devflow_init',
@@ -134,16 +134,7 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   if (!devFlowClient.hasLinkedProject()) {
     // Auto-discovery: detect git remote and check ignore list / project match
     if (!flowId) {
-      const gitRemote = await detectGitRemoteUrl(process.cwd());
-
-      if (gitRemote && isIgnored(gitRemote)) {
-        return [
-          '⚠️ DevFlow is disabled for this project.',
-          '',
-          'This directory is on the ignore list. To re-enable DevFlow, use:',
-          '→ devflow_connect',
-        ].join('\n');
-      }
+      const gitRemote = await detectGitRemoteUrl(getWorkingDir());
 
       if (gitRemote) {
         try {
@@ -269,7 +260,7 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     try {
       const projectResult = await devFlowClient.getProject(flow.projectId);
       const projectName = projectResult.data?.name || 'Unknown';
-      await saveProjectConfig(process.cwd(), flow.projectId, projectName);
+      await saveProjectConfig(getWorkingDir(), flow.projectId, projectName);
     } catch {
       // Non-critical — continue without auto-linking
     }

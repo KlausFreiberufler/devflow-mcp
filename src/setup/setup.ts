@@ -9,6 +9,7 @@
  *   npx devflow-mcp setup --client gemini           # Gemini CLI
  *   npx devflow-mcp setup --client windsurf         # Windsurf
  *   npx devflow-mcp setup --url https://custom.url  # Custom backend URL
+ *   npx devflow-mcp setup --project-id <id>         # Link to specific project
  */
 
 import { execSync } from 'child_process';
@@ -16,9 +17,14 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readlinkSync, unlin
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { installWrapper } from './wrapper.js';
+import { generateCursorrulesContent, CURSORRULES_MARKER_START, CURSORRULES_MARKER_END } from '../templates/cursorrules.js';
+import { generateAgentsMdContent, AGENTS_MARKER_START, AGENTS_MARKER_END } from '../templates/agents-md.js';
+import { generateGeminiMdContent, GEMINI_MARKER_START, GEMINI_MARKER_END } from '../templates/gemini-md.js';
+import { generateWindsurfrulesContent, WINDSURFRULES_MARKER_START, WINDSURFRULES_MARKER_END } from '../templates/windsurfrules.js';
+import { generateClaudeMdContent, MARKER_START, MARKER_END } from '../templates/claude-md.js';
 
 const DEFAULT_URL = 'https://api.app.dev-flow.tech';
-const SUPPORTED_CLIENTS = ['claude', 'cursor', 'codex', 'gemini', 'windsurf'] as const;
+const SUPPORTED_CLIENTS = ['claude', 'cursor', 'codex', 'gemini', 'windsurf', 'droid'] as const;
 type ClientType = typeof SUPPORTED_CLIENTS[number];
 
 // Normalize aliases to canonical setup names
@@ -32,11 +38,12 @@ function log(msg: string): void {
 
 type Scope = 'project' | 'global';
 
-function parseArgs(): { url: string; client: ClientType; scope: Scope } {
+function parseArgs(): { url: string; client: ClientType; scope: Scope; projectId?: string } {
   const args = process.argv.slice(2);
   let url = DEFAULT_URL;
   let client: ClientType = 'claude';
   let scope: Scope | undefined;
+  let projectId: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--url' && args[i + 1]) {
@@ -61,6 +68,9 @@ function parseArgs(): { url: string; client: ClientType; scope: Scope } {
         process.exit(1);
       }
       i++;
+    } else if (args[i] === '--project-id' && args[i + 1]) {
+      projectId = args[i + 1];
+      i++;
     }
   }
 
@@ -69,7 +79,7 @@ function parseArgs(): { url: string; client: ClientType; scope: Scope } {
     scope = client === 'claude' ? 'global' : 'project';
   }
 
-  return { url, client, scope };
+  return { url, client, scope, projectId };
 }
 
 function readJsonFile(filePath: string): Record<string, unknown> {
@@ -234,6 +244,104 @@ function setupWindsurf(wrapperPath: string, devflowUrl: string, scope: Scope = '
   }
 }
 
+function setupDroid(wrapperPath: string, devflowUrl: string, scope: Scope = 'project'): void {
+  log('[3/3] Configuring Droid MCP server...');
+
+  // Droid uses a project-local .droid/mcp.json or global ~/.droid/mcp.json
+  const configPath = scope === 'project'
+    ? join(process.cwd(), '.droid', 'mcp.json')
+    : join(homedir(), '.droid', 'mcp.json');
+
+  const config = readJsonFile(configPath);
+
+  if (!config.mcpServers) config.mcpServers = {};
+  (config.mcpServers as Record<string, unknown>).devflow = getMcpServerEntry(wrapperPath, devflowUrl, 'droid');
+
+  writeJsonFile(configPath, config);
+  log(`      Config written to: ${configPath}`);
+  if (scope === 'project') {
+    log('      Scope: This project only.');
+  }
+}
+
+// ─── Instruction file generation ─────────────────────────────────
+
+interface InstructionFileConfig {
+  fileName: string;
+  generate: (projectName: string, techStack?: string) => string;
+  markerStart: string;
+  markerEnd: string;
+}
+
+const INSTRUCTION_FILES: Record<ClientType, InstructionFileConfig> = {
+  claude: {
+    fileName: 'CLAUDE.md',
+    generate: (name, tech) => generateClaudeMdContent(name, tech),
+    markerStart: MARKER_START,
+    markerEnd: MARKER_END,
+  },
+  cursor: {
+    fileName: '.cursorrules',
+    generate: (name, tech) => generateCursorrulesContent(name, tech),
+    markerStart: CURSORRULES_MARKER_START,
+    markerEnd: CURSORRULES_MARKER_END,
+  },
+  codex: {
+    fileName: 'AGENTS.md',
+    generate: (name, tech) => generateAgentsMdContent(name, tech),
+    markerStart: AGENTS_MARKER_START,
+    markerEnd: AGENTS_MARKER_END,
+  },
+  gemini: {
+    fileName: 'GEMINI.md',
+    generate: (name, tech) => generateGeminiMdContent(name, tech),
+    markerStart: GEMINI_MARKER_START,
+    markerEnd: GEMINI_MARKER_END,
+  },
+  windsurf: {
+    fileName: '.windsurfrules',
+    generate: (name, tech) => generateWindsurfrulesContent(name, tech),
+    markerStart: WINDSURFRULES_MARKER_START,
+    markerEnd: WINDSURFRULES_MARKER_END,
+  },
+  droid: {
+    fileName: 'CLAUDE.md',
+    generate: (name, tech) => generateClaudeMdContent(name, tech),
+    markerStart: MARKER_START,
+    markerEnd: MARKER_END,
+  },
+};
+
+function writeInstructionFile(client: ClientType, projectName?: string): void {
+  const config = INSTRUCTION_FILES[client];
+  if (!config) return;
+
+  const name = projectName || 'DevFlow Project';
+  const filePath = join(process.cwd(), config.fileName);
+  const content = config.generate(name);
+
+  if (existsSync(filePath)) {
+    const existing = readFileSync(filePath, 'utf-8');
+    if (existing.includes(config.markerStart) && existing.includes(config.markerEnd)) {
+      // Replace existing rules section
+      const startIdx = existing.indexOf(config.markerStart);
+      const endIdx = existing.indexOf(config.markerEnd) + config.markerEnd.length;
+      const updated = existing.substring(0, startIdx) + content + existing.substring(endIdx);
+      writeFileSync(filePath, updated);
+      log(`      ${config.fileName} updated (rules section replaced).`);
+      return;
+    }
+    // Append rules
+    const separator = existing.endsWith('\n') ? '\n' : '\n\n';
+    writeFileSync(filePath, existing + separator + content);
+    log(`      ${config.fileName} updated (rules appended).`);
+    return;
+  }
+
+  writeFileSync(filePath, content);
+  log(`      ${config.fileName} created.`);
+}
+
 // ─── Main setup ─────────────────────────────────────────────────
 
 const CLIENT_LABELS: Record<ClientType, string> = {
@@ -242,6 +350,7 @@ const CLIENT_LABELS: Record<ClientType, string> = {
   codex: 'Codex (OpenAI)',
   gemini: 'Gemini CLI',
   windsurf: 'Windsurf',
+  droid: 'Droid',
 };
 
 const CLIENT_SETUP: Record<ClientType, (wrapperPath: string, url: string, scope: Scope) => void> = {
@@ -250,6 +359,7 @@ const CLIENT_SETUP: Record<ClientType, (wrapperPath: string, url: string, scope:
   codex: setupCodex,
   gemini: setupGemini,
   windsurf: setupWindsurf,
+  droid: setupDroid,
 };
 
 const CLIENT_NEXT_STEPS: Record<ClientType, string[]> = {
@@ -278,12 +388,17 @@ const CLIENT_NEXT_STEPS: Record<ClientType, string[]> = {
     '2. Click MCPs icon in Cascade panel to verify "devflow" is listed',
     '3. DevFlow tools are available in Cascade',
   ],
+  droid: [
+    '1. Restart Droid',
+    '2. Verify "devflow" MCP server is available',
+    '3. DevFlow tools are available in chat',
+  ],
 };
 
 async function setup(): Promise<void> {
   const scriptDir = join(import.meta.url.replace('file://', ''), '..', '..', '..');
   const distFile = join(scriptDir, 'dist', 'index.js');
-  const { url: devflowUrl, client, scope } = parseArgs();
+  const { url: devflowUrl, client, scope, projectId } = parseArgs();
 
   log(`=== DevFlow MCP Server Setup (${CLIENT_LABELS[client]}, ${scope}) ===`);
   log('');
@@ -318,6 +433,22 @@ async function setup(): Promise<void> {
   // Step 3: Client-specific setup
   log('');
   CLIENT_SETUP[client](wrapperPath, devflowUrl, scope);
+
+  // Step 4: Write editor-specific instruction file
+  writeInstructionFile(client, projectId);
+
+  // Step 5: Write .devflow.json if --project-id provided
+  if (projectId) {
+    const configPath = join(process.cwd(), '.devflow.json');
+    const config = {
+      projectId,
+      linkedAt: new Date().toISOString(),
+    };
+    writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+    log('');
+    log(`      Project linked: ${configPath}`);
+    log(`      Project ID: ${projectId}`);
+  }
 
   log('');
   log('=== Setup complete! ===');

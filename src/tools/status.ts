@@ -13,7 +13,7 @@ import { detectClientType } from '../context/client-detect.js';
 import { syncConfig } from '../config/sync.js';
 import { MCP_VERSION } from '../config/version.js';
 import { detectGitRemoteUrl } from '../utils/git.js';
-import { isIgnored } from '../utils/ignore-list.js';
+import { getWorkingDir } from '../utils/working-dir.js';
 
 export const tools: ToolModule = {
   devflow_status: {
@@ -71,16 +71,13 @@ async function handleStatus(): Promise<string> {
   const clientType = detectClientType();
   const baseUrl = process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
   const hasHeartbeat = devFlowClient.hasActiveHeartbeat();
-  const workingDir = process.cwd();
+  const workingDir = getWorkingDir();
 
   // Auto-discovery: detect git remote and check project status
   const discoveryLines: string[] = [];
   const gitRemote = await detectGitRemoteUrl(workingDir);
 
-  if (gitRemote && isIgnored(gitRemote)) {
-    discoveryLines.push('📁 Project: Ignored (DevFlow disabled for this directory)');
-    discoveryLines.push('💡 Use devflow_connect to re-enable DevFlow here.');
-  } else if (devFlowClient.hasLinkedProject()) {
+  if (devFlowClient.hasLinkedProject()) {
     discoveryLines.push(`📁 Project: ${projectName} (managed)`);
   } else if (gitRemote) {
     // Not linked, not ignored — try to discover
@@ -196,7 +193,7 @@ async function handleLink(projectId: string | undefined): Promise<string> {
     }
 
     // Write .devflow.json in CWD
-    const configPath = join(process.cwd(), '.devflow.json');
+    const configPath = join(getWorkingDir(), '.devflow.json');
     const config = {
       projectId: project.id,
       projectName: project.name,
@@ -227,7 +224,7 @@ async function handleLink(projectId: string | undefined): Promise<string> {
 }
 
 function handleUnlink(): string {
-  const configPath = join(process.cwd(), '.devflow.json');
+  const configPath = join(getWorkingDir(), '.devflow.json');
 
   if (!existsSync(configPath)) {
     return 'No project linked in this directory.';
