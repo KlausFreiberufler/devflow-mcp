@@ -10,8 +10,9 @@ import { join } from 'path';
 import type { ToolModule } from './registry.js';
 import { devFlowClient } from '../api/client.js';
 import { detectGitRemoteUrl } from '../utils/git.js';
-import { removeFromIgnoreList } from '../utils/ignore-list.js';
+
 import { syncConfig } from '../config/sync.js';
+import { getWorkingDir } from '../utils/working-dir.js';
 
 export const tools: ToolModule = {
   devflow_connect: {
@@ -46,16 +47,11 @@ export const tools: ToolModule = {
       const projectId = args.projectId as string | undefined;
       const createNew = args.createNew as boolean | undefined;
       const name = args.name as string | undefined;
-      const cwd = process.cwd();
+      const cwd = getWorkingDir();
 
       try {
         // Detect git remote
         const gitRemote = await detectGitRemoteUrl(cwd);
-
-        // Remove from ignore list if present
-        if (gitRemote) {
-          removeFromIgnoreList(gitRemote);
-        }
 
         let linkedProjectId: string;
         let linkedProjectName: string;

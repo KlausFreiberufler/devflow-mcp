@@ -8,6 +8,7 @@ import { createServer } from 'http';
 import { exec } from 'child_process';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { homedir } from 'os';
+import { getWorkingDir } from '../utils/working-dir.js';
 import { join } from 'path';
 import { setupClaudeMd, fetchProjectTechStack } from '../setup/claude-md-generator.js';
 
@@ -66,7 +67,7 @@ function openBrowser(url: string): void {
 async function pollForToken(
   baseUrl: string,
   code: string,
-  maxAttempts: number = 60,
+  maxAttempts: number = 150,
   intervalMs: number = 2000
 ): Promise<AuthResult | null> {
   for (let i = 0; i < maxAttempts; i++) {
@@ -130,7 +131,7 @@ export async function saveProjectConfig(workingDir: string, projectId: string, p
  * Load project configuration from working directory
  */
 export async function loadProjectConfig(workingDir?: string): Promise<ProjectConfig | null> {
-  const dir = workingDir || process.cwd();
+  const dir = workingDir || getWorkingDir();
   const configPath = join(dir, '.devflow.json');
 
   try {
@@ -172,7 +173,7 @@ export async function authenticateViaBrowser(baseUrl: string, workingDir?: strin
 
   // Find available port for callback
   const port = await findAvailablePort();
-  const dir = workingDir || process.cwd();
+  const dir = workingDir || getWorkingDir();
 
   // Request auth code from server
   const requestResponse = await fetch(`${baseUrl}/api/auth/cli/request`, {

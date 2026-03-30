@@ -2,41 +2,33 @@
  * devflow_disconnect — Disconnect this project from DevFlow
  *
  * Discovery tool (works without devflow_init).
- * Adds the current directory to the ignore list so DevFlow stays quiet here.
+ * Removes .devflow.json and stops the heartbeat.
  */
 
 import { existsSync, rmSync } from 'fs';
 import { join } from 'path';
 import type { ToolModule } from './registry.js';
 import { devFlowClient } from '../api/client.js';
-import { detectGitRemoteUrl } from '../utils/git.js';
-import { addToIgnoreList } from '../utils/ignore-list.js';
 import { sessionContext } from '../context/session.js';
+import { getWorkingDir } from '../utils/working-dir.js';
 
 export const tools: ToolModule = {
   devflow_disconnect: {
     definition: {
       name: 'devflow_disconnect',
       description:
-        'Disconnect this project from DevFlow. Adds the current directory to the ignore list ' +
-        'so DevFlow stays quiet here. You can re-enable anytime with devflow_connect.',
+        'Disconnect this project from DevFlow. Removes .devflow.json and stops the heartbeat. ' +
+        'You can re-enable anytime with devflow_connect.',
       inputSchema: {
         type: 'object' as const,
         properties: {},
       },
     },
     handler: async (args) => {
-      const cwd = process.cwd();
+      const cwd = getWorkingDir();
       const lines: string[] = [];
 
       try {
-        // Detect git remote and add to ignore list
-        const gitRemote = await detectGitRemoteUrl(cwd);
-        if (gitRemote) {
-          addToIgnoreList(gitRemote);
-          lines.push(`✅ Added to ignore list: ${gitRemote}`);
-        }
-
         // Remove .devflow.json if exists
         const configPath = join(cwd, '.devflow.json');
         if (existsSync(configPath)) {

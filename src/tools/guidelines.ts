@@ -8,6 +8,7 @@ import type { ProjectGuidelines } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { syncProjectGuidelines } from '../setup/claude-md-generator.js';
+import { getWorkingDir } from '../utils/working-dir.js';
 
 // ============ Tool Definitions ============
 
@@ -90,7 +91,7 @@ async function handleProjectGuidelinesUpdate(args: Record<string, unknown>): Pro
 
   // Sync to local CLAUDE.md immediately
   try {
-    await syncProjectGuidelines(process.cwd(), guidelines);
+    await syncProjectGuidelines(getWorkingDir(), guidelines);
   } catch {
     // Non-critical: local sync failure doesn't block the update
   }

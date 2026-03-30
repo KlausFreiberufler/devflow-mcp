@@ -1,6 +1,6 @@
 // src/context/client-detect.ts
 
-export type ClientType = 'claude-code' | 'cursor' | 'codex' | 'gemini' | 'windsurf' | 'unknown';
+export type ClientType = 'claude-code' | 'cursor' | 'codex' | 'gemini' | 'windsurf' | 'droid' | 'unknown';
 
 export function detectClientType(): ClientType {
   // Primary: DEVFLOW_CLIENT env var (set by setup command, always reliable)
@@ -24,7 +24,7 @@ const CLIENT_ALIASES: Record<string, ClientType> = {
 };
 
 function normalizeClientType(value: string): ClientType | null {
-  if (['claude-code', 'cursor', 'codex', 'gemini', 'windsurf'].includes(value)) {
+  if (['claude-code', 'cursor', 'codex', 'gemini', 'windsurf', 'droid'].includes(value)) {
     return value as ClientType;
   }
   return CLIENT_ALIASES[value] || null;
