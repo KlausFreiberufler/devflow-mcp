@@ -5,6 +5,8 @@
  * Set via devflow_init, cleared on session end.
  */
 
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { join } from 'path';
 import { devFlowClient, type Flow, type Task } from '../api/client.js';
 
 export interface SessionFeedback {
@@ -49,15 +51,23 @@ export interface ActiveContext {
   previousFeedback?: string | null;
 }
 
+const ACTIVE_FILE = '.devflow-active';
+
+function getActiveFilePath(): string {
+  return join(process.cwd(), ACTIVE_FILE);
+}
+
 class SessionContext {
   private context: ActiveContext | null = null;
 
   init(ctx: ActiveContext): void {
     this.context = ctx;
+    this.writeActiveFile();
   }
 
   release(): void {
     this.context = null;
+    this.deleteActiveFile();
   }
 
   isActive(): boolean {
@@ -90,12 +100,44 @@ class SessionContext {
   updateFlow(flow: Flow): void {
     if (this.context) {
       this.context.flow = flow;
+      this.writeActiveFile();
+
+      // Delete active file when flow is done
+      if (flow.currentState === 'done') {
+        this.deleteActiveFile();
+      }
     }
   }
 
   updateAllowedActions(actions: string[]): void {
     if (this.context) {
       this.context.allowedActions = actions;
+    }
+  }
+
+  private writeActiveFile(): void {
+    if (!this.context) return;
+    try {
+      const data = {
+        flowId: this.context.flow.id,
+        displayId: this.context.flow.displayId,
+        state: this.context.flow.currentState,
+        since: new Date().toISOString(),
+      };
+      writeFileSync(getActiveFilePath(), JSON.stringify(data, null, 2));
+    } catch {
+      // Non-critical: file write may fail in read-only environments
+    }
+  }
+
+  private deleteActiveFile(): void {
+    try {
+      const filePath = getActiveFilePath();
+      if (existsSync(filePath)) {
+        unlinkSync(filePath);
+      }
+    } catch {
+      // Non-critical
     }
   }
 

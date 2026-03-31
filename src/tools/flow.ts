@@ -512,13 +512,20 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
       }
 
       const guidance = NEXT_STEP_GUIDANCE[newState] || '';
+      const reinitHint = newState === 'approval'
+        ? `\n\n**Nach Genehmigung:** Rufe \`devflow_init({ flowId: "${resolvedId}" })\` auf — der Auto-Advance von ready → in_progress passiert dort automatisch.`
+        : '';
       const warningBlock = warnings.length > 0 ? `\n\n${warnings.join('\n')}` : '';
-      return `Flow updated successfully.\n\n${formatFlowDetail(updatedFlow)}\n\n---\n**Naechster Schritt:** ${guidance}${warningBlock}`;
+      return `Flow updated successfully.\n\n${formatFlowDetail(updatedFlow)}\n\n---\n**Naechster Schritt:** ${guidance}${reinitHint}${warningBlock}`;
     }
   }
 
+  // For any state change not caught above, add devflow_init reminder
   const warningBlock = warnings.length > 0 ? `\n\n${warnings.join('\n')}` : '';
-  return `Flow updated successfully.\n\n${formatFlowDetail(result.data)}${warningBlock}`;
+  const reinitHint = currentState
+    ? `\n\n---\n**WICHTIG:** State hat sich geändert. Rufe jetzt \`devflow_init({ flowId: "${resolvedId}" })\` auf um den nächsten Pipeline-Step und die erlaubten Aktionen zu erhalten.`
+    : '';
+  return `Flow updated successfully.\n\n${formatFlowDetail(result.data)}${reinitHint}${warningBlock}`;
 }
 
 async function handleFlowGetFeedback(args: Record<string, unknown>): Promise<string> {
