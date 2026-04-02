@@ -10,7 +10,7 @@ import { sessionContext, type SessionFeedback, type ActiveContext, type GitConte
 import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import { getConfig } from '../config/sync.js';
 import { formatStrictnessLevel } from '../config/types.js';
-import { checkForUpdate } from '../config/version-check.js';
+import { checkForUpdate, downloadUpdate } from '../config/version-check.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
@@ -420,6 +420,11 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
   // Version check (non-blocking, cached)
   const baseUrl = devFlowClient.getBaseUrl();
   const updateInfo = await checkForUpdate(baseUrl);
+
+  // Auto-download update in background (non-blocking)
+  if (updateInfo?.updateAvailable) {
+    downloadUpdate(baseUrl, updateInfo.latestVersion).catch(() => {});
+  }
 
   return formatInitResponse(activeContext, warning, updateInfo);
 }

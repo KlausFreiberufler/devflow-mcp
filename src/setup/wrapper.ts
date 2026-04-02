@@ -35,8 +35,30 @@ export function installWrapper(distFile: string): string {
     ].join('\r\n');
     writeFileSync(wrapperPath, content);
   } else {
+    const distDir = distFile.replace(/\/dist\/index\.js$/, '');
     const content = [
       '#!/bin/bash',
+      '',
+      '# Auto-update: check for pending updates in ~/.devflow/updates/',
+      'UPDATES_DIR="$HOME/.devflow/updates"',
+      `INSTALL_DIR="${distDir}"`,
+      'if [ -d "$UPDATES_DIR" ]; then',
+      '  UPDATE_TGZ=$(ls -t "$UPDATES_DIR"/devflow-mcp-*.tgz 2>/dev/null | head -1)',
+      '  if [ -n "$UPDATE_TGZ" ]; then',
+      '    echo "🔄 Installing MCP update: $(basename $UPDATE_TGZ)..." >&2',
+      '    TEMP_DIR=$(mktemp -d)',
+      '    tar -xzf "$UPDATE_TGZ" -C "$TEMP_DIR" 2>/dev/null',
+      '    if [ -d "$TEMP_DIR/package/dist" ]; then',
+      '      rm -rf "$INSTALL_DIR/dist"',
+      '      cp -r "$TEMP_DIR/package/dist" "$INSTALL_DIR/dist"',
+      '      rm -f "$UPDATE_TGZ"',
+      '      rmdir "$UPDATES_DIR" 2>/dev/null',
+      '      echo "✅ MCP update installed." >&2',
+      '    fi',
+      '    rm -rf "$TEMP_DIR"',
+      '  fi',
+      'fi',
+      '',
       `NODE=$(command -v node 2>/dev/null || echo "${nodePath}")`,
       'if [ ! -x "$NODE" ]; then',
       '  echo "Error: node not found. Install Node.js first." >&2',

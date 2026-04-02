@@ -48,6 +48,13 @@ if (process.argv[2] === 'setup') {
   process.exit(0);
 }
 
+// Subcommand: `devflow-mcp uninstall --client <type>`
+if (process.argv[2] === 'uninstall') {
+  const { uninstall } = await import('./setup/uninstall.js');
+  await uninstall(process.argv.slice(3));
+  process.exit(0);
+}
+
 // NOTE: project_list removed from runtime (only used during setup)
 registry.register(initTools);
 registry.register(flowTools);
