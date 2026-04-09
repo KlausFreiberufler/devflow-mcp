@@ -43,7 +43,7 @@ export class DevFlowClient {
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(baseUrl?: string, workingDir?: string) {
-    this.baseUrl = baseUrl || process.env.DEVFLOW_URL || 'https://api.flow.dev';
+    this.baseUrl = baseUrl || process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
     this.credentialsPath = join(homedir(), '.devflow', 'credentials.json');
     this.workingDir = workingDir || getWorkingDir();
     // Project scoping via environment variable
@@ -147,7 +147,7 @@ export class DevFlowClient {
 Authentication required. The browser should open automatically.
 If it doesn't, please:
 
-1. Open DevFlow: ${this.baseUrl.replace(':6011', ':6010')}
+1. Open DevFlow: ${this.baseUrl.replace('api.', 'app.')}
 2. Log in with your credentials
 3. The connection will be established automatically
 
