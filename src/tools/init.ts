@@ -14,6 +14,8 @@ import { checkForUpdate, downloadUpdate } from '../config/version-check.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { extractImagesFromTipTap } from '../utils/tiptap.js';
+import { formatAttachmentList } from '../utils/attachments.js';
+import type { FlowAttachment } from '../api/client.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
 import { saveProjectConfig } from '../auth/browser-auth.js';
 import { detectGitRemoteUrl } from '../utils/git.js';
@@ -427,7 +429,16 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     downloadUpdate(baseUrl, updateInfo.latestVersion).catch(() => {});
   }
 
-  return formatInitResponse(activeContext, warning, updateInfo);
+  // Load attachments
+  let attachmentSection = '';
+  try {
+    const attResult = await devFlowClient.getAttachments(activeContext.flow.id);
+    if (attResult.success && Array.isArray(attResult.data) && attResult.data.length > 0) {
+      attachmentSection = '\n\n' + formatAttachmentList(attResult.data as FlowAttachment[]);
+    }
+  } catch {}
+
+  return formatInitResponse(activeContext, warning, updateInfo) + attachmentSection;
 }
 
 function formatInitResponse(
