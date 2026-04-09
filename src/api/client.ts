@@ -458,6 +458,34 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<FlowFeedback>('GET', `/api/flows/${flowId}/feedback`);
   }
 
+  async getAttachments(flowId: string): Promise<ApiResponse<FlowAttachment[]>> {
+    return this.request<FlowAttachment[]>('GET', `/api/flows/${flowId}/attachments`);
+  }
+
+  async uploadAttachment(flowId: string, filename: string, content: string, mimeType = 'text/markdown'): Promise<ApiResponse<FlowAttachment>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Not authenticated.' };
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const formData = new FormData();
+    formData.append('file', blob, filename);
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.credentials.accessToken}`,
+    };
+    if (this.agentSessionId) {
+      headers['X-Agent-Session'] = this.agentSessionId;
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/flows/${flowId}/attachments`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return response.json();
+  }
+
   // ============ Task/Todo Methods ============
 
   async listTasks(flowId: string): Promise<ApiResponse<Task[]>> {
@@ -859,6 +887,16 @@ export interface FlowUpdate {
   prUrl?: string;
   prNumber?: number;
   prState?: string;
+}
+
+export interface FlowAttachment {
+  id: string;
+  flowId: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  url: string;
+  createdAt: string;
 }
 
 export interface FlowFeedback {

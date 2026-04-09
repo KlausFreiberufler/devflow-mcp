@@ -3,12 +3,13 @@
  * Tools for listing, getting, creating, and updating flows in DevFlow
  */
 
-import { devFlowClient, type Flow } from '../api/client.js';
+import { devFlowClient, type Flow, type FlowAttachment } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
 import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import { extractImagesFromTipTap } from '../utils/tiptap.js';
+import { formatAttachmentList } from '../utils/attachments.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
 
 // ============ Tool Definitions ============
@@ -248,7 +249,20 @@ async function handleFlowGet(args: Record<string, unknown>): Promise<string> {
     return `Error: ${result.error || 'Flow not found'}`;
   }
 
-  return formatFlowDetail(result.data);
+  // Load attachments
+  let attachments: FlowAttachment[] = [];
+  try {
+    const attResult = await devFlowClient.getAttachments(resolvedId);
+    if (attResult.success && Array.isArray(attResult.data)) {
+      attachments = attResult.data;
+    }
+  } catch {}
+
+  let output = formatFlowDetail(result.data);
+  if (attachments.length > 0) {
+    output += '\n\n' + formatAttachmentList(attachments);
+  }
+  return output;
 }
 
 async function handleFlowCreate(args: Record<string, unknown>): Promise<string> {
