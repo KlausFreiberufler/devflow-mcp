@@ -13,6 +13,7 @@ import { formatStrictnessLevel } from '../config/types.js';
 import { checkForUpdate, downloadUpdate } from '../config/version-check.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
+import { extractImagesFromTipTap } from '../utils/tiptap.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
 import { saveProjectConfig } from '../auth/browser-auth.js';
 import { detectGitRemoteUrl } from '../utils/git.js';
@@ -457,6 +458,18 @@ function formatInitResponse(
 
   if (w.description) {
     lines.push('', '## Beschreibung', w.description);
+  }
+
+  // Extract embedded images from TipTap JSON
+  if (w.descriptionJson) {
+    const baseUrl = process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
+    const images = extractImagesFromTipTap(w.descriptionJson, baseUrl);
+    if (images.length > 0) {
+      lines.push('', '## Embedded Images');
+      for (const url of images) {
+        lines.push(`- ![image](${url})`);
+      }
+    }
   }
 
   if (w.acceptanceCriteria && w.acceptanceCriteria.length > 0) {

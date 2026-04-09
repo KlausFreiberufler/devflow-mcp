@@ -8,6 +8,7 @@ import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
 import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
+import { extractImagesFromTipTap } from '../utils/tiptap.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
 
 // ============ Tool Definitions ============
@@ -653,6 +654,19 @@ function formatFlowDetail(flow: Flow): string {
     lines.push('## Description\n');
     lines.push(flow.description);
     lines.push('');
+  }
+
+  // Extract embedded images from TipTap JSON
+  if (flow.descriptionJson) {
+    const baseUrl = process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
+    const images = extractImagesFromTipTap(flow.descriptionJson, baseUrl);
+    if (images.length > 0) {
+      lines.push('## Embedded Images\n');
+      for (const url of images) {
+        lines.push(`- ![image](${url})`);
+      }
+      lines.push('');
+    }
   }
 
   if (flow.acceptanceCriteria && flow.acceptanceCriteria.length > 0) {
