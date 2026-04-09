@@ -804,6 +804,7 @@ export interface Flow {
   ticketKey?: string;
   summary: string;
   description?: string;
+  descriptionJson?: string;
   acceptanceCriteria?: string[];
   currentState: 'idea' | 'planning' | 'approval' | 'ready' | 'in_progress' | 'review' | 'done';
   agentStatus?: string;
@@ -1029,6 +1030,7 @@ export function transformFlow(raw: unknown): Flow {
     ticketKey: w.ticketKey as string | undefined,
     summary: w.ticketSummary as string,
     description: w.ticketDescription as string | undefined,
+    descriptionJson: w.ticketDescriptionJson as string | undefined,
     acceptanceCriteria: w.acceptanceCriteria as string[] | undefined,
     currentState: w.currentState as Flow['currentState'],
     agentStatus: w.agentStatus as string | undefined,
