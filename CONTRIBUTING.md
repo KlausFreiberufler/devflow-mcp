@@ -1,6 +1,6 @@
-# Contributing - DevFlow MCP Server
+# Contributing to DevFlow MCP Server
 
-## Entwicklungsumgebung einrichten
+## Development Setup
 
 ```bash
 git clone https://github.com/KlausFreiberufler/devflow-mcp.git
@@ -9,121 +9,130 @@ npm install
 npm run build
 ```
 
-## Lokalen MCP-Server registrieren
+## Register Local MCP Server
 
 ```bash
-# Mit Produktions-Backend
+# With production backend
 npm run setup
 
-# Mit lokalem Backend
-node dist/index.js setup --url http://localhost:6011
+# With custom backend URL
+node dist/setup/setup.js --url https://your-backend.example.com
 ```
 
-Die Registrierung zeigt auf `dist/index.js` in diesem Repo.
-Nach jedem Build nutzt Claude Code automatisch den neuen Code.
+The registration points to `dist/index.js` in this repo.
+After each build, your AI client automatically uses the new code.
 
-## Entwicklungs-Workflow
+## Development Workflow
 
-### Code ändern und testen
+### Edit, Build, Test
 
 ```bash
-# 1. Code in src/ bearbeiten
+# 1. Edit code in src/
 
-# 2. Bauen
+# 2. Build
 npm run build
 
-# 3. Claude Code neu starten (neue Session reicht)
-#    → MCP-Server lädt automatisch die neue dist/index.js
+# 3. Restart your AI client (a new session is enough)
+#    The MCP server automatically loads the new dist/index.js
 
-# 4. Testen: flow_list, devflow_init, etc. in Claude Code nutzen
+# 4. Test: use flow_list, devflow_init, etc. in your AI client
 ```
 
-### Auto-Build bei Änderungen
+### Auto-Build on Changes
 
 ```bash
 npm run dev
 ```
 
-Nutzt `tsc --watch` - kompiliert automatisch bei jeder Dateiänderung.
-Claude Code muss trotzdem neu gestartet werden um den neuen Code zu laden.
+Uses `tsc --watch` — compiles automatically on every file change.
+Your AI client still needs a restart to load the new code.
 
-## Projektstruktur
+## Project Structure
 
 ```
 src/
-├── index.ts              # Einstiegspunkt (MCP-Server + Setup-Routing)
+├── index.ts              # Entry point (MCP server + setup routing)
 ├── api/
-│   └── client.ts         # DevFlow API Client (Auth, HTTP, Typen)
+│   └── client.ts         # DevFlow API client (auth, HTTP, types)
 ├── auth/
-│   └── browser-auth.ts   # Browser-basierte Authentifizierung
+│   └── browser-auth.ts   # Browser-based authentication
 ├── config/
-│   ├── sync.ts           # Config-Sync vom Backend
-│   └── types.ts          # Config-Typen
+│   ├── sync.ts           # Config sync from backend
+│   ├── version.ts        # MCP version constant
+│   └── types.ts          # Config types
 ├── context/
-│   ├── auto-logger.ts    # Automatisches Session-Logging
-│   ├── auto-status.ts    # Automatische Status-Updates
-│   ├── permissions.ts    # Tool-Permissions pro Flow-State
-│   └── session.ts        # Session-Kontext (Init-Gate)
+│   ├── auto-logger.ts    # Automatic session logging
+│   ├── auto-status.ts    # Automatic status updates
+│   ├── client-detect.ts  # Client type detection
+│   ├── permissions.ts    # Tool permissions per flow state
+│   └── session.ts        # Session context (init gate)
 ├── setup/
-│   └── setup.ts          # Setup-Wizard (CLI)
+│   ├── setup.ts          # Setup wizard (CLI)
+│   └── wrapper.ts        # Shell wrapper generator
 ├── templates/
-│   └── claude-md.ts      # CLAUDE.md Template-Generator
+│   ├── claude-md.ts      # CLAUDE.md template generator
+│   ├── cursorrules.ts    # .cursorrules template
+│   ├── agents-md.ts      # AGENTS.md template (Codex)
+│   ├── gemini-md.ts      # GEMINI.md template
+│   └── windsurfrules.ts  # .windsurfrules template
 ├── tools/
-│   ├── registry.ts       # Tool-Registry
-│   ├── init.ts           # devflow_init Tool
-│   ├── flow.ts           # Flow-Tools (list, get, create, update)
-│   ├── task.ts           # Task-Tools
-│   ├── agent-session.ts  # Agent-Session-Tools
-│   ├── knowledge.ts      # Knowledge-Tools
-│   ├── release.ts        # Release-Tools
-│   └── search.ts         # Search-Tool
+│   ├── registry.ts       # Tool registry with guards
+│   ├── init.ts           # devflow_init tool
+│   ├── flow.ts           # Flow tools (list, get, create, update)
+│   ├── task.ts           # Task tools
+│   ├── agent-session.ts  # Agent session tools
+│   ├── docs.ts           # Documentation tools
+│   ├── release.ts        # Release tools
+│   ├── search.ts         # Search tool
+│   └── status.ts         # Status/connection tool
 └── utils/
-    └── errors.ts         # Error-Handling Utilities
+    ├── errors.ts         # Error handling utilities
+    ├── git.ts            # Git remote detection
+    └── working-dir.ts    # Working directory detection
 ```
 
-## Architektur
+## Architecture
 
-### Init-Gate
+### Init Gate
 
-Alle Tools (außer `devflow_init`, `flow_list`, `flow_create`) sind gesperrt bis `devflow_init` mit einer Flow-ID aufgerufen wird. Das stellt sicher, dass jede Arbeit einem Flow zugeordnet ist.
+All tools (except `devflow_init`, `flow_list`, `flow_create`, `devflow_status`) are blocked until `devflow_init` is called with a flow ID. This ensures every piece of work is associated with a flow.
 
-### Tool-Permissions
+### Tool Permissions
 
-Je nach Flow-State sind nur bestimmte Tools erlaubt. Die Permissions werden in `context/permissions.ts` definiert und vom Server erzwungen.
+Depending on the flow state, only certain tools are allowed. Permissions are enforced by the backend — the MCP server has no permission logic of its own.
 
-### API-Client
+### API Client
 
-Der Client in `api/client.ts` handhabt:
-- Browser-basierte Authentifizierung (Token + Refresh)
-- Automatische Retries bei 5xx-Fehlern
-- snake_case → camelCase Transformation der API-Responses
+The client in `api/client.ts` handles:
+- Browser-based authentication (token + refresh)
+- Automatic retries on 5xx errors
+- snake_case to camelCase transformation of API responses
 
-## npm-Paket
+## npm Package
 
-### Paket prüfen
+### Check Package Contents
 
 ```bash
-# Welche Dateien landen im Paket?
+# What files end up in the package?
 npm pack --dry-run
 
-# Nur dist/ + README.md + package.json sollten enthalten sein
+# Only dist/ + README.md + package.json should be included
 ```
 
-### Wichtige package.json Felder
+### Key package.json Fields
 
-| Feld | Wert | Zweck |
-|------|------|-------|
-| `private` | `true` | Verhindert versehentliches Publishen auf npm |
-| `files` | `["dist"]` | Nur kompilierte Dateien im Paket |
-| `prepare` | `npm run build` | Auto-Build bei `npx github:...` Installation |
-| `bin.devflow-mcp` | `dist/index.js` | Haupteinstiegspunkt + Setup-Routing |
+| Field | Value | Purpose |
+|-------|-------|---------|
+| `private` | `true` | Prevents accidental npm publishing |
+| `files` | `["dist"]` | Only compiled files in the package |
+| `prepare` | `npm run build` | Auto-build on `npx github:...` install |
+| `bin.devflow-mcp` | `dist/index.js` | Main entry point + setup routing |
 
-## Nützliche Befehle
+## Useful Commands
 
-| Befehl | Beschreibung |
-|--------|--------------|
-| `npm run build` | TypeScript kompilieren |
-| `npm run dev` | Watch-Mode (auto-kompilieren) |
-| `npm run setup` | Setup-Wizard starten |
-| `npm pack --dry-run` | Paketinhalt prüfen |
-| `node dist/index.js setup --url <url>` | Setup mit eigener URL |
+| Command | Description |
+|---------|-------------|
+| `npm run build` | Compile TypeScript |
+| `npm run dev` | Watch mode (auto-compile) |
+| `npm run setup` | Start setup wizard |
+| `npm pack --dry-run` | Check package contents |

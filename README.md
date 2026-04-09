@@ -1,209 +1,185 @@
 # DevFlow MCP Server
 
-MCP-Server für die Integration von [DevFlow](https://github.com/KlausFreiberufler/devflow) mit KI-Code-Assistenten.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Ermöglicht KI-Agents (Claude Code, Cursor, Gemini CLI, Windsurf u.a.), Flows und Tasks direkt zu verwalten — mit strukturiertem Planungs- und Review-Prozess.
+MCP server for integrating [DevFlow](https://dev-flow.tech) with AI code assistants. Enables structured development workflows with enforced planning, task tracking, and code review gates.
 
-## Kompatible Clients
+## What is DevFlow?
 
-| Client | MCP Support | Status |
-|--------|-------------|--------|
-| [Claude Code](https://claude.com/claude-code) | Native | Vollständig unterstützt |
-| [Cursor](https://cursor.sh) | MCP | Unterstützt |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | MCP | Unterstützt |
-| [Windsurf](https://codeium.com/windsurf) | MCP | Unterstützt |
-| [Codex](https://github.com/openai/codex) | Noch nicht | Geplant |
+DevFlow brings structure to AI-assisted development. Instead of letting AI agents write code without oversight, DevFlow enforces a workflow:
+
+```
+idea -> planning -> approval -> ready -> in_progress -> review -> done
+```
+
+Every feature or bugfix goes through planning, gets approved, is tracked with tasks, and must pass review before completion. The MCP server connects your AI coding assistant to DevFlow, making this workflow seamless.
 
 ## Installation
 
-### Voraussetzungen
+### As a Claude Code Plugin
 
-- Node.js >= 18
-- Ein MCP-kompatibler KI-Client
-- Zugang zum GitHub-Repo
+```bash
+/plugin install devflow
+```
 
-### Claude Code
+### Manual Setup
+
+#### Claude Code
 
 ```bash
 npx github:KlausFreiberufler/devflow-mcp setup
 ```
 
-### Cursor
+#### Cursor
 
 ```bash
 npx github:KlausFreiberufler/devflow-mcp setup --client cursor
 ```
 
-Oder manuell in `.cursor/mcp.json`:
-```json
-{
-  "mcpServers": {
-    "devflow": {
-      "command": "node",
-      "args": ["/pfad/zu/devflow-mcp/dist/index.js"],
-      "env": {
-        "DEVFLOW_URL": "https://api.app.dev-flow.tech"
-      }
-    }
-  }
-}
-```
-
-### Gemini CLI
+#### Gemini CLI
 
 ```bash
 npx github:KlausFreiberufler/devflow-mcp setup --client gemini
 ```
 
-Oder manuell in `~/.gemini/settings.json` als MCP-Server hinzufügen.
-
-### Eigene Backend-URL verwenden
+#### Windsurf
 
 ```bash
-npx github:KlausFreiberufler/devflow-mcp setup --url https://api.app.dev-flow.tech
+npx github:KlausFreiberufler/devflow-mcp setup --client windsurf
 ```
 
-**Danach den KI-Client neu starten.**
+**Restart your AI client after setup.**
 
-## Projekt verknüpfen
+## Getting Started
 
-Beim ersten Aufruf von `flow_list` oder `devflow_init` in einem Projekt:
-1. Browser öffnet sich zur Authentifizierung
-2. In DevFlow einloggen
-3. Projekt auswählen
-4. `.devflow.json` wird im Projektordner erstellt
+1. Run `devflow_status()` to check the connection
+2. The browser opens for authentication on first use
+3. Link your project — a `.devflow.json` file is created in your project directory
+4. Start working: `flow_list()` to see available flows, or `flow_create()` to create one
+5. Initialize your session: `devflow_init({ flowId: "..." })`
 
-Ab jetzt werden nur Flows dieses Projekts angezeigt.
+## Compatible Clients
 
-## Update
+| Client | MCP Support | Status |
+|--------|-------------|--------|
+| [Claude Code](https://claude.ai/code) | Native | Fully supported |
+| [Cursor](https://cursor.sh) | MCP | Supported |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | MCP | Supported |
+| [Windsurf](https://codeium.com/windsurf) | MCP | Supported |
 
-```bash
-npx github:KlausFreiberufler/devflow-mcp setup
-```
+## Flow States
 
-Das Setup erkennt vorhandene Registrierungen und aktualisiert sie.
+| State | Description |
+|-------|-------------|
+| `idea` | New idea, no plan yet |
+| `planning` | Agent creates implementation plan |
+| `approval` | User approves the plan (wait state) |
+| `ready` | Plan approved, ready for implementation |
+| `in_progress` | Implementation in progress |
+| `review` | User reviews the implementation (wait state) |
+| `done` | Completed |
 
-## Flow-Prozess
+### Required Fields for State Transitions
 
-```
-idea → planning → approval → ready → in_progress → review → done
-```
+| Transition | Required Fields |
+|------------|----------------|
+| -> `approval` | `implementationPlan` |
+| -> `review` | `agentSummary`, `testingInstructions` |
 
-Review-States (`approval`, `review`) sind Wartezustände.
-Der User muss in der DevFlow-UI genehmigen bevor es weitergeht.
+## Available MCP Tools
 
-### Pflichtfelder bei State-Transitions
+### Session & Flows
 
-| Transition | Pflichtfelder |
-|------------|--------------|
-| → `approval` | `implementationPlan` |
-| → `review` | `agentSummary`, `testingInstructions` |
-
-## Pipeline Integration (v3.2)
-
-Projekte mit Pipeline-Konfiguration erhalten erweiterte Features:
-
-### Pipeline-Modell
-
-Jeder Pipeline-Step hat vier unabhängige Dimensionen:
-
-| Feld | Beschreibung | Werte |
-|------|-------------|-------|
-| `actor` | Wer arbeitet in diesem Step? | `human`, `agent`, `both`, `auto`, `skip` |
-| `transitionPolicy` | Wer darf den Step abschließen? | `human_only`, `agent_only`, `human_or_agent`, `auto` |
-| `kind` | Semantischer Step-Typ | `work`, `review`, `handoff`, `terminal` |
-| `skippable` | Kann der Step übersprungen werden? | `true`, `false` |
-
-### Standard-Pipeline (Strict)
-
-| Step | actor | transitionPolicy | kind |
-|------|-------|------------------|------|
-| Idea | human | human_or_agent | handoff |
-| Planning | agent | human_or_agent | work |
-| Approval | human | human_only | review |
-| Ready | auto | auto | terminal |
-| Execution | agent | human_or_agent | work |
-| Review | both | human_or_agent | work |
-| Testing | human | human_only | review |
-| Done | auto | auto | terminal |
-
-### Pipeline-Kontext bei Init
-
-`devflow_init` zeigt automatisch:
-- **Aktueller Pipeline-Step** mit `actor`, `kind`, `transitionPolicy`
-- **Zugewiesener Skill** (z.B. "Brainstorming", "Code Reviewer")
-- **Gate-Info** wenn der Step eine bestimmte `transitionPolicy` hat
-- **Retry-Info** bei Ablehnungen (Feedback vom letzten Review)
-
-### Erlaubte Aktionen
-
-Das **Backend ist die einzige Source of Truth** für Permissions. Der MCP-Server hat keine eigene Permission-Logik — er gibt die `allowedActions` vom Backend 1:1 weiter.
-
-### Gate-Handling
-
-Gates werden über `transitionPolicy` gesteuert:
-- `human_only` → Agent wird blockiert (403), Human muss in der UI handeln
-- `agent_only` → Nur Agent darf weiter
-- `human_or_agent` → Beide dürfen den Step abschließen
-- `auto` → System-Transition, kein Akteur nötig
-
-## Verfügbare MCP-Tools
-
-### Init & Flows
-
-| Tool | Beschreibung |
-|------|--------------|
-| `devflow_init` | **Pflicht vor allen anderen Tools.** Startet eine Flow-Session |
-| `flow_list` | Listet Flows (automatisch nach Projekt gefiltert) |
-| `flow_get` | Holt Flow-Details inkl. Plan und Audit-Trail |
-| `flow_create` | Erstellt neuen Flow |
-| `flow_update` | Updated Status, Plan, Agent-Nachrichten |
-| `flow_get_feedback` | Holt User-Feedback zu Plan oder Code |
+| Tool | Description |
+|------|-------------|
+| `devflow_init` | **Required before all other tools.** Starts a flow session |
+| `devflow_status` | Show connection status, link/unlink projects |
+| `flow_list` | List flows (filtered by project) |
+| `flow_get` | Get flow details including plan and audit trail |
+| `flow_create` | Create a new flow |
+| `flow_update` | Update state, plan, agent messages |
+| `flow_get_feedback` | Get user feedback on plan or code |
 
 ### Tasks
 
-| Tool | Beschreibung |
-|------|--------------|
-| `task_list` | Listet Tasks eines Flows |
-| `task_create` | Erstellt neuen Task |
-| `task_update` | Updated Task oder markiert als erledigt |
+| Tool | Description |
+|------|-------------|
+| `task_list` | List tasks of a flow |
+| `task_create` | Create a new task |
+| `task_update` | Update task or mark as completed |
 
 ### Agent Sessions
 
-| Tool | Beschreibung |
-|------|--------------|
-| `agent_session_create` | Erstellt neue Agent-Session (Tracking) |
-| `agent_session_log` | Loggt Fortschritt in eine Session |
-| `agent_session_complete` | Schließt eine Agent-Session ab |
-| `agent_session_list` | Listet Sessions eines Flows |
+| Tool | Description |
+|------|-------------|
+| `agent_session_create` | Create agent session (tracking) |
+| `agent_session_log` | Log progress to a session |
+| `agent_session_complete` | Complete an agent session |
+| `agent_session_list` | List sessions of a flow |
 
-### Projekte & Wissen
+### Documentation & Search
 
-| Tool | Beschreibung |
-|------|--------------|
-| `project_knowledge_get` | Holt Projekt-Wissensbasis |
-| `project_knowledge_update` | Aktualisiert Projekt-Dokumentation |
-| `project_guidelines_get` | Holt Projekt-Richtlinien |
-| `release_list` | Listet Releases eines Projekts |
-| `release_get` | Holt Release-Details |
-| `release_create` | Erstellt neues Release |
-| `release_update` | Updated Release-Status/Details |
-| `search` | Sucht Flows, Tasks und Projekte nach Stichwort |
+| Tool | Description |
+|------|-------------|
+| `doc_page_list` | List documentation pages |
+| `doc_page_get` | Get a documentation page |
+| `doc_page_create` | Create a documentation page |
+| `doc_page_update` | Update a documentation page |
+| `project_guidelines_get` | Get project guidelines |
+| `search` | Search flows, tasks, and projects |
 
-## Manuelle Konfiguration
+### Releases
 
-Falls du das Setup-Script nicht verwenden möchtest:
+| Tool | Description |
+|------|-------------|
+| `release_list` | List releases |
+| `release_get` | Get release details |
+| `release_create` | Create a new release |
+| `release_update` | Update release status/details |
 
-### Claude Code
+## Pipeline Integration
 
-In `~/.claude/settings.json` (global) oder `.claude/settings.json` (pro Projekt):
+Projects with pipeline configuration get extended features:
+
+### Pipeline Model
+
+Each pipeline step has four dimensions:
+
+| Field | Description | Values |
+|-------|-------------|--------|
+| `actor` | Who works on this step? | `human`, `agent`, `both`, `auto`, `skip` |
+| `transitionPolicy` | Who can complete the step? | `human_only`, `agent_only`, `human_or_agent`, `auto` |
+| `kind` | Semantic step type | `work`, `review`, `handoff`, `terminal` |
+| `skippable` | Can the step be skipped? | `true`, `false` |
+
+### Gate Handling
+
+Gates are controlled via `transitionPolicy`:
+- `human_only` — Agent is blocked (403), human must act in the UI
+- `agent_only` — Only agents can proceed
+- `human_or_agent` — Both can complete the step
+- `auto` — System transition, no actor needed
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEVFLOW_URL` | Backend URL | `https://api.app.dev-flow.tech` |
+| `DEVFLOW_TOKEN` | Auth token (skips browser auth) | - |
+| `DEVFLOW_PROJECT_ID` | Project scoping | from `.devflow.json` |
+
+### Manual Configuration
+
+Add to your client's MCP configuration:
 
 ```json
 {
   "mcpServers": {
     "devflow": {
       "command": "node",
-      "args": ["/pfad/zu/devflow-mcp/dist/index.js"],
+      "args": ["/path/to/devflow-mcp/dist/index.js"],
       "env": {
         "DEVFLOW_URL": "https://api.app.dev-flow.tech"
       }
@@ -212,47 +188,10 @@ In `~/.claude/settings.json` (global) oder `.claude/settings.json` (pro Projekt)
 }
 ```
 
-### Cursor
+## Development
 
-In `.cursor/mcp.json`:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and development workflow.
 
-```json
-{
-  "mcpServers": {
-    "devflow": {
-      "command": "node",
-      "args": ["/pfad/zu/devflow-mcp/dist/index.js"],
-      "env": {
-        "DEVFLOW_URL": "https://api.app.dev-flow.tech"
-      }
-    }
-  }
-}
-```
+## License
 
-### Umgebungsvariablen
-
-| Variable | Beschreibung | Default |
-|----------|--------------|---------|
-| `DEVFLOW_URL` | Backend-URL | `https://api.app.dev-flow.tech` |
-| `DEVFLOW_TOKEN` | Auth-Token (überspringt Browser-Auth) | - |
-| `DEVFLOW_PROJECT_ID` | Projekt-Scoping | aus `.devflow.json` |
-
-## Changelog
-
-### v3.2.0
-- **Pipeline Architecture Refactor:** `executor` → `actor` + `transitionPolicy` + `kind` + `skippable`
-- **Backend als Source of Truth:** `statePermissions` entfernt, keine eigene Permission-Logik im MCP
-- **Neue API-Methode:** `getNextStep()` für Permission-Refresh nach Auto-Advance
-- **Session-Context:** `stepKind` und `transitionPolicy` werden gespeichert
-
-### v3.1.0
-- Pipeline Phase 2: Skills-Enforcement, Phase-Tracking (pre/action/after)
-- Reject/Retry Loops mit Escalation
-
-### v3.0.0
-- Pipeline Integration: Gate-Handling, Skill-Zuordnung, next-step API
-
-## Entwicklung
-
-Siehe [CONTRIBUTING.md](CONTRIBUTING.md) für Setup und Workflow bei der Weiterentwicklung.
+[MIT](LICENSE) - DevFlow (dev-flow.tech)

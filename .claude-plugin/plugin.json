@@ -1,0 +1,30 @@
+{
+  "name": "devflow",
+  "version": "1.0.0",
+  "description": "Structured AI development workflows with enforced planning, task tracking, and code review gates",
+  "author": {
+    "name": "DevFlow",
+    "url": "https://dev-flow.tech"
+  },
+  "homepage": "https://dev-flow.tech",
+  "repository": "https://github.com/KlausFreiberufler/devflow-mcp",
+  "license": "MIT",
+  "keywords": [
+    "devflow",
+    "workflow",
+    "mcp",
+    "claude-code",
+    "ai-development",
+    "project-management",
+    "code-review",
+    "task-tracking"
+  ],
+  "userConfig": {
+    "devflow_url": {
+      "title": "DevFlow Backend URL",
+      "description": "The URL of your DevFlow backend server (default: https://api.app.dev-flow.tech)",
+      "type": "string",
+      "sensitive": false
+    }
+  }
+}

@@ -17,21 +17,21 @@ export function withErrorHandling(
 
       // Connection errors
       if (message.includes('ECONNREFUSED') || message.includes('fetch failed')) {
-        const url = process.env.DEVFLOW_URL || 'http://localhost:6011';
-        return `Fehler: Server nicht erreichbar (${url}). Läuft der Backend-Server? Versuche: docker-compose up`;
+        const url = process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
+        return `Error: Server unreachable (${url}). Check your DEVFLOW_URL configuration.`;
       }
 
       // Timeout errors
       if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
-        return `Fehler: Server-Timeout bei ${toolName}. Der Server antwortet nicht rechtzeitig.`;
+        return `Error: Server timeout for ${toolName}. The server is not responding.`;
       }
 
       // DNS errors
       if (message.includes('ENOTFOUND')) {
-        return `Fehler: Server-Adresse nicht gefunden. Prüfe DEVFLOW_URL in der MCP-Konfiguration.`;
+        return `Error: Server address not found. Check your DEVFLOW_URL configuration.`;
       }
 
-      return `Fehler in ${toolName}: ${message}`;
+      return `Error in ${toolName}: ${message}`;
     }
   };
 }

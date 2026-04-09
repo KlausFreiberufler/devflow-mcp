@@ -1,8 +1,8 @@
 {
   "name": "devflow-mcp",
-  "version": "3.7.3",
+  "version": "4.0.0",
   "description": "MCP Server for DevFlow - Claude Code Integration",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "files": [
@@ -18,8 +18,9 @@
     "start": "node dist/index.js",
     "setup": "node dist/setup/setup.js",
     "prepare": "npm run build",
-    "publish:devflow": "bash /Users/klaus/Documents/devflow/scripts/build-mcp-package.sh"
+    "publish:devflow": "bash scripts/build-package.sh"
   },
+  "private": true,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/KlausFreiberufler/devflow-mcp.git"
