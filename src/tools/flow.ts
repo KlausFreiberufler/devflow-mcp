@@ -474,6 +474,21 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
 
   const result = await devFlowClient.updateFlow(resolvedId, cleanUpdate);
 
+  // If an implementation plan was submitted, also upload it as a markdown attachment.
+  // This gives the user a rendered markdown view in the UI instead of a plain text field.
+  if (implementationPlan && result.success) {
+    try {
+      await devFlowClient.uploadAttachment(
+        resolvedId,
+        'implementation-plan.md',
+        implementationPlan.replace(/\\n/g, '\n'),
+        'text/markdown'
+      );
+    } catch {
+      // Non-critical: plan is still saved as text via updateFlow
+    }
+  }
+
   if (!result.success || !result.data) {
     // Handle 403 gate blocked response
     if (result.statusCode === 403 && result.gate) {
