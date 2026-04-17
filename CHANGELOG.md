@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.7.2] - 2026-03-28
 
 ### Added
-- Uninstall command: `npx devflow-mcp uninstall --client <name>`
+- Uninstall command: `npx github:KlausFreiberufler/devflow-mcp uninstall --client <name>`
 - Auto-update: background download of new versions, applied on next start
 - Agent session isolation hints in status output
 

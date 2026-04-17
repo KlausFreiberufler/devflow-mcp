@@ -3,13 +3,13 @@
  * DevFlow MCP Server - Multi-Client Setup
  *
  * Usage:
- *   npx devflow-mcp setup                          # Claude Code (default)
- *   npx devflow-mcp setup --client cursor           # Cursor
- *   npx devflow-mcp setup --client codex            # OpenAI Codex
- *   npx devflow-mcp setup --client gemini           # Gemini CLI
- *   npx devflow-mcp setup --client windsurf         # Windsurf
- *   npx devflow-mcp setup --url https://custom.url  # Custom backend URL
- *   npx devflow-mcp setup --project-id <id>         # Link to specific project
+ *   npx github:KlausFreiberufler/devflow-mcp setup                          # Claude Code (default)
+ *   npx github:KlausFreiberufler/devflow-mcp setup --client cursor           # Cursor
+ *   npx github:KlausFreiberufler/devflow-mcp setup --client codex            # OpenAI Codex
+ *   npx github:KlausFreiberufler/devflow-mcp setup --client gemini           # Gemini CLI
+ *   npx github:KlausFreiberufler/devflow-mcp setup --client windsurf         # Windsurf
+ *   npx github:KlausFreiberufler/devflow-mcp setup --url https://custom.url  # Custom backend URL
+ *   npx github:KlausFreiberufler/devflow-mcp setup --project-id <id>         # Link to specific project
  */
 
 import { execSync } from 'child_process';
