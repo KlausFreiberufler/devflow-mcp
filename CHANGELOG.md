@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-04-17
+
+### Added
+- Heartbeat now includes `workingDirectory` (process.cwd()) for better server-side client deduplication (DF-215)
+
+### Notes
+- Requires DevFlow backend with DF-215 deployed for dedup to take effect
+- Legacy behaviour preserved: backend falls back to projectId match when workingDirectory is absent
+
 ## [4.1.0] - 2026-04-17
 
 ### Added
