@@ -6,19 +6,19 @@ Dieses Projekt ist mit DevFlow verbunden. Du hast MCP-Tools um Workflows zu bear
 
 | Editor | Setup-Befehl | Instruktionsdatei |
 |--------|-------------|-------------------|
-| Claude Code | `npx devflow-mcp setup` | `CLAUDE.md` |
-| Cursor | `npx devflow-mcp setup --client cursor` | `.cursorrules` |
-| Codex | `npx devflow-mcp setup --client codex` | `AGENTS.md` |
-| Gemini | `npx devflow-mcp setup --client gemini` | `GEMINI.md` |
-| Windsurf | `npx devflow-mcp setup --client windsurf` | `.windsurfrules` |
-| Droid | `npx devflow-mcp setup --client droid` | `CLAUDE.md` |
+| Claude Code | `npx github:KlausFreiberufler/devflow-mcp setup` | `CLAUDE.md` |
+| Cursor | `npx github:KlausFreiberufler/devflow-mcp setup --client cursor` | `.cursorrules` |
+| Codex | `npx github:KlausFreiberufler/devflow-mcp setup --client codex` | `AGENTS.md` |
+| Gemini | `npx github:KlausFreiberufler/devflow-mcp setup --client gemini` | `GEMINI.md` |
+| Windsurf | `npx github:KlausFreiberufler/devflow-mcp setup --client windsurf` | `.windsurfrules` |
+| Droid | `npx github:KlausFreiberufler/devflow-mcp setup --client droid` | `CLAUDE.md` |
 
 ### Projekt verknuepfen
 
 Mit `--project-id` wird das Projekt direkt verknuepft:
 
 ```bash
-npx devflow-mcp setup --client cursor --project-id <id>
+npx github:KlausFreiberufler/devflow-mcp setup --client cursor --project-id <id>
 ```
 
 Dies erstellt `.devflow.json` im Projektverzeichnis.
