@@ -1,0 +1,16 @@
+{
+  "name": "devflow",
+  "owner": {
+    "name": "DevFlow",
+    "url": "https://dev-flow.tech"
+  },
+  "plugins": [
+    {
+      "name": "devflow",
+      "source": "./",
+      "description": "Structured AI development workflows with enforced planning, task tracking, and code review gates. Ships an MCP server, enforcement hooks, slash commands, and state-specific skills.",
+      "category": "development",
+      "tags": ["devflow", "workflow", "mcp", "project-management"]
+    }
+  ]
+}
