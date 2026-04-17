@@ -35,5 +35,6 @@ devflow_active_field() {
   local field="$1"
   local f
   f="$(devflow_active_file)" || return 1
-  node -e "const d=require('$f');process.stdout.write(String(d['$field']||''))"
+  command -v node >/dev/null 2>&1 || { echo "devflow-state.sh: node not found" >&2; return 1; }
+  node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String(d[process.argv[2]]||""))' "$f" "$field"
 }
