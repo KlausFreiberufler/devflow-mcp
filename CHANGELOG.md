@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-04-17
+
+### Added
+- 4 plugin hooks: `PreToolUse` (enforcement), `SessionStart` (context), `PostToolUse` (state-change reminder), `Stop` (exit warning)
+- 7 slash commands: `/devflow-start`, `/devflow-status`, `/devflow-next`, `/devflow-tasks`, `/devflow-review`, `/devflow-list`, `/devflow-create`
+- 4 state-specific skills: `devflow-core`, `devflow-planning`, `devflow-executing`, `devflow-reviewing` — with optional `superpowers:*` references
+- Shared bash helper library `scripts/lib/devflow-state.sh` for hook scripts
+- Test coverage: `bats-core` for bash hooks, `node:test` for JS hooks
+
+### Changed
+- Monolithic `devflow-workflow` skill split into 4 state-specific skills
+- External `PreToolUse` hook (previously required in `~/.claude/settings.json`) is now provided by the plugin itself
+
+### Removed
+- `skills/devflow-workflow/` (replaced by 4 new skills)
+
+### Migration
+- Existing users with the external hook can leave it in place or remove it — plugin hook takes precedence. No breaking changes.
+
 ## [4.0.0] - 2026-04-09
 
 ### Added
