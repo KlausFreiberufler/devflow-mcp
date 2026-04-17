@@ -16,11 +16,19 @@ Every feature or bugfix goes through planning, gets approved, is tracked with ta
 
 ## Installation
 
-### As a Claude Code Plugin
+### As a Claude Code Plugin (recommended)
+
+Until the plugin is published to the official Claude Code marketplace, add this repository as a custom marketplace source:
 
 ```bash
+/plugin marketplace add https://github.com/KlausFreiberufler/devflow-mcp
 /plugin install devflow
+/reload-plugins
 ```
+
+This installs the MCP server **plus** the plugin extras: enforcement hooks, state-specific skills, and seven slash commands (`/devflow-start`, `/devflow-status`, `/devflow-next`, `/devflow-tasks`, `/devflow-create`, `/devflow-list`, `/devflow-review`).
+
+Once the plugin is officially published, the marketplace-add step will no longer be needed.
 
 ### Manual Setup
 
