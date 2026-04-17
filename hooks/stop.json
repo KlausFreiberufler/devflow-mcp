@@ -1,0 +1,13 @@
+{
+  "hooks": [
+    {
+      "matcher": "Stop",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/stop-check.js"
+        }
+      ]
+    }
+  ]
+}
