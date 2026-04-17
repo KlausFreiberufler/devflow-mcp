@@ -649,6 +649,7 @@ Or set: export DEVFLOW_TOKEN="your-token"
         projectId: projectId || undefined,
         mcpVersion: MCP_VERSION,
         sessionId: this.getAgentSessionId() || undefined,
+        workingDirectory: process.cwd(),
       });
     } catch {
       // Heartbeat failure is non-critical, don't crash
