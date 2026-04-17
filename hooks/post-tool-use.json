@@ -1,0 +1,13 @@
+{
+  "hooks": [
+    {
+      "matcher": "mcp__devflow__flow_update",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/post-flow-update.js"
+        }
+      ]
+    }
+  ]
+}
