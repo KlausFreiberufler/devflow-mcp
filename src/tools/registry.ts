@@ -24,9 +24,15 @@ export interface ToolDefinition {
   inputSchema: object;
 }
 
+export type ToolContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
+
+export type ToolHandlerResult = string | ToolContentBlock[];
+
 export interface ToolRegistration {
   definition: ToolDefinition;
-  handler: (args: Record<string, unknown>) => Promise<string>;
+  handler: (args: Record<string, unknown>) => Promise<ToolHandlerResult>;
 }
 
 export type ToolModule = Record<string, ToolRegistration>;
@@ -50,7 +56,7 @@ class ToolRegistry {
   /**
    * Dispatch a tool call with Context-Guard, State-Guard, Auto-Logging, and Auto-Status.
    */
-  async handle(name: string, args: Record<string, unknown>): Promise<string> {
+  async handle(name: string, args: Record<string, unknown>): Promise<ToolHandlerResult> {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Unknown tool: ${name}`);
