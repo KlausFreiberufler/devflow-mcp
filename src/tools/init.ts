@@ -10,7 +10,7 @@ import { sessionContext, type SessionFeedback, type ActiveContext, type GitConte
 import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import { getConfig } from '../config/sync.js';
 import { formatStrictnessLevel } from '../config/types.js';
-import { checkForUpdate, downloadUpdate } from '../config/version-check.js';
+import { checkForUpdate } from '../config/version-check.js';
 import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { extractImagesFromTipTap } from '../utils/tiptap.js';
@@ -420,14 +420,10 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
 
   sessionContext.init(activeContext);
 
-  // Version check (non-blocking, cached)
+  // Version check (non-blocking, cached). DF-216: no auto-download — the user
+  // reinstalls via Claude-Code plugin / `npx github:...setup`.
   const baseUrl = devFlowClient.getBaseUrl();
   const updateInfo = await checkForUpdate(baseUrl);
-
-  // Auto-download update in background (non-blocking)
-  if (updateInfo?.updateAvailable) {
-    downloadUpdate(baseUrl, updateInfo.latestVersion).catch(() => {});
-  }
 
   // Load attachments
   let attachmentSection = '';
