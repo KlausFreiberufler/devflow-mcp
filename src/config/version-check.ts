@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import { MCP_VERSION } from './version.js'
@@ -87,33 +87,6 @@ export async function checkForUpdate(baseUrl: string): Promise<VersionCheckResul
   }
 }
 
-/**
- * Download update tgz to ~/.devflow/updates/ (async, non-blocking).
- * The wrapper script will pick it up on next start.
- */
-export async function downloadUpdate(baseUrl: string, version: string): Promise<boolean> {
-  try {
-    const updatesDir = join(homedir(), '.devflow', 'updates')
-    mkdirSync(updatesDir, { recursive: true })
-
-    const targetPath = join(updatesDir, `devflow-mcp-${version}.tgz`)
-
-    // Skip if already downloaded
-    if (existsSync(targetPath)) return true
-
-    const url = `${baseUrl}/api/downloads/devflow-mcp-latest.tgz`
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 30000) // 30s timeout for download
-    const response = await fetch(url, { signal: controller.signal })
-    clearTimeout(timeout)
-
-    if (!response.ok) return false
-
-    const buffer = await response.arrayBuffer()
-    writeFileSync(targetPath, Buffer.from(buffer))
-    return true
-  } catch {
-    // Download failed — non-critical, will retry on next init
-    return false
-  }
-}
+// DF-216: downloadUpdate() removed. The MCP server is installed and updated
+// via the Claude Code plugin (`/plugin install devflow`) or `npx github:...setup`
+// in other clients — there is no backend-side tarball to fetch anymore.
