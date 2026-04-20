@@ -462,7 +462,13 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request<FlowAttachment[]>('GET', `/api/flows/${flowId}/attachments`);
   }
 
-  async uploadAttachment(flowId: string, filename: string, content: string, mimeType = 'text/markdown'): Promise<ApiResponse<FlowAttachment>> {
+  async uploadAttachment(
+    flowId: string,
+    filename: string,
+    content: string,
+    mimeType = 'text/markdown',
+    kind?: 'plan' | 'summary' | 'design' | 'notes',
+  ): Promise<ApiResponse<FlowAttachment>> {
     if (!this.credentials) {
       return { success: false, error: 'Not authenticated.' };
     }
@@ -470,6 +476,7 @@ Or set: export DEVFLOW_TOKEN="your-token"
     const blob = new Blob([content], { type: mimeType });
     const formData = new FormData();
     formData.append('file', blob, filename);
+    if (kind) formData.append('kind', kind);
 
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.credentials.accessToken}`,
@@ -484,6 +491,63 @@ Or set: export DEVFLOW_TOKEN="your-token"
       body: formData,
     });
     return response.json();
+  }
+
+  /**
+   * DF-208: Fetch raw attachment content from the auth-protected endpoint.
+   * Returns either text (for text-like MIME types) or base64 (for binary).
+   */
+  async getAttachmentContent(
+    flowId: string,
+    attachmentId: string,
+  ): Promise<{ success: true; mimeType: string; text?: string; base64?: string } | { success: false; error: string }> {
+    if (!this.credentials) {
+      return { success: false, error: 'Not authenticated.' };
+    }
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.credentials.accessToken}`,
+    };
+    if (this.agentSessionId) {
+      headers['X-Agent-Session'] = this.agentSessionId;
+    }
+
+    const url = `${this.baseUrl}/api/flows/${flowId}/attachments/${attachmentId}/content`;
+    const response = await fetch(url, { headers });
+
+    if (!response.ok) {
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+
+    const mimeType = response.headers.get('content-type')?.split(';')[0].trim() || 'application/octet-stream';
+    const isText = mimeType.startsWith('text/') || mimeType === 'application/json';
+    if (isText) {
+      const text = await response.text();
+      return { success: true, mimeType, text };
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return { success: true, mimeType, base64: buffer.toString('base64') };
+  }
+
+  /**
+   * DF-208: Fetch arbitrary URL (e.g. TipTap-embedded image) and return base64 + mimeType.
+   * Uses Bearer auth if URL is on the DevFlow base URL.
+   */
+  async fetchBinaryAsBase64(url: string): Promise<{ success: true; mimeType: string; base64: string } | { success: false; error: string }> {
+    const headers: Record<string, string> = {};
+    // Only send auth for same-origin URLs
+    if (url.startsWith(this.baseUrl) && this.credentials) {
+      headers['Authorization'] = `Bearer ${this.credentials.accessToken}`;
+    }
+    try {
+      const response = await fetch(url, { headers });
+      if (!response.ok) return { success: false, error: `HTTP ${response.status}` };
+      const mimeType = response.headers.get('content-type')?.split(';')[0].trim() || 'application/octet-stream';
+      const buffer = Buffer.from(await response.arrayBuffer());
+      return { success: true, mimeType, base64: buffer.toString('base64') };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
   }
 
   // ============ Task/Todo Methods ============

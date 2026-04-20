@@ -84,9 +84,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     const result = await registry.handle(name, (args || {}) as Record<string, unknown>);
-    return {
-      content: [{ type: 'text', text: result }],
-    };
+    const content = typeof result === 'string'
+      ? [{ type: 'text', text: result }]
+      : result;
+    return { content };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return {

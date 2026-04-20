@@ -4,13 +4,24 @@
  */
 
 import { devFlowClient, type Flow, type FlowAttachment } from '../api/client.js';
-import type { ToolModule } from '../tools/registry.js';
+import type { ToolContentBlock, ToolHandlerResult, ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
 import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
 import { extractImagesFromTipTap } from '../utils/tiptap.js';
 import { formatAttachmentList } from '../utils/attachments.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
+
+// DF-208: MIME types that should be embedded inline as text in flow_get
+const INLINE_TEXT_MIME = new Set([
+  'text/markdown', 'text/plain', 'text/html', 'text/css', 'text/csv',
+  'application/json',
+]);
+const IMAGE_MIME_PREFIX = 'image/';
+// Cap per-image payload to avoid runaway MCP responses (images above this are linked, not embedded)
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+// Cap total inline text per flow_get to avoid huge responses
+const MAX_INLINE_TEXT_BYTES = 512 * 1024;
 
 // ============ Tool Definitions ============
 
@@ -236,7 +247,7 @@ async function handleFlowList(args: Record<string, unknown>): Promise<string> {
   return contextInfo + formatFlowList(flows);
 }
 
-async function handleFlowGet(args: Record<string, unknown>): Promise<string> {
+async function handleFlowGet(args: Record<string, unknown>): Promise<ToolHandlerResult> {
   const flowId = args.flowId as string;
 
   const resolvedId = await resolveFlowId(flowId);
@@ -258,11 +269,70 @@ async function handleFlowGet(args: Record<string, unknown>): Promise<string> {
     }
   } catch {}
 
-  let output = formatFlowDetail(result.data);
-  if (attachments.length > 0) {
-    output += '\n\n' + formatAttachmentList(attachments);
+  // DF-208: load inline content for text/markdown attachments + image blocks
+  const imageBlocks: ToolContentBlock[] = [];
+  const inlineTextSections: string[] = [];
+  const otherAttachments: FlowAttachment[] = [];
+  let inlineBudgetRemaining = MAX_INLINE_TEXT_BYTES;
+
+  for (const att of attachments) {
+    const mime = att.mimeType || 'application/octet-stream';
+
+    if (INLINE_TEXT_MIME.has(mime) && inlineBudgetRemaining > 0) {
+      const contentResult = await devFlowClient.getAttachmentContent(resolvedId, att.id);
+      if (contentResult.success && contentResult.text !== undefined) {
+        const slice = contentResult.text.slice(0, inlineBudgetRemaining);
+        const truncated = slice.length < contentResult.text.length;
+        const lang = mime === 'text/markdown' ? 'markdown' : (mime === 'application/json' ? 'json' : (mime === 'text/html' ? 'html' : 'text'));
+        inlineTextSections.push(
+          `## Attachment: ${att.originalName}\n\n` +
+          '```' + lang + '\n' + slice + (truncated ? '\n... [truncated]' : '') + '\n```'
+        );
+        inlineBudgetRemaining -= slice.length;
+      } else {
+        otherAttachments.push(att);
+      }
+    } else if (mime.startsWith(IMAGE_MIME_PREFIX) && att.fileSize <= MAX_IMAGE_BYTES) {
+      const contentResult = await devFlowClient.getAttachmentContent(resolvedId, att.id);
+      if (contentResult.success && contentResult.base64) {
+        imageBlocks.push({ type: 'image', data: contentResult.base64, mimeType: contentResult.mimeType });
+      } else {
+        otherAttachments.push(att);
+      }
+    } else {
+      otherAttachments.push(att);
+    }
   }
-  return output;
+
+  // DF-208: fetch TipTap-embedded images from descriptionJson as image blocks
+  const flow = result.data;
+  if (flow.descriptionJson) {
+    const baseUrl = process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
+    const urls = extractImagesFromTipTap(flow.descriptionJson, baseUrl);
+    for (const url of urls) {
+      const imgResult = await devFlowClient.fetchBinaryAsBase64(url);
+      if (imgResult.success && imgResult.base64) {
+        imageBlocks.push({ type: 'image', data: imgResult.base64, mimeType: imgResult.mimeType });
+      }
+    }
+  }
+
+  // Build text response: flow detail + inline attachments + remaining attachment list
+  let output = formatFlowDetail(flow, { skipEmbeddedImages: true });
+  if (inlineTextSections.length > 0) {
+    output += '\n\n' + inlineTextSections.join('\n\n');
+  }
+  if (otherAttachments.length > 0) {
+    output += '\n\n' + formatAttachmentList(otherAttachments);
+  }
+
+  // If no images were loaded, keep backwards-compat: return string
+  if (imageBlocks.length === 0) {
+    return output;
+  }
+
+  // Return multi-content: text + image blocks
+  return [{ type: 'text', text: output }, ...imageBlocks];
 }
 
 async function handleFlowCreate(args: Record<string, unknown>): Promise<string> {
@@ -649,7 +719,7 @@ function formatFlowList(flows: Flow[]): string {
   return lines.join('\n');
 }
 
-function formatFlowDetail(flow: Flow): string {
+function formatFlowDetail(flow: Flow, opts: { skipEmbeddedImages?: boolean } = {}): string {
   const lines = [
     `# Flow: ${flow.summary}`,
     '',
@@ -685,8 +755,8 @@ function formatFlowDetail(flow: Flow): string {
     lines.push('');
   }
 
-  // Extract embedded images from TipTap JSON
-  if (flow.descriptionJson) {
+  // Extract embedded images from TipTap JSON (URL-list fallback when image-blocks aren't used)
+  if (flow.descriptionJson && !opts.skipEmbeddedImages) {
     const baseUrl = process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
     const images = extractImagesFromTipTap(flow.descriptionJson, baseUrl);
     if (images.length > 0) {
