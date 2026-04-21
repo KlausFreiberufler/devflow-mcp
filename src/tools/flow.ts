@@ -168,7 +168,7 @@ IMPORTANT: Some state transitions require mandatory fields:
           },
           required: ['hash', 'message']
         },
-        description: 'List of git commits to add to this flow. New commits are appended to existing ones.'
+        description: 'List of git commits to add to this flow. New commits are appended to existing ones. TIP: When transitioning to `review`, either include your docs commit(s) here in the same call, OR ensure you have previously registered docs commits on the flow — docsUpdate=5 will block review otherwise. For Git-Discipline 5, at least one commit must be visible on the flow (either in this call or persisted).'
       },
       branchName: {
         type: 'string',
@@ -515,12 +515,14 @@ async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> 
         }
       }
       if (strictness.gitDiscipline >= 5) {
-        if (!prUrl) {
+        if (!prUrl && !currentFlow.data?.prUrl) {
           return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert eine PR-URL.\nErstelle eine PR und melde sie mit flow_update({ prUrl: "...", currentState: "review" }).`;
         }
-        // Check that commits are being reported with this review transition
-        if (!commits || commits.length === 0) {
-          return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert Commits.\nMelde Commits mit flow_update({ commits: [{ hash: "...", message: "..." }], currentState: "review" }).`;
+        // Check that commits are reported — either in this call, or previously persisted on the flow.
+        const persistedCommits = currentFlow.data?.commits ?? [];
+        const totalCommits = [...persistedCommits, ...(commits || [])];
+        if (totalCommits.length === 0) {
+          return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert Commits.\nMelde Commits mit flow_update({ commits: [{ hash: "...", message: "..." }] }) — idealerweise im selben Call wie die Review-Transition.`;
         }
       }
     }
