@@ -930,6 +930,7 @@ export interface Flow {
   prUrl?: string;
   prNumber?: number;
   prState?: string;
+  commits?: { hash: string; message: string }[] | null;
 }
 
 export interface FlowCreate {
@@ -1165,6 +1166,7 @@ export function transformFlow(raw: unknown): Flow {
     prUrl: w.prUrl as string | undefined,
     prNumber: w.prNumber as number | undefined,
     prState: w.prState as string | undefined,
+    commits: w.commits as { hash: string; message: string }[] | null | undefined,
   };
 }
 
