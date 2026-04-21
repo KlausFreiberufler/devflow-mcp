@@ -420,7 +420,7 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
   ].join('\n');
 }
 
-async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> {
+export async function handleFlowUpdate(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
   const currentState = args.currentState as Flow['currentState'] | undefined;
   const agentStatus = args.agentStatus as string | undefined;

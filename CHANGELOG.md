@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.1] - 2026-04-21
+
+### Fixed
+- `transformFlow()` dropped the `commits` field, making the MCP-side strictness check blind to persisted commits. This caused docsUpdate=5 to block `review` transitions even when docs commits were registered in a prior `flow_update` call (DF-217 reproducer, DF-218 fix).
+- Git-discipline check now also accepts persisted `prUrl` and `commits` on the flow (previously required them in the same call).
+
+### Added
+- Vitest test suite covering all strictness gates: `tests/strictness/rules.test.ts`, `tests/strictness/git.test.ts`, `tests/strictness/happy-path-paranoid.test.ts` (25 test cases).
+- `npm test` / `npm run test:watch` scripts and `vitest.config.ts`.
+
+### Changed
+- `flow_update.commits` tool description clarifies same-call vs persisted semantics.
+
 ## [4.2.0] - 2026-04-17
 
 ### Added
