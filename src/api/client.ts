@@ -635,6 +635,50 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('DELETE', `/api/projects/${projectId}/docs/${docId}`);
   }
 
+  // ============ Knowledge Wiki Methods (DF-226) ============
+
+  async searchWiki(projectId: string, q: string, limit = 20): Promise<ApiResponse<unknown[]>> {
+    return this.request<unknown[]>('GET', `/api/knowledge/search?projectId=${projectId}&q=${encodeURIComponent(q)}&limit=${limit}`);
+  }
+
+  async getBacklinks(assetType: string, assetId: string): Promise<ApiResponse<unknown[]>> {
+    return this.request<unknown[]>('GET', `/api/knowledge/backlinks?assetType=${assetType}&assetId=${encodeURIComponent(assetId)}`);
+  }
+
+  async getOutgoing(assetType: string, assetId: string): Promise<ApiResponse<unknown[]>> {
+    return this.request<unknown[]>('GET', `/api/knowledge/outgoing?assetType=${assetType}&assetId=${encodeURIComponent(assetId)}`);
+  }
+
+  async fetchGraph(projectId: string, types?: string[], tags?: string[]): Promise<ApiResponse<unknown>> {
+    const params = new URLSearchParams({ projectId });
+    if (types?.length) params.set('types', types.join(','));
+    if (tags?.length) params.set('tags', tags.join(','));
+    return this.request('GET', `/api/knowledge/graph?${params.toString()}`);
+  }
+
+  async resolveWikiLink(projectId: string, raw: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/knowledge/resolve?projectId=${projectId}&raw=${encodeURIComponent(raw)}`);
+  }
+
+  // ============ ADR Methods (DF-226) ============
+
+  async fetchAdrs(projectId: string, status?: string): Promise<ApiResponse<unknown[]>> {
+    const q = status ? `?status=${status}` : '';
+    return this.request<unknown[]>('GET', `/api/projects/${projectId}/adrs${q}`);
+  }
+
+  async fetchAdr(projectId: string, number: number | string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/adrs/${number}`);
+  }
+
+  async acceptAdrFromAttachment(projectId: string, attachmentId: string, opts: { supersedesId?: string; status?: string } = {}): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/projects/${projectId}/adrs/accept`, { attachmentId, ...opts });
+  }
+
+  async updateAdrStatus(adrId: string, status: string): Promise<ApiResponse<unknown>> {
+    return this.request('PATCH', `/api/adrs/${adrId}`, { status });
+  }
+
   // ============ Guidelines Methods ============
 
   async getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>> {

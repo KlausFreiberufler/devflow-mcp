@@ -1,6 +1,6 @@
 {
   "name": "devflow-mcp",
-  "version": "4.4.1",
+  "version": "4.5.0",
   "description": "MCP Server for DevFlow - Claude Code Integration",
   "license": "MIT",
   "type": "module",
