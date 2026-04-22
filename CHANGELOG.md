@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.0] - 2026-04-22
+
+### Added
+- MCP Resources (DF-240): `devflow://project/{id}/adr/{number}`, `/flow/{displayId}`, `/graph`, `/search?q=...`
+- MCP Prompts (DF-240): `ask_project`, `plan_with_project_knowledge`, `review_with_drift_check`
+- `capabilities.resources` + `capabilities.prompts` enabled on the server
+- Prompts auto-assemble project context (ADRs + recent done-flows) so Claude gets one-shot answers
+
 ## [4.7.0] - 2026-04-22
 
 ### Added
