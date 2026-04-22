@@ -120,6 +120,26 @@ const harvestDef = {
   }
 };
 
+const checkDriftDef = {
+  name: 'knowledge_check_drift',
+  description: `Check whether an ADR has drifted from the actual codebase.
+
+Returns the ADR content + its affects_paths (glob patterns). YOU THEN:
+1. Use your own Glob/Read/Grep tools to inspect the files under those paths in the user's workspace
+2. Compare the ADR's claims/decisions to what the code actually does
+3. Return a structured drift report: { drifts: [{ claim, evidence, severity }] } or {} if no drift.
+
+If affectsPaths is empty, tell the user: "ADR-N has no affects_paths configured — ask them to add glob patterns via the UI".`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      projectId: { type: 'string' },
+      adrNumber: { type: 'number', description: 'ADR number to check' }
+    },
+    required: ['adrNumber']
+  }
+};
+
 const checkFlowDef = {
   name: 'knowledge_check_flow',
   description: `Run a knowledge check on a flow: spot drift against existing ADRs and identify missing knowledge (topics without an asset). Returns flow text + ADR snapshots + instructions. YOU return the analysis — no draft creation in this tool. Use before submitting a flow to review.`,
@@ -194,6 +214,34 @@ async function handleHarvest(args: Record<string, unknown>): Promise<string> {
   return JSON.stringify(r.data, null, 2);
 }
 
+async function handleCheckDrift(args: Record<string, unknown>): Promise<string> {
+  const projectId = resolveProjectId(args);
+  if (!projectId) return 'Error: projectId required';
+  const adrNumber = args.adrNumber as number | undefined;
+  if (!adrNumber) return 'Error: adrNumber required';
+  const r = await devFlowClient.fetchAdr(projectId, adrNumber);
+  if (!r.success || !r.data) return `Error: ${r.error}`;
+  const adr = r.data as { number: number; title: string; status: string; content: string; affectsPaths: string[] };
+  return JSON.stringify({
+    adr: {
+      number: adr.number,
+      title: adr.title,
+      status: adr.status,
+      content: adr.content,
+      affectsPaths: adr.affectsPaths || []
+    },
+    instructions: {
+      task: 'Inspect the files under affectsPaths (your own Glob/Read/Grep tools) and compare with ADR content.',
+      output: 'Return { drifts: [{ claim, evidence, severity: "info"|"warn"|"critical" }], summary } or {} if no drift.',
+      rules: [
+        'If affectsPaths is empty: report back that the user should configure them',
+        'Be conservative — only flag contradictions you can point to with a file+line',
+        'Ignore trivial wording differences'
+      ]
+    }
+  }, null, 2);
+}
+
 async function handleCheckFlow(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
   if (!flowId) return 'Error: flowId required';
@@ -211,5 +259,6 @@ export const tools: ToolModule = {
   knowledge_draft_accept:     { definition: draftAcceptDef,     handler: withErrorHandling('knowledge_draft_accept',     handleDraftAccept) },
   knowledge_draft_reject:     { definition: draftRejectDef,     handler: withErrorHandling('knowledge_draft_reject',     handleDraftReject) },
   knowledge_harvest:          { definition: harvestDef,         handler: withErrorHandling('knowledge_harvest',          handleHarvest) },
-  knowledge_check_flow:       { definition: checkFlowDef,       handler: withErrorHandling('knowledge_check_flow',       handleCheckFlow) }
+  knowledge_check_flow:       { definition: checkFlowDef,       handler: withErrorHandling('knowledge_check_flow',       handleCheckFlow) },
+  knowledge_check_drift:      { definition: checkDriftDef,      handler: withErrorHandling('knowledge_check_drift',      handleCheckDrift) }
 };
