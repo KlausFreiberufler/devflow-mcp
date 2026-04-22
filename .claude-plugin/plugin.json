@@ -30,7 +30,7 @@
   "mcpServers": {
     "devflow": {
       "command": "npx",
-      "args": ["-y", "@dev-flow-tech/mcp-server@4.9.0"],
+      "args": ["-y", "-p", "@dev-flow-tech/mcp-server@4.9.0", "devflow-mcp"],
       "env": {}
     }
   }
