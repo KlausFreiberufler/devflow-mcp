@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.0] - 2026-04-22
+
+### Added
+- 5 MCP-first Knowledge-Drafts tools (DF-245): `knowledge_backfill_request`, `knowledge_draft_create`, `knowledge_draft_list`, `knowledge_draft_accept`, `knowledge_draft_reject`. Claude reads project context + existing ADRs + structured instructions, classifies done-flows itself, and writes back drafts — no server-side LLM required.
+- Backend endpoints `POST /api/knowledge-drafts` (direct create) and `GET /api/projects/:id/knowledge-backfill/prepare` (data + instructions for Claude).
+- Plugin-manifest version synchronized with MCP-server version (both 4.6.0). Future releases bump both in sync.
+
+### Notes
+- Dedup-Check from DF-244 Phase 1 applies automatically: repeated draft creation with the same `(projectId, draftType, title)` merges `sourceFlowIds` instead of duplicating.
+
 ## [4.4.1] - 2026-04-21
 
 ### Fixed

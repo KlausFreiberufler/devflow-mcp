@@ -679,6 +679,37 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('PATCH', `/api/adrs/${adrId}`, { status });
   }
 
+  // ============ Knowledge Drafts Methods (DF-245) ============
+
+  async prepareKnowledgeBackfill(projectId: string, limit = 50): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/knowledge-backfill/prepare?limit=${limit}`);
+  }
+
+  async createKnowledgeDraft(data: {
+    projectId: string;
+    draftType: 'adr' | 'pattern' | 'runbook' | 'lessons_learned';
+    title: string;
+    body?: string;
+    rationale?: string;
+    sourceFlowIds?: string[];
+    frontmatter?: Record<string, unknown>;
+  }): Promise<ApiResponse<unknown>> {
+    return this.request('POST', '/api/knowledge-drafts', data);
+  }
+
+  async listKnowledgeDrafts(projectId: string, status?: string): Promise<ApiResponse<unknown[]>> {
+    const q = status ? `?status=${status}` : '';
+    return this.request<unknown[]>('GET', `/api/projects/${projectId}/knowledge-drafts${q}`);
+  }
+
+  async acceptKnowledgeDraft(id: string): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/knowledge-drafts/${id}/accept`);
+  }
+
+  async rejectKnowledgeDraft(id: string, notes?: string): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/knowledge-drafts/${id}/reject`, notes ? { notes } : {});
+  }
+
   // ============ Guidelines Methods ============
 
   async getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>> {
