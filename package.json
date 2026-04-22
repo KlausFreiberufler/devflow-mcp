@@ -1,5 +1,5 @@
 {
-  "name": "devflow-mcp",
+  "name": "@dev-flow-tech/mcp-server",
   "version": "4.9.0",
   "description": "MCP Server for DevFlow - Claude Code Integration",
   "license": "MIT",
@@ -12,6 +12,9 @@
     "devflow-mcp": "dist/index.js",
     "devflow-mcp-setup": "dist/setup/setup.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
@@ -20,9 +23,10 @@
     "prepare": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "publish:devflow": "bash scripts/build-package.sh"
+    "publish:devflow": "bash scripts/build-package.sh",
+    "publish:npm": "npm run build && npm publish"
   },
-  "private": true,
+  "private": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/KlausFreiberufler/devflow-mcp.git"
