@@ -42,6 +42,7 @@ import { tools as disconnectTools } from './tools/disconnect.js';
 import { tools as attachmentTools } from './tools/attachment.js';
 import { tools as wikiTools } from './tools/wiki.js';
 import { tools as adrsTools } from './tools/adrs.js';
+import { tools as knowledgeDraftsTools } from './tools/knowledgeDrafts.js';
 
 // Subcommand routing: `devflow-mcp setup [--url ...]` delegates to setup script
 if (process.argv[2] === 'setup') {
@@ -73,6 +74,7 @@ registry.register(disconnectTools);
 registry.register(attachmentTools);
 registry.register(wikiTools);
 registry.register(adrsTools);
+registry.register(knowledgeDraftsTools);
 
 const server = new Server(
   { name: 'devflow', version: MCP_VERSION },
