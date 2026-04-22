@@ -145,6 +145,66 @@ npx github:KlausFreiberufler/devflow-mcp setup --client windsurf
 | `release_create` | Create a new release |
 | `release_update` | Update release status/details |
 
+### Knowledge — Wiki & ADRs (v4.5.0)
+
+| Tool | Description |
+|------|-------------|
+| `wiki_search` | Full-text search over flows, doc-pages, reviews, releases |
+| `wiki_get_page` | Resolve a slug / title / display-id to a concrete asset + backlinks |
+| `wiki_list_by_type` | List assets of a specific document-type (adr, pattern, runbook, …) |
+| `wiki_backlinks` | Reverse lookup: all assets that link to X |
+| `wiki_graph_neighbors` | Graph (nodes + edges) of the project or a subset |
+| `wiki_get_flow_context` | A flow's outgoing + incoming wiki links |
+| `wiki_get_project_context` | Project knowledge graph summary |
+| `adr_list` | List ADRs (optional status filter) |
+| `adr_get` | ADR detail with supersedes chain |
+| `adr_accept` | Accept an ADR from a flow-attachment |
+| `adr_update_status` | Move ADR through proposed → accepted → deprecated / superseded |
+
+### Knowledge Drafts (v4.6.0)
+
+| Tool | Description |
+|------|-------------|
+| `knowledge_backfill_request` | Get done-flows + existing ADRs + instructions — you classify and call `knowledge_draft_create` for each draft |
+| `knowledge_draft_create` | Create a draft (dedup-aware: same (project, type, title) merges `sourceFlowIds`) |
+| `knowledge_draft_list` | List drafts (optional status filter) |
+| `knowledge_draft_accept` | Accept a draft (creates the ADR / doc-page) |
+| `knowledge_draft_reject` | Reject a draft with optional reviewer note |
+
+### Knowledge Harvest / Check (v4.7.0)
+
+| Tool | Description |
+|------|-------------|
+| `knowledge_harvest` | Per-flow harvest — returns a single done-flow + context + instructions for draft proposal |
+| `knowledge_check_flow` | Flow analysis — drift (against existing ADRs) + missing-knowledge suggestions |
+
+### Code Drift (v4.9.0)
+
+| Tool | Description |
+|------|-------------|
+| `knowledge_check_drift` | Returns ADR content + its `affects_paths` + instructions. You use your own Glob/Read/Grep to compare claims vs code and report drift |
+
+## MCP Resources (v4.8.0)
+
+URI-addressable project assets for reading via `ReadResource`.
+
+| URI | Description |
+|-----|-------------|
+| `devflow://project/{id}/adr/{number}` | ADR content as markdown |
+| `devflow://project/{id}/flow/{displayId}` | Flow with plan + agent summary |
+| `devflow://project/{id}/graph` | Project knowledge-graph summary |
+| `devflow://project/{id}/search?q=...` | FTS search formatted as markdown |
+
+## MCP Prompts (v4.8.0)
+
+Guided one-shot workflows — each auto-assembles relevant project context.
+
+| Prompt | Args | Purpose |
+|--------|------|---------|
+| `ask_project` | `query` | Answer a free-form question; loads ADRs + recent done-flows as context |
+| `plan_with_project_knowledge` | `flowId` | Pre-build a planning prompt with relevant ADRs + related flows |
+| `review_with_drift_check` | `flowId` | Auto-run knowledge-check-prepare and produce a review prompt |
+
 ## Pipeline Integration
 
 Projects with pipeline configuration get extended features:
