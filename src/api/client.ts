@@ -710,6 +710,14 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('POST', `/api/knowledge-drafts/${id}/reject`, notes ? { notes } : {});
   }
 
+  async prepareKnowledgeHarvest(flowId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/flows/${flowId}/knowledge-harvest/prepare`);
+  }
+
+  async prepareKnowledgeCheck(flowId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/flows/${flowId}/knowledge-check/prepare`);
+  }
+
   // ============ Guidelines Methods ============
 
   async getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>> {

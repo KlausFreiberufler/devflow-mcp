@@ -108,6 +108,30 @@ const draftRejectDef = {
   }
 };
 
+const harvestDef = {
+  name: 'knowledge_harvest',
+  description: `Harvest knowledge from a single done-flow. Call this right after flow_update transitions a flow to done (the server's nextStep will remind you). Returns the flow + existing ADRs + related drafts + instructions. Decide: does this flow warrant a new draft? If yes, call knowledge_draft_create. If the theme is already covered, skip.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      flowId: { type: 'string', description: 'Flow id to harvest (must be in done state)' }
+    },
+    required: ['flowId']
+  }
+};
+
+const checkFlowDef = {
+  name: 'knowledge_check_flow',
+  description: `Run a knowledge check on a flow: spot drift against existing ADRs and identify missing knowledge (topics without an asset). Returns flow text + ADR snapshots + instructions. YOU return the analysis — no draft creation in this tool. Use before submitting a flow to review.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      flowId: { type: 'string' }
+    },
+    required: ['flowId']
+  }
+};
+
 // ============ Handlers ============
 
 async function handleBackfillRequest(args: Record<string, unknown>): Promise<string> {
@@ -162,6 +186,22 @@ async function handleDraftReject(args: Record<string, unknown>): Promise<string>
   return `Draft ${args.id} rejected.`;
 }
 
+async function handleHarvest(args: Record<string, unknown>): Promise<string> {
+  const flowId = args.flowId as string;
+  if (!flowId) return 'Error: flowId required';
+  const r = await devFlowClient.prepareKnowledgeHarvest(flowId);
+  if (!r.success || !r.data) return `Error: ${r.error}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
+async function handleCheckFlow(args: Record<string, unknown>): Promise<string> {
+  const flowId = args.flowId as string;
+  if (!flowId) return 'Error: flowId required';
+  const r = await devFlowClient.prepareKnowledgeCheck(flowId);
+  if (!r.success || !r.data) return `Error: ${r.error}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
 // ============ Tool Registry Export ============
 
 export const tools: ToolModule = {
@@ -169,5 +209,7 @@ export const tools: ToolModule = {
   knowledge_draft_create:     { definition: draftCreateDef,     handler: withErrorHandling('knowledge_draft_create',     handleDraftCreate) },
   knowledge_draft_list:       { definition: draftListDef,       handler: withErrorHandling('knowledge_draft_list',       handleDraftList) },
   knowledge_draft_accept:     { definition: draftAcceptDef,     handler: withErrorHandling('knowledge_draft_accept',     handleDraftAccept) },
-  knowledge_draft_reject:     { definition: draftRejectDef,     handler: withErrorHandling('knowledge_draft_reject',     handleDraftReject) }
+  knowledge_draft_reject:     { definition: draftRejectDef,     handler: withErrorHandling('knowledge_draft_reject',     handleDraftReject) },
+  knowledge_harvest:          { definition: harvestDef,         handler: withErrorHandling('knowledge_harvest',          handleHarvest) },
+  knowledge_check_flow:       { definition: checkFlowDef,       handler: withErrorHandling('knowledge_check_flow',       handleCheckFlow) }
 };
