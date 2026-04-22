@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "devflow": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@dev-flow-tech/mcp-server@4.9.0"],
       "env": {
         "DEVFLOW_URL": "${user_config.devflow_url:-https://api.app.dev-flow.tech}",
         "DEVFLOW_CLIENT": "claude"
