@@ -19,7 +19,13 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { listResources, readResource } from './resources/devflowResources.js';
+import { prompts as devflowPrompts, getPrompt } from './prompts/devflowPrompts.js';
 
 import { devFlowClient } from './api/client.js';
 import { registry } from './tools/registry.js';
@@ -78,12 +84,34 @@ registry.register(knowledgeDraftsTools);
 
 const server = new Server(
   { name: 'devflow', version: MCP_VERSION },
-  { capabilities: { tools: {} } }
+  { capabilities: { tools: {}, resources: {}, prompts: {} } }
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: registry.listTools(),
 }));
+
+// DF-240 MCP Resources
+server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  resources: await listResources()
+}));
+
+server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  const uri = request.params.uri;
+  const content = await readResource(uri);
+  return { contents: [content] };
+});
+
+// DF-240 MCP Prompts
+server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+  prompts: devflowPrompts
+}));
+
+server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  const result = await getPrompt(name, (args || {}) as Record<string, string>);
+  return result as any;
+});
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
