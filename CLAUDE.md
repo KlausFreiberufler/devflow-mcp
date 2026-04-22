@@ -54,6 +54,37 @@ Mache Self-Review (Diff pruefen, Findings fixen).
 
 ### Docs-Update: 🏖️ Chill
 Pruefe relevante Docs und aktualisiere sie bei Bedarf.
+
+### Knowledge-Pflicht (MCP-First)
+
+Die DevFlow-Wissensdatenbank (ADRs / Patterns / Runbooks / Lessons Learned) wird
+ueber MCP-Tools gepflegt, NICHT ueber Backend-LLM-Aufrufe. Du bist die Intelligenz.
+
+**Regeln:**
+
+1. Nach jedem `flow_update`, der einen Flow auf `done` setzt, enthaelt die
+   Response `suggestedNextTool`. Du MUSST diesen Hinweis befolgen und
+   `knowledge_harvest({ flowId })` aufrufen.
+
+2. `knowledge_harvest` liefert den Flow, bestehende ADRs und Related-Drafts.
+   Entscheide basierend darauf:
+   - Wenn das Thema schon durch einen ADR abgedeckt ist: skip.
+   - Wenn schon ein Draft fuer diesen Flow existiert: skip.
+   - Sonst: Entscheide, ob ADR / Pattern / Runbook / Lessons-Learned passt, und
+     rufe `knowledge_draft_create` mit sinnvollem Titel + Body.
+
+3. Vor kritischen `flow_update`-Transitions (z.B. `in_progress → review`) rufe
+   `knowledge_check_flow({ flowId })` auf, wenn der Flow architektonische
+   Entscheidungen enthaelt. Das liefert dir Drift- und Missing-Hinweise.
+
+4. Fuer Projekt-weite Backfills: `knowledge_backfill_request({ projectId })`
+   liefert alle done-Flows + Kontext. Klassifiziere, gruppiere, rufe
+   `knowledge_draft_create` fuer jeden Draft.
+
+**Dedup ist automatisch** — wiederholtes `knowledge_draft_create` mit gleichem
+(projectId, draftType, title) mergt `sourceFlowIds` statt zu duplizieren.
+
+**Sei konservativ.** Wenige hochwertige Drafts sind besser als viele laute.
 <!-- DEVFLOW-RULES-END -->
 
 
