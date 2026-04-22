@@ -26,5 +26,12 @@
       "type": "string",
       "sensitive": false
     }
+  },
+  "mcpServers": {
+    "devflow": {
+      "command": "npx",
+      "args": ["-y", "@dev-flow-tech/mcp-server@4.9.0"],
+      "env": {}
+    }
   }
 }

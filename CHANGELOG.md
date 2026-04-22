@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `knowledge_check_drift(projectId, adrNumber)` tool (DF-238): returns ADR content + its configured `affects_paths`, plus instructions for Claude to inspect the files and report drift. Drift detection runs client-side (Claude's own Read/Glob/Grep against the user workspace) — no backend code access needed.
 
+### Changed (DF-242)
+- Package renamed from `devflow-mcp` to `@dev-flow-tech/mcp-server` (scoped under the npm org `@dev-flow-tech`). `"private": true` flipped to `false` and `publishConfig.access: "public"` added so the package is publishable.
+- `.claude-plugin/plugin.json` now carries an `mcpServers.devflow` entry pointing at `npx -y @dev-flow-tech/mcp-server@4.9.0`. Installing the plugin (`/plugin install devflow`) now registers the MCP server automatically — no separate `npx github:... setup` step needed.
+- Added `npm run publish:npm` script (`npm run build && npm publish`) for future releases.
+- README install section now shows `/plugin install devflow` as the primary path; the legacy `npx github:` fallback stays documented.
+
 ## [4.8.0] - 2026-04-22
 
 ### Added
