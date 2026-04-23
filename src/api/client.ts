@@ -679,6 +679,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('PATCH', `/api/adrs/${adrId}`, { status });
   }
 
+  async fetchAdrAuditLog(adrId: string): Promise<ApiResponse<unknown[]>> {
+    return this.request<unknown[]>('GET', `/api/adrs/${adrId}/audit-log`);
+  }
+
   // ============ Knowledge Drafts Methods (DF-245) ============
 
   async prepareKnowledgeBackfill(projectId: string, limit = 50): Promise<ApiResponse<unknown>> {
