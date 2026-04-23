@@ -56,6 +56,20 @@ Idempotent: re-calling with the same attachmentId returns the existing ADR.`,
   }
 };
 
+const adrGetAuditLogDef = {
+  name: 'adr_get_audit_log',
+  description: `Get the audit log (status change history) for an ADR.
+Returns the full timeline of status transitions with user, timestamp and optional note.
+Use this to understand why a decision moved from proposed → accepted or was later deprecated/superseded.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      adrId: { type: 'string', description: 'Internal ADR id (not the display number)' }
+    },
+    required: ['adrId']
+  }
+};
+
 const adrUpdateStatusDef = {
   name: 'adr_update_status',
   description: `Change an ADR's status (proposed → accepted → deprecated → superseded).
@@ -116,6 +130,21 @@ async function handleAdrAccept(args: Record<string, unknown>): Promise<string> {
   return `✓ ADR accepted: **${a.displayId}** · ${a.title} [${a.status}]`;
 }
 
+async function handleAdrGetAuditLog(args: Record<string, unknown>): Promise<string> {
+  const r = await devFlowClient.fetchAdrAuditLog(args.adrId as string);
+  if (!r.success || !r.data) return `Error: ${r.error || 'audit log not available'}`;
+  const entries = r.data as any[];
+  if (entries.length === 0) return 'No audit entries yet.';
+  return entries
+    .map((e: any) => {
+      const who = e.userName || e.userId || 'unknown';
+      const when = (e.createdAt || '').slice(0, 19).replace('T', ' ');
+      const note = e.note ? ` — ${e.note}` : '';
+      return `- ${when} · ${who}: ${e.oldStatus || '∅'} → ${e.newStatus}${note}`;
+    })
+    .join('\n');
+}
+
 async function handleAdrUpdateStatus(args: Record<string, unknown>): Promise<string> {
   const r = await devFlowClient.updateAdrStatus(args.adrId as string, args.status as string);
   if (!r.success || !r.data) return `Error: ${r.error}`;
@@ -127,5 +156,6 @@ export const tools: ToolModule = {
   adr_list:          { definition: adrListDef,         handler: withErrorHandling('adr_list', handleAdrList) },
   adr_get:           { definition: adrGetDef,          handler: withErrorHandling('adr_get', handleAdrGet) },
   adr_accept:        { definition: adrAcceptDef,       handler: withErrorHandling('adr_accept', handleAdrAccept) },
-  adr_update_status: { definition: adrUpdateStatusDef, handler: withErrorHandling('adr_update_status', handleAdrUpdateStatus) }
+  adr_update_status: { definition: adrUpdateStatusDef, handler: withErrorHandling('adr_update_status', handleAdrUpdateStatus) },
+  adr_get_audit_log: { definition: adrGetAuditLogDef,  handler: withErrorHandling('adr_get_audit_log', handleAdrGetAuditLog) }
 };
