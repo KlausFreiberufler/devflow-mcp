@@ -726,6 +726,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('GET', `/api/flows/${flowId}/planning-context`);
   }
 
+  async flowSealBackfill(projectId: string): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/projects/${projectId}/flow-seal-backfill`);
+  }
+
   async updateAdrAffectsPaths(adrId: string, paths: string[]): Promise<ApiResponse<unknown>> {
     return this.request('PATCH', `/api/adrs/${adrId}`, { affectsPaths: paths });
   }
