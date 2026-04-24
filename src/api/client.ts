@@ -734,6 +734,50 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('PATCH', `/api/adrs/${adrId}`, { affectsPaths: paths });
   }
 
+  // ============ DF-269 — State-aware planning + resolutions ============
+
+  async fetchPendingWork(
+    projectId: string,
+    opts: { tags?: string[]; paths?: string[]; excludeFlowId?: string } = {}
+  ): Promise<ApiResponse<unknown>> {
+    const qs = new URLSearchParams();
+    if (opts.tags?.length) qs.set('tags', opts.tags.join(','));
+    if (opts.paths?.length) qs.set('paths', opts.paths.join(','));
+    if (opts.excludeFlowId) qs.set('excludeFlowId', opts.excludeFlowId);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request('GET', `/api/projects/${projectId}/pending-work${suffix}`);
+  }
+
+  async resolveIntent(flowId: string, pageId: string, note?: string): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/flows/${flowId}/intents/${pageId}/resolve`, note ? { note } : {});
+  }
+
+  async suggestAutoTags(
+    projectId: string,
+    content: string,
+    opts: { existingTags?: string[]; limit?: number } = {}
+  ): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/knowledge/autotag-suggest?projectId=${projectId}`, {
+      content,
+      existingTags: opts.existingTags || [],
+      limit: opts.limit ?? 5
+    });
+  }
+
+  async createKnowledgeResolution(
+    flowId: string,
+    payload: {
+      topic: string;
+      resolutionType: 'adr' | 'pattern' | 'runbook' | 'intent_defer' | 'dismiss';
+      entityType?: string;
+      entityId?: string;
+      reason?: string;
+      horizon?: string;
+    }
+  ): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/flows/${flowId}/knowledge-resolutions`, payload);
+  }
+
   // ============ Guidelines Methods ============
 
   async getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>> {

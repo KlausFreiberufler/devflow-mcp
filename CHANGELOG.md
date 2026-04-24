@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.0] - 2026-04-24
+
+### Added (DF-269)
+
+Four new tools so Claude can use the DF-261 / DF-263 / DF-264 backend features directly instead of hand-rolled REST calls:
+
+- `pending_work(projectId?, tags?, paths?, excludeFlowId?)` — 4-bucket snapshot (`inFlightFlows`, `openIntents`, `proposedAdrs`, `pendingDrafts`). Call this at planning start to avoid proposing something already in flight.
+- `intent_resolve(flowId, pageId, note?)` — close a forward-intent doc-page (from DF-254 `flow_seal`) once the current flow actually delivers that follow-up. Updates `frontmatter.status='resolved'` and links the resolving flow.
+- `knowledge_autotag_suggest(projectId?, content, existingTags?, limit?)` — TF-IDF tag suggestions from the existing project tag pool (no new tags invented, avoiding tag-wildwuchs).
+- `knowledge_check_resolve(flowId, topic, resolutionType, entityType?, entityId?, reason?, horizon?)` — mark a warning from `knowledge_check_flow` / `knowledge_check_drift` as resolved. Five resolution types: `adr`, `pattern`, `runbook`, `intent_defer` (seeds an intent doc-page), `dismiss`.
+
+Allowlist (backend DF-269): the two read-only tools are callable in every working state; the two writes are scoped to `planning` + `in_progress`.
+
 ## [4.9.0] - 2026-04-22
 
 ### Added
