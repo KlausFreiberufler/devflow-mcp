@@ -51,6 +51,7 @@ import { tools as adrsTools } from './tools/adrs.js';
 import { tools as knowledgeDraftsTools } from './tools/knowledgeDrafts.js';
 import { tools as planningContextTools } from './tools/planningContext.js';
 import { tools as flowSealBackfillTools } from './tools/flowSealBackfill.js';
+import { tools as bootstrapAuditTools } from './tools/bootstrapAudit.js';
 
 // Subcommand routing: `devflow-mcp setup [--url ...]` delegates to setup script
 if (process.argv[2] === 'setup') {
@@ -85,6 +86,7 @@ registry.register(adrsTools);
 registry.register(knowledgeDraftsTools);
 registry.register(planningContextTools);
 registry.register(flowSealBackfillTools);
+registry.register(bootstrapAuditTools);
 
 const server = new Server(
   { name: 'devflow', version: MCP_VERSION },
