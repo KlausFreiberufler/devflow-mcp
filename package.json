@@ -23,7 +23,6 @@
     "prepare": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "publish:devflow": "bash scripts/build-package.sh",
     "publish:npm": "npm run build && npm publish"
   },
   "private": false,
