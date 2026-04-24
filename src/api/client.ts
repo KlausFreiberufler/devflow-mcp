@@ -722,6 +722,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('GET', `/api/flows/${flowId}/knowledge-check/prepare`);
   }
 
+  async fetchPlanningContext(flowId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/flows/${flowId}/planning-context`);
+  }
+
   async updateAdrAffectsPaths(adrId: string, paths: string[]): Promise<ApiResponse<unknown>> {
     return this.request('PATCH', `/api/adrs/${adrId}`, { affectsPaths: paths });
   }
