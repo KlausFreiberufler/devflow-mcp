@@ -467,7 +467,7 @@ Or set: export DEVFLOW_TOKEN="your-token"
     filename: string,
     content: string,
     mimeType = 'text/markdown',
-    kind?: 'plan' | 'summary' | 'design' | 'notes',
+    kind?: 'plan' | 'summary' | 'design' | 'decision' | 'notes',
   ): Promise<ApiResponse<FlowAttachment>> {
     if (!this.credentials) {
       return { success: false, error: 'Not authenticated.' };

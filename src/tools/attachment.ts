@@ -7,7 +7,9 @@ import type { ToolModule } from './registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
 
-const ALLOWED_KINDS = ['plan', 'summary', 'design', 'notes'] as const;
+// DF-282: 'decision' added — backend has supported it since DF-224.
+// kind='decision' attachments can be promoted to ADRs via adr_accept.
+const ALLOWED_KINDS = ['plan', 'summary', 'design', 'decision', 'notes'] as const;
 type AttachmentKind = typeof ALLOWED_KINDS[number];
 
 const flowUploadDef = {
@@ -19,7 +21,8 @@ const flowUploadDef = {
     'Common use cases:\n' +
     '- Upload implementation plans as .md files (use kind="plan" to link it to the flow)\n' +
     '- Attach analysis notes or design documents (kind="design" or "notes")\n' +
-    '- Save code review summaries (kind="summary")',
+    '- Save code review summaries (kind="summary")\n' +
+    '- Document architectural decisions (kind="decision" — can be promoted to ADR via adr_accept)',
   inputSchema: {
     type: 'object' as const,
     properties: {
