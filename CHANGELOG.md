@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.1] - 2026-04-26
+
+### Fixed (DF-282)
+
+- `flow_upload` now accepts `kind="decision"` (was rejected with "Invalid kind decision"). The DevFlow backend has supported `decision` since DF-224 — the MCP-tool's `ALLOWED_KINDS` allowlist was missing it. Discovered during DF-274 when the agent had to bypass MCP and upload via direct REST to create a `decision.md` for `adr_accept`.
+
 ## [4.14.0] - 2026-04-24
 
 ### Added (DF-269)
