@@ -16,7 +16,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/build.js",
+    "build:tsc": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "setup": "node dist/setup/setup.js",
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "esbuild": "^0.28.0",
     "typescript": "^5.3.3",
     "vitest": "^4.1.4"
   },
