@@ -5,7 +5,7 @@
  */
 import { createServer } from 'http';
 import { exec } from 'child_process';
-import { writeFile, readFile, mkdir } from 'fs/promises';
+import { writeFile, readFile, mkdir, chmod, stat } from 'fs/promises';
 import { homedir } from 'os';
 import { getWorkingDir } from '../utils/working-dir.js';
 import { join } from 'path';
@@ -74,13 +74,14 @@ async function pollForToken(baseUrl, code, maxAttempts = 150, intervalMs = 2000)
  */
 async function saveCredentials(token) {
     const dir = join(homedir(), '.devflow');
-    await mkdir(dir, { recursive: true });
+    await mkdir(dir, { recursive: true, mode: 0o700 });
     const credentials = {
         accessToken: token,
         refreshToken: '',
         expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000 // 1 year
     };
-    await writeFile(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2));
+    await writeFile(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2), { mode: 0o600 });
+    await chmod(CREDENTIALS_PATH, 0o600);
 }
 /**
  * Save project configuration to working directory
@@ -117,6 +118,17 @@ export async function loadCredentials() {
     try {
         const data = await readFile(CREDENTIALS_PATH, 'utf-8');
         const credentials = JSON.parse(data);
+        // Migrate world-readable creds to 0o600 — runs unconditionally so
+        // expired-but-still-on-disk tokens don't sit at 0644 forever.
+        try {
+            const info = await stat(CREDENTIALS_PATH);
+            if ((info.mode & 0o077) !== 0) {
+                await chmod(CREDENTIALS_PATH, 0o600);
+            }
+        }
+        catch {
+            // chmod failures are non-fatal
+        }
         if (credentials.expiresAt && credentials.expiresAt < Date.now()) {
             return null; // Expired
         }
