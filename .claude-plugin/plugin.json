@@ -29,8 +29,8 @@
   },
   "mcpServers": {
     "devflow": {
-      "command": "npx",
-      "args": ["-y", "-p", "@dev-flow-tech/mcp-server@4.14.1", "devflow-mcp"],
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
       "env": {}
     }
   }

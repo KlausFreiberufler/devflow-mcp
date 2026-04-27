@@ -21,6 +21,14 @@ jobs:
 
       - run: npm run build
 
+      - name: Verify committed dist/ matches build output
+        run: |
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "::error::dist/ is out of date relative to src/. Run 'npm run build && git add dist/ && git commit' locally and re-push."
+            git diff --stat dist/
+            exit 1
+          fi
+
       - name: Pack tarball
         run: npm pack
 
