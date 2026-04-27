@@ -2,10 +2,11 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
 
 permissions:
   contents: write
+  id-token: write   # for npm provenance
 
 jobs:
   release:
@@ -16,11 +17,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
 
       - name: Verify versions in sync (package.json, plugin.json, src/config/version.ts)
         run: npm run version:check
+
+      - name: Verify tag matches package.json version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(node -p "require('./package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $pkg_version"
+            exit 1
+          fi
 
       - run: npm run build
 
@@ -32,25 +43,19 @@ jobs:
             exit 1
           fi
 
-      - name: Pack tarball
-        run: npm pack
+      - run: npm test
 
-      - name: Get version
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Rename tarball for stable link
-        run: cp devflow-mcp-${{ steps.version.outputs.version }}.tgz devflow-mcp-latest.tgz
-
-      - name: Create or update release
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           generate_release_notes: true
           make_latest: true
-          files: |
-            devflow-mcp-${{ steps.version.outputs.version }}.tgz
-            devflow-mcp-latest.tgz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
