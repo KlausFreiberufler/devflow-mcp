@@ -23,7 +23,9 @@
     "prepare": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "publish:npm": "npm run build && npm publish"
+    "version:check": "node scripts/check-versions.js",
+    "version:bump": "node scripts/bump-version.js",
+    "publish:npm": "npm run version:check && npm run build && npm publish"
   },
   "private": false,
   "repository": {
