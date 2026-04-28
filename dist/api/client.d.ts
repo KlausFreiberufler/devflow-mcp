@@ -187,6 +187,17 @@ export declare class DevFlowClient {
         reason?: string;
         horizon?: string;
     }): Promise<ApiResponse<unknown>>;
+    emitDisciplineToken(flowId: string, payload: {
+        skillName: string;
+        evidence?: unknown;
+    }): Promise<ApiResponse<{
+        id: string;
+        skillName: string;
+        token: string;
+        createdAt: string;
+        expiresAt: string;
+    }>>;
+    listActiveDisciplineTokens(flowId: string): Promise<ApiResponse<unknown[]>>;
     getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>>;
     updateProjectGuidelines(guidelines: string, projectId?: string): Promise<ApiResponse<ProjectGuidelines>>;
     listReleases(projectId?: string): Promise<ApiResponse<Release[]>>;
