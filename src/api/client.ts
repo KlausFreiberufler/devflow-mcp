@@ -778,6 +778,19 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('POST', `/api/flows/${flowId}/knowledge-resolutions`, payload);
   }
 
+  // ============ Discipline-Tokens (DF-289 + DF-292) ============
+
+  async emitDisciplineToken(
+    flowId: string,
+    payload: { skillName: string; evidence?: unknown }
+  ): Promise<ApiResponse<{ id: string; skillName: string; token: string; createdAt: string; expiresAt: string }>> {
+    return this.request('POST', `/api/flows/${flowId}/discipline-tokens`, payload);
+  }
+
+  async listActiveDisciplineTokens(flowId: string): Promise<ApiResponse<unknown[]>> {
+    return this.request('GET', `/api/flows/${flowId}/discipline-tokens`);
+  }
+
   // ============ Guidelines Methods ============
 
   async getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>> {
