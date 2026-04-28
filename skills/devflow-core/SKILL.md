@@ -42,6 +42,26 @@ The MCP server writes `.devflow-active` in the project root when `devflow_init` 
 - **400 Missing field:** The response tells you which field. For `review` transitions: `agentSummary` + `testingInstructions` are required.
 - **Lease expired:** Call `devflow_init` again to refresh the session lease.
 
+## Git Mode (DF-302)
+
+Every `devflow_init` response includes a `gitEnabled` boolean (from `git_settings.enabled`). Behave accordingly:
+
+- **`gitEnabled: true`** — Project follows a git workflow. You MUST create branches, commit with Gitmoji, report `branchName` + `commits[]` via `flow_update`, and ensure a merged PR before `review → done`.
+- **`gitEnabled: false`** — Project does not enforce git. **Do not run `git checkout -b`, do not produce commits, do not call `flow_update({ commits: [...] })`, do not report a PR URL.** Just edit files, run tests, and submit `agentSummary + testingInstructions` for review.
+
+Default to **OFF** when in doubt — Beta-phase projects often have git off.
+
+## Self-Approval Mode (DF-302)
+
+Every `devflow_init` response also includes `allowSelfApproval` (from `project_configs.allow_agent_self_approval`).
+
+- **`allowSelfApproval: false`** (default) — `planning → approval/ready` and `review → done` are **human-only**. When you hit a 403 with `gate.policy === 'human_only'`, the response carries `gate.userMessage`. **Show that message verbatim to the user** and stop. Don't retry.
+- **`allowSelfApproval: true`** — You may transition both gates yourself by emitting discipline-tokens via `devflow_token_emit` for every skill listed in `gate.requiredSkills`, then calling `flow_update({ currentState, selfApproved: true, disciplineTokens: [...] })`.
+
+Hardcoded required skills (DF-302):
+- `approval` step: `devflow-collision-acknowledged`, `devflow-pattern-reuse`, `devflow-tdd`
+- `testing` step: `devflow-verification-gate`, `devflow-adr-compliance`
+
 ## State-Specific Guidance
 
 For deeper instructions on a specific state, use the matching skill:

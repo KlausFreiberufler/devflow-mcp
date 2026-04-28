@@ -23,7 +23,7 @@ If none are available, follow the inline loop below.
    b. Write failing test
    c. Implement minimal code
    d. Run test, verify pass
-   e. Commit with Gitmoji prefix
+   e. **If `gitEnabled: true`** → commit with Gitmoji prefix. **If `gitEnabled: false`** → skip the commit, just save your edits.
    f. Mark `completed` via `task_update`
 3. After all tasks done: verify build/tests pass globally
 4. Submit for review:
@@ -36,11 +36,16 @@ If none are available, follow the inline loop below.
    })
    ```
 
-## Commits
+## Commits — Only if `gitEnabled: true` (DF-302)
 
-Attach each commit to the flow via `flow_update({ commits: [...] })` so the DevFlow UI links them.
+Read `gitEnabled` from the most recent `devflow_init` response.
 
-Use Gitmoji prefixes:
+**`gitEnabled: true`:**
+- Each task gets its own commit with a Gitmoji prefix
+- Attach commits to the flow via `flow_update({ commits: [{hash, message}, ...] })` so the DevFlow UI links them
+- A merged PR is required before `review → done`
+
+Gitmoji prefixes:
 - ✨ feat: new feature
 - 🐛 fix: bug fix
 - 📝 docs: documentation
@@ -48,11 +53,17 @@ Use Gitmoji prefixes:
 - ✅ test: tests
 - 🔧 chore: tooling
 
+**`gitEnabled: false`:**
+- Do **not** run `git commit`, `git checkout`, or any other git command
+- Do **not** call `flow_update({ commits: [...] })` — leave the field empty
+- Just edit files in place. Tests still need to pass; a clean `agentSummary + testingInstructions` is enough
+
 ## Before Submitting Review
 
 - All tasks in `task_list` must be `completed`
 - Build passes (run project's build command)
 - Tests pass
 - Docs updated if applicable (check project's docs-update rule)
+- **If `gitEnabled: true`** — your commits are attached to the flow
 
 Then use `/devflow-review` to submit cleanly.

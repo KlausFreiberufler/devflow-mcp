@@ -46,4 +46,9 @@ flow_update({
 })
 ```
 
-The flow now waits for user approval in DevFlow UI. Do not continue working on this flow — explain to the user that it is waiting for them.
+What happens next depends on the project's **Self-Approval mode** (DF-302, see `devflow-core`):
+
+- **`allowSelfApproval: false`** (default) — `approval → ready` is human-only. The 403 you get back will carry `gate.userMessage`. Show that message to the user verbatim, then stop. Do not retry.
+- **`allowSelfApproval: true`** — emit discipline-tokens for `gate.requiredSkills` (`devflow-collision-acknowledged`, `devflow-pattern-reuse`, `devflow-tdd`) via `devflow_token_emit`, then `flow_update({ currentState: 'ready', selfApproved: true, disciplineTokens: [...] })` to advance.
+
+In either mode, the flow does not silently stay in `approval` — either the user clicks Approve, or you self-approve with tokens.
