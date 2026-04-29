@@ -136,3 +136,42 @@ npm pack --dry-run
 | `npm run dev` | Watch mode (auto-compile) |
 | `npm run setup` | Start setup wizard |
 | `npm pack --dry-run` | Check package contents |
+
+## Releasing (Manual / Local)
+
+`npm publish` runs **locally on the maintainer's machine**, not from CI. Reason: avoids storing an npm token as a GitHub Action secret and keeps the publish under direct human control. The CI workflow (`.github/workflows/release.yml`) still runs on each tag push to validate version-sync + dist/ + tests + create the GitHub release.
+
+### Steps
+
+1. **Bump version in all three files** (single command):
+   ```bash
+   node scripts/bump-version.js 4.17.0
+   ```
+   This syncs `package.json`, `.claude-plugin/plugin.json`, `src/config/version.ts`.
+
+2. **Build + commit dist/**:
+   ```bash
+   npm run build
+   git add dist/ package.json .claude-plugin/plugin.json src/config/version.ts
+   git commit -m "🚀 release: v4.17.0"
+   git push origin main
+   ```
+
+3. **Tag + push (this triggers the validation workflow)**:
+   ```bash
+   git tag v4.17.0
+   git push origin v4.17.0
+   ```
+
+4. **Publish to npm (locally)**:
+   ```bash
+   npm publish --access public
+   ```
+   Your local `~/.npmrc` `_authToken` is used. If you don't have one, run `npm login` once.
+
+5. **Verify**:
+   ```bash
+   npm view @dev-flow-tech/mcp-server version
+   ```
+
+The GitHub Action attaches the npm-link to the auto-generated GitHub release notes once the tag-push completes.

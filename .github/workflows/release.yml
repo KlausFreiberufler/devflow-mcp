@@ -1,12 +1,18 @@
 name: Release
 
+# Validates a tag-push: version-sync, tag-matches-pkg, build is reproducible,
+# tests pass, dist/ is committed. Then creates a GitHub release.
+#
+# npm publish runs LOCALLY from the maintainer's machine (`npm publish --access public`),
+# not from CI. See CONTRIBUTING.md → Releasing. This avoids storing an npm token
+# as a GitHub Action secret and keeps publish under direct human control.
+
 on:
   push:
     tags: ['v*']
 
 permissions:
   contents: write
-  id-token: write   # for npm provenance
 
 jobs:
   release:
@@ -17,7 +23,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
 
@@ -45,11 +50,6 @@ jobs:
 
       - run: npm test
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -57,5 +57,14 @@ jobs:
           name: ${{ github.ref_name }}
           generate_release_notes: true
           make_latest: true
+          body: |
+            Published to npm: https://www.npmjs.com/package/@dev-flow-tech/mcp-server/v/${{ github.ref_name }}
+
+            Install / update locally:
+            ```
+            claude plugin update devflow
+            # or fresh:
+            rm -rf ~/.claude/plugins/cache/devflow
+            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
