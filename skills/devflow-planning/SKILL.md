@@ -34,6 +34,12 @@ Otherwise, write the plan inline using the template below.
 - <how to verify>
 ```
 
+## Knowledge-Check pre-flight
+
+Before submitting the plan to `approval`, run `knowledge_check_flow(flowId)`. The response lists topics in the plan text that have no ADR/Pattern/Runbook yet. For each, call `knowledge_check_resolve` (`dismiss` with a reason ≥10 chars is the right call for passing mentions, otherwise link an existing entity).
+
+This avoids hitting the gate during the transition. See `devflow-core` → "Knowledge-Check Gate" for the full playbook if the gate fires anyway.
+
 ## Submitting for Approval
 
 Once the plan is written:

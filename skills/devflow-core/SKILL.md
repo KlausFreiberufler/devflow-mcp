@@ -62,6 +62,30 @@ Hardcoded required skills (DF-302):
 - `approval` step: `devflow-collision-acknowledged`, `devflow-pattern-reuse`, `devflow-tdd`
 - `testing` step: `devflow-verification-gate`, `devflow-adr-compliance`
 
+## Knowledge-Check Gate (DF-264 / DF-302)
+
+When you call `flow_update` to transition state and the response is **403 with `gate.reason === 'missing_documentation'`**, the flow text mentions architectural topics (auth, billing, cache, api, etc) that have no ADR / Pattern / Runbook yet. The transition is blocked until each is resolved.
+
+The 403 carries `gate.agentInstructions` — read it. Standard playbook:
+
+1. **Don't panic, don't retry**. The list `gate.topics` tells you exactly which topics need resolution.
+2. For each topic, call:
+   ```
+   knowledge_check_resolve({
+     flowId, topic, resolutionType: 'dismiss',
+     reason: '<≥10 chars explaining why this is a passing mention, not a real architectural concern>'
+   })
+   ```
+3. If a topic IS a real architectural decision in the flow, prefer `'adr'` / `'pattern'` / `'runbook'` (link to an existing doc-page via entityType+entityId) or `'intent_defer'` (with horizon `'next-quarter'` | `'later'`).
+4. After all topics are resolved, retry the original `flow_update` transition.
+
+**Important state restriction:** `knowledge_check_resolve` is only allowed in `planning` or `in_progress`. If the gate fires in `review`/`approval`, you must:
+- `flow_update({ currentState: 'in_progress' })` (or `planning`) first
+- resolve every topic
+- `flow_update({ currentState: 'review', agentSummary, testingInstructions })` again to re-enter review
+
+**Proactive habit:** Before every `flow_update` to `approval` or `done`, run `knowledge_check_flow(flowId)` and resolve any banner topics. Catching them early avoids the round-trip.
+
 ## State-Specific Guidance
 
 For deeper instructions on a specific state, use the matching skill:

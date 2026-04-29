@@ -65,5 +65,8 @@ Gitmoji prefixes:
 - Tests pass
 - Docs updated if applicable (check project's docs-update rule)
 - **If `gitEnabled: true`** — your commits are attached to the flow
+- **Knowledge-Check pre-flight**: call `knowledge_check_flow(flowId)`. For every topic that comes back without a resolution, call `knowledge_check_resolve` (`dismiss` with a reason ≥10 chars is fine for passing mentions). This is much cheaper than hitting the 403 gate during the `review` transition.
 
 Then use `/devflow-review` to submit cleanly.
+
+If the gate fires anyway (`gate.reason === 'missing_documentation'`), follow the playbook in `devflow-core` → "Knowledge-Check Gate". Resolve here in `in_progress`, then retry.
