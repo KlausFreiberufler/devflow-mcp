@@ -177,6 +177,13 @@ export declare class DevFlowClient {
     fetchWikiLint(projectId: string, staleDays?: number): Promise<ApiResponse<unknown>>;
     /** DF-315 — Idea-Backlog (5 sources aggregated for Pick&Plan) */
     fetchIdeasBacklog(projectId: string): Promise<ApiResponse<unknown>>;
+    /** DF-316 — Error-Driven Wiki Lookup */
+    fetchErrorContext(projectId: string, payload: {
+        errorMessage?: string;
+        stackTrace?: string;
+        filePath?: string;
+        recentCommits?: string[];
+    }): Promise<ApiResponse<unknown>>;
     flowSealBackfill(projectId: string): Promise<ApiResponse<unknown>>;
     updateAdrAffectsPaths(adrId: string, paths: string[]): Promise<ApiResponse<unknown>>;
     fetchPendingWork(projectId: string, opts?: {

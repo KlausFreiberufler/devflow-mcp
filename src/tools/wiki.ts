@@ -257,6 +257,23 @@ Useful for "what's been happening to the wiki recently" — drives the Activity-
   }
 };
 
+const errorContextGetDef = {
+  name: 'error_context_get',
+  description: `DF-316 — Error-Driven Wiki Lookup. When you hit an unexpected error / exception / failing test, call this FIRST (via the devflow-error-investigator skill) to pull every wiki signal that's relevant: matching runbooks (FTS), ADRs whose affects_paths cover the error file, recent flows in the same area, related patterns, similar past errors from done-flows, plus a briefing-Markdown.
+
+Iron Law of compounding wikis: never debug from scratch what the wiki has already seen. If no runbook matches AND the fix is non-trivial, write a runbook on the way out.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      projectId: { type: 'string' },
+      errorMessage: { type: 'string', description: 'Concise error / exception string' },
+      stackTrace: { type: 'string', description: 'Optional stack trace' },
+      filePath: { type: 'string', description: 'Optional file where the error occurred (matches ADR affects_paths)' },
+      recentCommits: { type: 'array', items: { type: 'string' }, description: 'Optional recent commit hashes for context' }
+    }
+  }
+};
+
 const ideasGetDef = {
   name: 'ideas_get',
   description: `DF-315 — Idea-Backlog: aggregates 5 organic idea sources from the wiki into one curated pipeline:
@@ -324,6 +341,22 @@ async function handleWikiGetLint(args: Record<string, unknown>): Promise<string>
   return JSON.stringify(r.data, null, 2);
 }
 
+async function handleErrorContextGet(args: Record<string, unknown>): Promise<string> {
+  const projectId = resolveProjectId(args);
+  if (!projectId) return 'Error: projectId required (or link a project)';
+  const errorMessage = args.errorMessage as string | undefined;
+  const filePath = args.filePath as string | undefined;
+  if (!errorMessage && !filePath) return 'Error: errorMessage or filePath required';
+  const r = await devFlowClient.fetchErrorContext(projectId, {
+    errorMessage,
+    stackTrace: args.stackTrace as string | undefined,
+    filePath,
+    recentCommits: args.recentCommits as string[] | undefined
+  });
+  if (!r.success || !r.data) return `Error: ${r.error || 'failed'}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
 async function handleIdeasGet(args: Record<string, unknown>): Promise<string> {
   const projectId = resolveProjectId(args);
   if (!projectId) return 'Error: projectId required (or link a project)';
@@ -348,5 +381,7 @@ export const tools: ToolModule = {
   wiki_get_log:             { definition: wikiGetLogDef,            handler: withErrorHandling('wiki_get_log', handleWikiGetLog) },
   wiki_get_lint:            { definition: wikiGetLintDef,           handler: withErrorHandling('wiki_get_lint', handleWikiGetLint) },
   // DF-315 — Idea-Backlog
-  ideas_get:                { definition: ideasGetDef,              handler: withErrorHandling('ideas_get', handleIdeasGet) }
+  ideas_get:                { definition: ideasGetDef,              handler: withErrorHandling('ideas_get', handleIdeasGet) },
+  // DF-316 — Error-Driven Wiki Lookup
+  error_context_get:        { definition: errorContextGetDef,       handler: withErrorHandling('error_context_get', handleErrorContextGet) }
 };

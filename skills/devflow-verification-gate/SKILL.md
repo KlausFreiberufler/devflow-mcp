@@ -17,7 +17,16 @@ iron_laws:
 
 ## When to use
 
-Use this skill in `review` state, **after** implementation is complete and self-review (`devflow-receiving-review`, DF-294) has been done. It is the last skill before `flow_update review→done` under `agent_with_discipline` mode.
+In `review` state, in this exact order:
+
+1. `devflow-receiving-review` — triage code-review findings (Critical / Important / Minor)
+2. `devflow-plan-reconciliation` (DF-310) — reconcile plan ↔ actual implementation (done/partial/missing/extra/moved)
+3. **`devflow-verification-gate` (this skill)** — prove every AC with a real evidence command
+4. `devflow-adr-compliance` — ADR-glob path-check
+5. `devflow-knowledge-completer` — close any wiki gaps
+6. `flow_update review → done` with all 4 discipline-tokens
+
+Without this exact order under `agent_with_discipline`, the gate blocks with `discipline_incomplete`.
 
 ## Process
 

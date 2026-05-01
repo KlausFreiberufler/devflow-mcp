@@ -35,10 +35,13 @@ Also call `planning_context({ flowId })` for the related-ADRs, parallel-flows, a
 Render the four buckets as a checklist. **Never auto-accept.** For each item, the user decides:
 
 - **✓ keep** → Pick a `resolutionType`:
+  - `extend` (DF-310, **preferred**) if a related entry already exists and this flow refines it. Pass `entityType + entityId + body + rationale`. Backend appends a dated update section.
   - `adr` / `pattern` / `runbook` if the item already covers the topic. Pass the entity id. Hook 1 will inject `[[DisplayName]]` into the implementation plan and create a `knowledge_links` edge automatically.
   - `intent_defer` if the item is real but out of scope here — provide a `horizon` (`next-sprint`, `next-quarter`, `eventually`) and an optional reason.
-- **✗ irrelevant** → `resolutionType: 'dismiss'` — **mandatory `reason` ≥ 10 characters** (audit-trailed; the dismiss is durable across sessions).
+- **✗ irrelevant** → ⚠ Iron Law (DF-310): **never `dismiss`** without first checking if this is a recurring false-positive. If the topic-detection misfires repeatedly (e.g. `invalidation` in a non-cache project), `extend` an existing convention page with a one-line note instead — that auto-resolves future flows via DF-314 project-conventions.
 - **↺ later** → equivalent to `intent_defer` with no specific decision yet.
+
+> **DF-314 Auto-Resolve note:** if a topic was resolved 3+ times in this project via the same pattern, the gate auto-applies the convention silently — you might never see it in the awareness list. That's the system working.
 
 Use `POST /api/flows/:id/knowledge-resolutions` (MCP: `knowledge_check_resolve`) for each decision.
 

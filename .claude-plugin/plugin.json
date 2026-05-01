@@ -1,6 +1,6 @@
 {
   "name": "devflow",
-  "version": "4.18.0",
+  "version": "4.19.0",
   "description": "Structured AI development workflows with enforced planning, task tracking, and code review gates",
   "author": {
     "name": "DevFlow",

@@ -25,7 +25,9 @@ Skip when: the flow has no tags / scope is fully novel / no patterns exist yet i
 
 ### 1 · Pull existing patterns
 
-For each tag the flow carries (or each tag in the topic-scope), query:
+**Preferred (DF-310):** call `wiki_get_briefing({flowId})` — returns related ADRs, patterns, runbooks AND the briefing-Markdown automatically scoped to this flow's tags. The agent doesn't have to assemble it manually.
+
+**Fallback (manual scope query):** for each tag the flow carries, query:
 
 ```
 GET /api/projects/:projectId/docs?documentType=pattern&tag=<tag>

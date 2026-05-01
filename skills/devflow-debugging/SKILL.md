@@ -15,14 +15,15 @@ iron_laws:
 
 > **Iron-Law port** of Superpowers `systematic-debugging`. The four phases are non-negotiable; skipping ahead leaves untested assumptions in the code base.
 
+> **Sister skill (DF-316):** **run `devflow-error-investigator` FIRST** to pull wiki signals relevant to the error (runbooks, affected ADRs, recent flows, similar past errors). Then come back here for the systematic 4-phase walk. Together they enforce: never debug from scratch what the wiki has already seen.
+
 ## When to use
 
-Use this skill in `in_progress` state whenever:
-- A test fails unexpectedly (not the planned RED of `devflow-tdd`).
-- Behavior on staging/prod doesn't match the spec or the test-suite.
-- A reviewer flags a regression you can't immediately explain.
+- Test fails unexpectedly (not the planned RED of `devflow-tdd`)
+- Behavior on staging/prod doesn't match the spec or the test-suite
+- Reviewer flags a regression you can't immediately explain
 
-Skip when: the failure is the *expected* RED of a TDD cycle — that belongs to `devflow-tdd`.
+**Skip when:** the failure is the expected RED of a TDD cycle — that belongs to `devflow-tdd`.
 
 ## Process
 

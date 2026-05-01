@@ -21397,7 +21397,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.18.0";
+var MCP_VERSION = "4.19.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -21968,6 +21968,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
   /** DF-315 — Idea-Backlog (5 sources aggregated for Pick&Plan) */
   async fetchIdeasBacklog(projectId) {
     return this.request("GET", `/api/projects/${projectId}/ideas`);
+  }
+  /** DF-316 — Error-Driven Wiki Lookup */
+  async fetchErrorContext(projectId, payload) {
+    return this.request("POST", `/api/projects/${projectId}/error-context`, payload);
   }
   async flowSealBackfill(projectId) {
     return this.request("POST", `/api/projects/${projectId}/flow-seal-backfill`);
@@ -26142,6 +26146,22 @@ Useful for "what's been happening to the wiki recently" \u2014 drives the Activi
     }
   }
 };
+var errorContextGetDef = {
+  name: "error_context_get",
+  description: `DF-316 \u2014 Error-Driven Wiki Lookup. When you hit an unexpected error / exception / failing test, call this FIRST (via the devflow-error-investigator skill) to pull every wiki signal that's relevant: matching runbooks (FTS), ADRs whose affects_paths cover the error file, recent flows in the same area, related patterns, similar past errors from done-flows, plus a briefing-Markdown.
+
+Iron Law of compounding wikis: never debug from scratch what the wiki has already seen. If no runbook matches AND the fix is non-trivial, write a runbook on the way out.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string" },
+      errorMessage: { type: "string", description: "Concise error / exception string" },
+      stackTrace: { type: "string", description: "Optional stack trace" },
+      filePath: { type: "string", description: "Optional file where the error occurred (matches ADR affects_paths)" },
+      recentCommits: { type: "array", items: { type: "string" }, description: "Optional recent commit hashes for context" }
+    }
+  }
+};
 var ideasGetDef = {
   name: "ideas_get",
   description: `DF-315 \u2014 Idea-Backlog: aggregates 5 organic idea sources from the wiki into one curated pipeline:
@@ -26203,6 +26223,21 @@ async function handleWikiGetLint(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return JSON.stringify(r.data, null, 2);
 }
+async function handleErrorContextGet(args) {
+  const projectId = resolveProjectId2(args);
+  if (!projectId) return "Error: projectId required (or link a project)";
+  const errorMessage = args.errorMessage;
+  const filePath = args.filePath;
+  if (!errorMessage && !filePath) return "Error: errorMessage or filePath required";
+  const r = await devFlowClient.fetchErrorContext(projectId, {
+    errorMessage,
+    stackTrace: args.stackTrace,
+    filePath,
+    recentCommits: args.recentCommits
+  });
+  if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
+  return JSON.stringify(r.data, null, 2);
+}
 async function handleIdeasGet(args) {
   const projectId = resolveProjectId2(args);
   if (!projectId) return "Error: projectId required (or link a project)";
@@ -26224,7 +26259,9 @@ var tools13 = {
   wiki_get_log: { definition: wikiGetLogDef, handler: withErrorHandling("wiki_get_log", handleWikiGetLog) },
   wiki_get_lint: { definition: wikiGetLintDef, handler: withErrorHandling("wiki_get_lint", handleWikiGetLint) },
   // DF-315 — Idea-Backlog
-  ideas_get: { definition: ideasGetDef, handler: withErrorHandling("ideas_get", handleIdeasGet) }
+  ideas_get: { definition: ideasGetDef, handler: withErrorHandling("ideas_get", handleIdeasGet) },
+  // DF-316 — Error-Driven Wiki Lookup
+  error_context_get: { definition: errorContextGetDef, handler: withErrorHandling("error_context_get", handleErrorContextGet) }
 };
 
 // src/tools/adrs.ts

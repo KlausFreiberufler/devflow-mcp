@@ -753,6 +753,14 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('GET', `/api/projects/${projectId}/ideas`);
   }
 
+  /** DF-316 — Error-Driven Wiki Lookup */
+  async fetchErrorContext(
+    projectId: string,
+    payload: { errorMessage?: string; stackTrace?: string; filePath?: string; recentCommits?: string[] }
+  ): Promise<ApiResponse<unknown>> {
+    return this.request('POST', `/api/projects/${projectId}/error-context`, payload);
+  }
+
   async flowSealBackfill(projectId: string): Promise<ApiResponse<unknown>> {
     return this.request('POST', `/api/projects/${projectId}/flow-seal-backfill`);
   }
