@@ -748,6 +748,11 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('GET', `/api/projects/${projectId}/wiki-lint?staleDays=${staleDays}`);
   }
 
+  /** DF-315 — Idea-Backlog (5 sources aggregated for Pick&Plan) */
+  async fetchIdeasBacklog(projectId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/ideas`);
+  }
+
   async flowSealBackfill(projectId: string): Promise<ApiResponse<unknown>> {
     return this.request('POST', `/api/projects/${projectId}/flow-seal-backfill`);
   }

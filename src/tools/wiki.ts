@@ -257,6 +257,25 @@ Useful for "what's been happening to the wiki recently" — drives the Activity-
   }
 };
 
+const ideasGetDef = {
+  name: 'ideas_get',
+  description: `DF-315 — Idea-Backlog: aggregates 5 organic idea sources from the wiki into one curated pipeline:
+
+- Open intents (forward-deferred topics from past flows)
+- Stale ADRs (>90d old, still cited — refresh candidates)
+- Orphan pages (no in/out wiki-links — reconnect candidates)
+- Contradictions (deprecated/superseded ADRs still cited — refactor candidates)
+- Hotspot topics (resolved 2+ times across flows — strategic-review candidates)
+
+Each item has a prefilledSummary + prefilledDescription ready to feed into flow_create. Use this to pick the next thing to work on without staring at a blank page — the wiki itself is the idea backlog.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      projectId: { type: 'string', description: 'Project id (defaults to linked project)' }
+    }
+  }
+};
+
 const wikiGetLintDef = {
   name: 'wiki_get_lint',
   description: `DF-312 — Health-report of the wiki: stale (release-stage entries older than N days that are still cited), orphan (entries with no in/out wiki-links), contradictions (deprecated/superseded ADRs that newer sources still cite).
@@ -305,6 +324,14 @@ async function handleWikiGetLint(args: Record<string, unknown>): Promise<string>
   return JSON.stringify(r.data, null, 2);
 }
 
+async function handleIdeasGet(args: Record<string, unknown>): Promise<string> {
+  const projectId = resolveProjectId(args);
+  if (!projectId) return 'Error: projectId required (or link a project)';
+  const r = await devFlowClient.fetchIdeasBacklog(projectId);
+  if (!r.success || !r.data) return `Error: ${r.error || 'failed'}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
 // ============ Tool Registry Export ============
 
 export const tools: ToolModule = {
@@ -319,5 +346,7 @@ export const tools: ToolModule = {
   wiki_get_briefing:        { definition: wikiGetBriefingDef,       handler: withErrorHandling('wiki_get_briefing', handleWikiGetBriefing) },
   wiki_get_index:           { definition: wikiGetIndexDef,          handler: withErrorHandling('wiki_get_index', handleWikiGetIndex) },
   wiki_get_log:             { definition: wikiGetLogDef,            handler: withErrorHandling('wiki_get_log', handleWikiGetLog) },
-  wiki_get_lint:            { definition: wikiGetLintDef,           handler: withErrorHandling('wiki_get_lint', handleWikiGetLint) }
+  wiki_get_lint:            { definition: wikiGetLintDef,           handler: withErrorHandling('wiki_get_lint', handleWikiGetLint) },
+  // DF-315 — Idea-Backlog
+  ideas_get:                { definition: ideasGetDef,              handler: withErrorHandling('ideas_get', handleIdeasGet) }
 };

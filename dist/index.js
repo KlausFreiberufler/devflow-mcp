@@ -21397,7 +21397,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.17.0";
+var MCP_VERSION = "4.18.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -21964,6 +21964,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
   /** DF-312 — health-report (stale / orphan / contradiction) */
   async fetchWikiLint(projectId, staleDays = 90) {
     return this.request("GET", `/api/projects/${projectId}/wiki-lint?staleDays=${staleDays}`);
+  }
+  /** DF-315 — Idea-Backlog (5 sources aggregated for Pick&Plan) */
+  async fetchIdeasBacklog(projectId) {
+    return this.request("GET", `/api/projects/${projectId}/ideas`);
   }
   async flowSealBackfill(projectId) {
     return this.request("POST", `/api/projects/${projectId}/flow-seal-backfill`);
@@ -26138,6 +26142,24 @@ Useful for "what's been happening to the wiki recently" \u2014 drives the Activi
     }
   }
 };
+var ideasGetDef = {
+  name: "ideas_get",
+  description: `DF-315 \u2014 Idea-Backlog: aggregates 5 organic idea sources from the wiki into one curated pipeline:
+
+- Open intents (forward-deferred topics from past flows)
+- Stale ADRs (>90d old, still cited \u2014 refresh candidates)
+- Orphan pages (no in/out wiki-links \u2014 reconnect candidates)
+- Contradictions (deprecated/superseded ADRs still cited \u2014 refactor candidates)
+- Hotspot topics (resolved 2+ times across flows \u2014 strategic-review candidates)
+
+Each item has a prefilledSummary + prefilledDescription ready to feed into flow_create. Use this to pick the next thing to work on without staring at a blank page \u2014 the wiki itself is the idea backlog.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string", description: "Project id (defaults to linked project)" }
+    }
+  }
+};
 var wikiGetLintDef = {
   name: "wiki_get_lint",
   description: `DF-312 \u2014 Health-report of the wiki: stale (release-stage entries older than N days that are still cited), orphan (entries with no in/out wiki-links), contradictions (deprecated/superseded ADRs that newer sources still cite).
@@ -26181,6 +26203,13 @@ async function handleWikiGetLint(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return JSON.stringify(r.data, null, 2);
 }
+async function handleIdeasGet(args) {
+  const projectId = resolveProjectId2(args);
+  if (!projectId) return "Error: projectId required (or link a project)";
+  const r = await devFlowClient.fetchIdeasBacklog(projectId);
+  if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
+  return JSON.stringify(r.data, null, 2);
+}
 var tools13 = {
   wiki_search: { definition: wikiSearchDef, handler: withErrorHandling("wiki_search", handleWikiSearch) },
   wiki_get_page: { definition: wikiGetPageDef, handler: withErrorHandling("wiki_get_page", handleWikiGetPage) },
@@ -26193,7 +26222,9 @@ var tools13 = {
   wiki_get_briefing: { definition: wikiGetBriefingDef, handler: withErrorHandling("wiki_get_briefing", handleWikiGetBriefing) },
   wiki_get_index: { definition: wikiGetIndexDef, handler: withErrorHandling("wiki_get_index", handleWikiGetIndex) },
   wiki_get_log: { definition: wikiGetLogDef, handler: withErrorHandling("wiki_get_log", handleWikiGetLog) },
-  wiki_get_lint: { definition: wikiGetLintDef, handler: withErrorHandling("wiki_get_lint", handleWikiGetLint) }
+  wiki_get_lint: { definition: wikiGetLintDef, handler: withErrorHandling("wiki_get_lint", handleWikiGetLint) },
+  // DF-315 — Idea-Backlog
+  ideas_get: { definition: ideasGetDef, handler: withErrorHandling("ideas_get", handleIdeasGet) }
 };
 
 // src/tools/adrs.ts
