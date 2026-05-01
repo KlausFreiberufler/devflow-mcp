@@ -186,6 +186,18 @@ IMPORTANT: Some state transitions require mandatory fields:
         type: 'string',
         enum: ['open', 'closed', 'merged'],
         description: 'GitHub PR state'
+      },
+      // DF-292 — agent_with_discipline self-approval. When the project has
+      // allow_agent_self_approval=ON and the active step requires discipline-
+      // tokens, pass selfApproved + the signed tokens to satisfy the gate.
+      selfApproved: {
+        type: 'boolean',
+        description: "DF-292 — set to true to claim this transition under 'agent_with_discipline' policy. Must be combined with disciplineTokens."
+      },
+      disciplineTokens: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'DF-292 — signed HMAC tokens (one per required skill) returned by devflow_token_emit. Backend verifies all required tokens before allowing the transition.'
       }
     },
     required: ['flowId']
@@ -434,6 +446,9 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
   const prUrl = args.prUrl as string | undefined;
   const prNumber = args.prNumber as number | undefined;
   const prState = args.prState as string | undefined;
+  // DF-292 — agent_with_discipline self-approval
+  const selfApproved = args.selfApproved as boolean | undefined;
+  const disciplineTokens = args.disciplineTokens as string[] | undefined;
 
   const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
@@ -543,6 +558,9 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
   if (prUrl) cleanUpdate.prUrl = prUrl;
   if (prNumber) cleanUpdate.prNumber = prNumber;
   if (prState) cleanUpdate.prState = prState;
+  // DF-292 — agent_with_discipline self-approval fields
+  if (selfApproved !== undefined) cleanUpdate.selfApproved = selfApproved;
+  if (disciplineTokens) cleanUpdate.disciplineTokens = disciplineTokens;
 
   const result = await devFlowClient.updateFlow(resolvedId, cleanUpdate);
 

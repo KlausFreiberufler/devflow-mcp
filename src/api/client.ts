@@ -726,6 +726,28 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('GET', `/api/flows/${flowId}/planning-context`);
   }
 
+  // ============ DF-310 + DF-312 — LLM-Wiki ============
+
+  /** DF-310 — per-flow Wiki briefing (drives the WikiBriefingPanel UI) */
+  async fetchWikiContext(flowId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/flows/${flowId}/wiki-context`);
+  }
+
+  /** DF-312 — global hierarchical TOC, grouped by lifecycle_stage */
+  async fetchWikiIndex(projectId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/wiki-index`);
+  }
+
+  /** DF-312 — chronological mutation feed (create/extend/supersede/deprecate) */
+  async fetchWikiLog(projectId: string, days = 30): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/wiki-log?days=${days}`);
+  }
+
+  /** DF-312 — health-report (stale / orphan / contradiction) */
+  async fetchWikiLint(projectId: string, staleDays = 90): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/wiki-lint?staleDays=${staleDays}`);
+  }
+
   async flowSealBackfill(projectId: string): Promise<ApiResponse<unknown>> {
     return this.request('POST', `/api/projects/${projectId}/flow-seal-backfill`);
   }
@@ -768,11 +790,16 @@ Or set: export DEVFLOW_TOKEN="your-token"
     flowId: string,
     payload: {
       topic: string;
-      resolutionType: 'adr' | 'pattern' | 'runbook' | 'intent_defer' | 'dismiss';
+      // DF-310 — `extend` appends a dated update section to an existing
+      // ADR/pattern/runbook instead of dismissing. Iron Law of the LLM-Wiki.
+      resolutionType: 'adr' | 'pattern' | 'runbook' | 'intent_defer' | 'dismiss' | 'extend';
       entityType?: string;
       entityId?: string;
       reason?: string;
       horizon?: string;
+      // DF-310 — for resolutionType='extend': appended content + rationale
+      body?: string;
+      rationale?: string;
     }
   ): Promise<ApiResponse<unknown>> {
     return this.request('POST', `/api/flows/${flowId}/knowledge-resolutions`, payload);

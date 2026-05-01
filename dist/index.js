@@ -21397,7 +21397,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.16.1";
+var MCP_VERSION = "4.17.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -21947,6 +21947,23 @@ Or set: export DEVFLOW_TOKEN="your-token"
   }
   async fetchPlanningContext(flowId) {
     return this.request("GET", `/api/flows/${flowId}/planning-context`);
+  }
+  // ============ DF-310 + DF-312 — LLM-Wiki ============
+  /** DF-310 — per-flow Wiki briefing (drives the WikiBriefingPanel UI) */
+  async fetchWikiContext(flowId) {
+    return this.request("GET", `/api/flows/${flowId}/wiki-context`);
+  }
+  /** DF-312 — global hierarchical TOC, grouped by lifecycle_stage */
+  async fetchWikiIndex(projectId) {
+    return this.request("GET", `/api/projects/${projectId}/wiki-index`);
+  }
+  /** DF-312 — chronological mutation feed (create/extend/supersede/deprecate) */
+  async fetchWikiLog(projectId, days = 30) {
+    return this.request("GET", `/api/projects/${projectId}/wiki-log?days=${days}`);
+  }
+  /** DF-312 — health-report (stale / orphan / contradiction) */
+  async fetchWikiLint(projectId, staleDays = 90) {
+    return this.request("GET", `/api/projects/${projectId}/wiki-lint?staleDays=${staleDays}`);
   }
   async flowSealBackfill(projectId) {
     return this.request("POST", `/api/projects/${projectId}/flow-seal-backfill`);
@@ -23740,6 +23757,18 @@ IMPORTANT: Some state transitions require mandatory fields:
         type: "string",
         enum: ["open", "closed", "merged"],
         description: "GitHub PR state"
+      },
+      // DF-292 — agent_with_discipline self-approval. When the project has
+      // allow_agent_self_approval=ON and the active step requires discipline-
+      // tokens, pass selfApproved + the signed tokens to satisfy the gate.
+      selfApproved: {
+        type: "boolean",
+        description: "DF-292 \u2014 set to true to claim this transition under 'agent_with_discipline' policy. Must be combined with disciplineTokens."
+      },
+      disciplineTokens: {
+        type: "array",
+        items: { type: "string" },
+        description: "DF-292 \u2014 signed HMAC tokens (one per required skill) returned by devflow_token_emit. Backend verifies all required tokens before allowing the transition."
       }
     },
     required: ["flowId"]
@@ -23938,6 +23967,8 @@ async function handleFlowUpdate(args) {
   const prUrl = args.prUrl;
   const prNumber = args.prNumber;
   const prState = args.prState;
+  const selfApproved = args.selfApproved;
+  const disciplineTokens = args.disciplineTokens;
   const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
     return `Error: Flow not found (tried exact and prefix match for "${flowId}")`;
@@ -24028,6 +24059,8 @@ Melde Commits mit flow_update({ commits: [{ hash: "...", message: "..." }] }) \u
   if (prUrl) cleanUpdate.prUrl = prUrl;
   if (prNumber) cleanUpdate.prNumber = prNumber;
   if (prState) cleanUpdate.prState = prState;
+  if (selfApproved !== void 0) cleanUpdate.selfApproved = selfApproved;
+  if (disciplineTokens) cleanUpdate.disciplineTokens = disciplineTokens;
   const result = await devFlowClient.updateFlow(resolvedId, cleanUpdate);
   if (implementationPlan && result.success) {
     try {
@@ -26067,6 +26100,87 @@ async function handleWikiGetProjectContext(args) {
     `**Total: ${g.nodes.length} assets, ${g.edges.length} links**`
   ].join("\n");
 }
+var wikiGetBriefingDef = {
+  name: "wiki_get_briefing",
+  description: `DF-310 \u2014 Per-flow LLM-Wiki briefing. Returns the curated set of related ADRs, related patterns/runbooks/intents, parallel work in scope, and open knowledge gaps for a specific flow. This is the same data the Knowledge-Tab in the UI renders via WikiBriefingPanel.
+
+Use this in planning + before review\u2192done to make sure the flow's plan + implementation respect the existing wiki and to find gaps that the agent should close (preferably via 'extend', see knowledge_check_resolve).`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      flowId: { type: "string", description: "Flow id to build the briefing for" }
+    },
+    required: ["flowId"]
+  }
+};
+var wikiGetIndexDef = {
+  name: "wiki_get_index",
+  description: `DF-312 \u2014 Hierarchical TOC of the project's wiki, grouped by lifecycle_stage (release / plan / idea / superseded / deprecated). Each entry has id, displayId, title, lifecycleStage, documentType, tags, updatedAt.
+
+Use this for "what does the wiki actually contain" \u2014 global counterpart to wiki_get_briefing (which is per-flow).`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string", description: "Project id (defaults to linked project)" }
+    }
+  }
+};
+var wikiGetLogDef = {
+  name: "wiki_get_log",
+  description: `DF-312 \u2014 Chronological mutation feed of the wiki: ADR/doc_page creates, extends, supersedes, deprecates within a time window. Default window: 30 days. Use 'days' to widen up to 365.
+
+Useful for "what's been happening to the wiki recently" \u2014 drives the Activity-Tab in the UI.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string" },
+      days: { type: "number", description: "Window in days (default 30, max 365)" }
+    }
+  }
+};
+var wikiGetLintDef = {
+  name: "wiki_get_lint",
+  description: `DF-312 \u2014 Health-report of the wiki: stale (release-stage entries older than N days that are still cited), orphan (entries with no in/out wiki-links), contradictions (deprecated/superseded ADRs that newer sources still cite).
+
+Use periodically (or before a major refactor) to keep the wiki clean. Resolve findings via the devflow-wiki-lint skill \u2014 never delete entries, always extend / cross-link / re-classify.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string" },
+      staleDays: { type: "number", description: "Days before a release entry counts as stale (default 90)" }
+    }
+  }
+};
+async function handleWikiGetBriefing(args) {
+  const flowId = args.flowId;
+  if (!flowId) return "Error: flowId required";
+  const r = await devFlowClient.fetchWikiContext(flowId);
+  if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
+  return JSON.stringify(r.data, null, 2);
+}
+async function handleWikiGetIndex(args) {
+  const projectId = resolveProjectId2(args);
+  if (!projectId) return "Error: projectId required (or link a project)";
+  const r = await devFlowClient.fetchWikiIndex(projectId);
+  if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
+  return JSON.stringify(r.data, null, 2);
+}
+async function handleWikiGetLog(args) {
+  const projectId = resolveProjectId2(args);
+  if (!projectId) return "Error: projectId required (or link a project)";
+  const days = args.days || 30;
+  const r = await devFlowClient.fetchWikiLog(projectId, days);
+  if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
+  return JSON.stringify(r.data, null, 2);
+}
+async function handleWikiGetLint(args) {
+  const projectId = resolveProjectId2(args);
+  if (!projectId) return "Error: projectId required (or link a project)";
+  const staleDays = args.staleDays || 90;
+  const r = await devFlowClient.fetchWikiLint(projectId, staleDays);
+  if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
+  return JSON.stringify(r.data, null, 2);
+}
 var tools13 = {
   wiki_search: { definition: wikiSearchDef, handler: withErrorHandling("wiki_search", handleWikiSearch) },
   wiki_get_page: { definition: wikiGetPageDef, handler: withErrorHandling("wiki_get_page", handleWikiGetPage) },
@@ -26074,7 +26188,12 @@ var tools13 = {
   wiki_backlinks: { definition: wikiBacklinksDef, handler: withErrorHandling("wiki_backlinks", handleWikiBacklinks) },
   wiki_graph_neighbors: { definition: wikiGraphNeighborsDef, handler: withErrorHandling("wiki_graph_neighbors", handleWikiGraphNeighbors) },
   wiki_get_flow_context: { definition: wikiGetFlowContextDef, handler: withErrorHandling("wiki_get_flow_context", handleWikiGetFlowContext) },
-  wiki_get_project_context: { definition: wikiGetProjectContextDef, handler: withErrorHandling("wiki_get_project_context", handleWikiGetProjectContext) }
+  wiki_get_project_context: { definition: wikiGetProjectContextDef, handler: withErrorHandling("wiki_get_project_context", handleWikiGetProjectContext) },
+  // DF-310 + DF-312 — LLM-Wiki Phase 1 + 2
+  wiki_get_briefing: { definition: wikiGetBriefingDef, handler: withErrorHandling("wiki_get_briefing", handleWikiGetBriefing) },
+  wiki_get_index: { definition: wikiGetIndexDef, handler: withErrorHandling("wiki_get_index", handleWikiGetIndex) },
+  wiki_get_log: { definition: wikiGetLogDef, handler: withErrorHandling("wiki_get_log", handleWikiGetLog) },
+  wiki_get_lint: { definition: wikiGetLintDef, handler: withErrorHandling("wiki_get_lint", handleWikiGetLint) }
 };
 
 // src/tools/adrs.ts
@@ -26611,12 +26730,13 @@ var knowledgeCheckResolveDef = {
   name: "knowledge_check_resolve",
   description: `Resolve a warning from knowledge_check_flow / knowledge_check_drift so it stops blocking the gate and disappears on the next check.
 
-Five resolution types:
+Six resolution types (Iron Law of the LLM-Wiki: prefer extend over dismiss \u2014 knowledge is never thrown away):
+- 'extend'        \u2014 append a dated update section to an existing ADR/pattern/runbook (DF-310). Pass entityType + entityId of the existing entry, plus body (the new content) and rationale (one sentence why). Backend appends '## Update YYYY-MM-DD \u2014 extended by <flow>' + body to the entry. Hook 1 also injects the wikilink into the plan.
 - 'adr'           \u2014 a new/existing ADR covers the topic (pass entityType='adr', entityId=<adrId>)
 - 'pattern'       \u2014 existing pattern doc covers it (entityType='doc_page', entityId=<pageId>)
 - 'runbook'       \u2014 existing runbook covers it
 - 'intent_defer'  \u2014 not doing it now, but deferring as a forward-intent. Seeds an intent doc-page automatically. Optional horizon: 'next-quarter'|'later'.
-- 'dismiss'       \u2014 warning is a false positive. Reason recommended.
+- 'dismiss'       \u2014 warning is a false positive. Reason recommended. The Iron Law forbids this in normal use \u2014 extend an existing entry with a one-line note instead so the next flow doesn't trip on the same false positive.
 
 flowId = the flow the warning is attached to. topic = the warning's topic string (e.g. 'billing', 'cache-invalidation').`,
   inputSchema: {
@@ -26626,13 +26746,15 @@ flowId = the flow the warning is attached to. topic = the warning's topic string
       topic: { type: "string", description: "Topic string from the warning" },
       resolutionType: {
         type: "string",
-        enum: ["adr", "pattern", "runbook", "intent_defer", "dismiss"],
+        enum: ["extend", "adr", "pattern", "runbook", "intent_defer", "dismiss"],
         description: "How this warning is being resolved"
       },
-      entityType: { type: "string", description: "Linked entity type ('adr' or 'doc_page')" },
+      entityType: { type: "string", description: "Linked entity type ('adr' or 'doc_page'); for 'extend' it must point at the existing entry to extend" },
       entityId: { type: "string", description: "Linked entity id" },
       reason: { type: "string", description: "Free-text note (recommended for dismiss)" },
-      horizon: { type: "string", description: "For intent_defer: 'next-quarter' | 'later'" }
+      horizon: { type: "string", description: "For intent_defer: 'next-quarter' | 'later'" },
+      body: { type: "string", description: "DF-310 \u2014 for resolutionType='extend': the markdown content to append to the existing entity (1-3 paragraphs)" },
+      rationale: { type: "string", description: "DF-310 \u2014 for resolutionType='extend': one short sentence why this update matters" }
     },
     required: ["flowId", "topic", "resolutionType"]
   }
@@ -26681,7 +26803,9 @@ async function handleKnowledgeCheckResolve(args) {
     entityType: args.entityType,
     entityId: args.entityId,
     reason: args.reason,
-    horizon: args.horizon
+    horizon: args.horizon,
+    body: args.body,
+    rationale: args.rationale
   });
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return `Resolution created: ${resolutionType} for topic "${topic}" on flow ${flowId}.`;

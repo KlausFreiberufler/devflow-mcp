@@ -80,12 +80,13 @@ const knowledgeCheckResolveDef = {
   name: 'knowledge_check_resolve',
   description: `Resolve a warning from knowledge_check_flow / knowledge_check_drift so it stops blocking the gate and disappears on the next check.
 
-Five resolution types:
+Six resolution types (Iron Law of the LLM-Wiki: prefer extend over dismiss — knowledge is never thrown away):
+- 'extend'        — append a dated update section to an existing ADR/pattern/runbook (DF-310). Pass entityType + entityId of the existing entry, plus body (the new content) and rationale (one sentence why). Backend appends '## Update YYYY-MM-DD — extended by <flow>' + body to the entry. Hook 1 also injects the wikilink into the plan.
 - 'adr'           — a new/existing ADR covers the topic (pass entityType='adr', entityId=<adrId>)
 - 'pattern'       — existing pattern doc covers it (entityType='doc_page', entityId=<pageId>)
 - 'runbook'       — existing runbook covers it
 - 'intent_defer'  — not doing it now, but deferring as a forward-intent. Seeds an intent doc-page automatically. Optional horizon: 'next-quarter'|'later'.
-- 'dismiss'       — warning is a false positive. Reason recommended.
+- 'dismiss'       — warning is a false positive. Reason recommended. The Iron Law forbids this in normal use — extend an existing entry with a one-line note instead so the next flow doesn't trip on the same false positive.
 
 flowId = the flow the warning is attached to. topic = the warning's topic string (e.g. 'billing', 'cache-invalidation').`,
   inputSchema: {
@@ -95,13 +96,15 @@ flowId = the flow the warning is attached to. topic = the warning's topic string
       topic: { type: 'string', description: 'Topic string from the warning' },
       resolutionType: {
         type: 'string',
-        enum: ['adr', 'pattern', 'runbook', 'intent_defer', 'dismiss'],
+        enum: ['extend', 'adr', 'pattern', 'runbook', 'intent_defer', 'dismiss'],
         description: 'How this warning is being resolved'
       },
-      entityType: { type: 'string', description: "Linked entity type ('adr' or 'doc_page')" },
+      entityType: { type: 'string', description: "Linked entity type ('adr' or 'doc_page'); for 'extend' it must point at the existing entry to extend" },
       entityId: { type: 'string', description: 'Linked entity id' },
       reason: { type: 'string', description: 'Free-text note (recommended for dismiss)' },
-      horizon: { type: 'string', description: "For intent_defer: 'next-quarter' | 'later'" }
+      horizon: { type: 'string', description: "For intent_defer: 'next-quarter' | 'later'" },
+      body: { type: 'string', description: "DF-310 — for resolutionType='extend': the markdown content to append to the existing entity (1-3 paragraphs)" },
+      rationale: { type: 'string', description: "DF-310 — for resolutionType='extend': one short sentence why this update matters" }
     },
     required: ['flowId', 'topic', 'resolutionType']
   }
@@ -146,7 +149,7 @@ async function handleAutotagSuggest(args: Record<string, unknown>): Promise<stri
 async function handleKnowledgeCheckResolve(args: Record<string, unknown>): Promise<string> {
   const flowId = args.flowId as string;
   const topic = args.topic as string;
-  const resolutionType = args.resolutionType as 'adr' | 'pattern' | 'runbook' | 'intent_defer' | 'dismiss';
+  const resolutionType = args.resolutionType as 'adr' | 'pattern' | 'runbook' | 'intent_defer' | 'dismiss' | 'extend';
   if (!flowId || !topic || !resolutionType) {
     return 'Error: flowId, topic, and resolutionType are required';
   }
@@ -156,7 +159,9 @@ async function handleKnowledgeCheckResolve(args: Record<string, unknown>): Promi
     entityType: args.entityType as string | undefined,
     entityId: args.entityId as string | undefined,
     reason: args.reason as string | undefined,
-    horizon: args.horizon as string | undefined
+    horizon: args.horizon as string | undefined,
+    body: args.body as string | undefined,
+    rationale: args.rationale as string | undefined
   });
   if (!r.success || !r.data) return `Error: ${r.error || 'failed'}`;
   return `Resolution created: ${resolutionType} for topic "${topic}" on flow ${flowId}.`;

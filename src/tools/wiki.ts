@@ -214,6 +214,97 @@ async function handleWikiGetProjectContext(args: Record<string, unknown>): Promi
   ].join('\n');
 }
 
+// ============ DF-310 + DF-312 — LLM-Wiki Phase 1 + 2 ============
+
+const wikiGetBriefingDef = {
+  name: 'wiki_get_briefing',
+  description: `DF-310 — Per-flow LLM-Wiki briefing. Returns the curated set of related ADRs, related patterns/runbooks/intents, parallel work in scope, and open knowledge gaps for a specific flow. This is the same data the Knowledge-Tab in the UI renders via WikiBriefingPanel.
+
+Use this in planning + before review→done to make sure the flow's plan + implementation respect the existing wiki and to find gaps that the agent should close (preferably via 'extend', see knowledge_check_resolve).`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      flowId: { type: 'string', description: 'Flow id to build the briefing for' }
+    },
+    required: ['flowId']
+  }
+};
+
+const wikiGetIndexDef = {
+  name: 'wiki_get_index',
+  description: `DF-312 — Hierarchical TOC of the project's wiki, grouped by lifecycle_stage (release / plan / idea / superseded / deprecated). Each entry has id, displayId, title, lifecycleStage, documentType, tags, updatedAt.
+
+Use this for "what does the wiki actually contain" — global counterpart to wiki_get_briefing (which is per-flow).`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      projectId: { type: 'string', description: 'Project id (defaults to linked project)' }
+    }
+  }
+};
+
+const wikiGetLogDef = {
+  name: 'wiki_get_log',
+  description: `DF-312 — Chronological mutation feed of the wiki: ADR/doc_page creates, extends, supersedes, deprecates within a time window. Default window: 30 days. Use 'days' to widen up to 365.
+
+Useful for "what's been happening to the wiki recently" — drives the Activity-Tab in the UI.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      projectId: { type: 'string' },
+      days: { type: 'number', description: 'Window in days (default 30, max 365)' }
+    }
+  }
+};
+
+const wikiGetLintDef = {
+  name: 'wiki_get_lint',
+  description: `DF-312 — Health-report of the wiki: stale (release-stage entries older than N days that are still cited), orphan (entries with no in/out wiki-links), contradictions (deprecated/superseded ADRs that newer sources still cite).
+
+Use periodically (or before a major refactor) to keep the wiki clean. Resolve findings via the devflow-wiki-lint skill — never delete entries, always extend / cross-link / re-classify.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      projectId: { type: 'string' },
+      staleDays: { type: 'number', description: 'Days before a release entry counts as stale (default 90)' }
+    }
+  }
+};
+
+async function handleWikiGetBriefing(args: Record<string, unknown>): Promise<string> {
+  const flowId = args.flowId as string;
+  if (!flowId) return 'Error: flowId required';
+  const r = await devFlowClient.fetchWikiContext(flowId);
+  if (!r.success || !r.data) return `Error: ${r.error || 'failed'}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
+async function handleWikiGetIndex(args: Record<string, unknown>): Promise<string> {
+  const projectId = resolveProjectId(args);
+  if (!projectId) return 'Error: projectId required (or link a project)';
+  const r = await devFlowClient.fetchWikiIndex(projectId);
+  if (!r.success || !r.data) return `Error: ${r.error || 'failed'}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
+async function handleWikiGetLog(args: Record<string, unknown>): Promise<string> {
+  const projectId = resolveProjectId(args);
+  if (!projectId) return 'Error: projectId required (or link a project)';
+  const days = (args.days as number) || 30;
+  const r = await devFlowClient.fetchWikiLog(projectId, days);
+  if (!r.success || !r.data) return `Error: ${r.error || 'failed'}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
+async function handleWikiGetLint(args: Record<string, unknown>): Promise<string> {
+  const projectId = resolveProjectId(args);
+  if (!projectId) return 'Error: projectId required (or link a project)';
+  const staleDays = (args.staleDays as number) || 90;
+  const r = await devFlowClient.fetchWikiLint(projectId, staleDays);
+  if (!r.success || !r.data) return `Error: ${r.error || 'failed'}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
 // ============ Tool Registry Export ============
 
 export const tools: ToolModule = {
@@ -223,5 +314,10 @@ export const tools: ToolModule = {
   wiki_backlinks:           { definition: wikiBacklinksDef,         handler: withErrorHandling('wiki_backlinks', handleWikiBacklinks) },
   wiki_graph_neighbors:     { definition: wikiGraphNeighborsDef,    handler: withErrorHandling('wiki_graph_neighbors', handleWikiGraphNeighbors) },
   wiki_get_flow_context:    { definition: wikiGetFlowContextDef,    handler: withErrorHandling('wiki_get_flow_context', handleWikiGetFlowContext) },
-  wiki_get_project_context: { definition: wikiGetProjectContextDef, handler: withErrorHandling('wiki_get_project_context', handleWikiGetProjectContext) }
+  wiki_get_project_context: { definition: wikiGetProjectContextDef, handler: withErrorHandling('wiki_get_project_context', handleWikiGetProjectContext) },
+  // DF-310 + DF-312 — LLM-Wiki Phase 1 + 2
+  wiki_get_briefing:        { definition: wikiGetBriefingDef,       handler: withErrorHandling('wiki_get_briefing', handleWikiGetBriefing) },
+  wiki_get_index:           { definition: wikiGetIndexDef,          handler: withErrorHandling('wiki_get_index', handleWikiGetIndex) },
+  wiki_get_log:             { definition: wikiGetLogDef,            handler: withErrorHandling('wiki_get_log', handleWikiGetLog) },
+  wiki_get_lint:            { definition: wikiGetLintDef,           handler: withErrorHandling('wiki_get_lint', handleWikiGetLint) }
 };

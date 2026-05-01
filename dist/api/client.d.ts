@@ -167,6 +167,14 @@ export declare class DevFlowClient {
     prepareKnowledgeHarvest(flowId: string): Promise<ApiResponse<unknown>>;
     prepareKnowledgeCheck(flowId: string): Promise<ApiResponse<unknown>>;
     fetchPlanningContext(flowId: string): Promise<ApiResponse<unknown>>;
+    /** DF-310 — per-flow Wiki briefing (drives the WikiBriefingPanel UI) */
+    fetchWikiContext(flowId: string): Promise<ApiResponse<unknown>>;
+    /** DF-312 — global hierarchical TOC, grouped by lifecycle_stage */
+    fetchWikiIndex(projectId: string): Promise<ApiResponse<unknown>>;
+    /** DF-312 — chronological mutation feed (create/extend/supersede/deprecate) */
+    fetchWikiLog(projectId: string, days?: number): Promise<ApiResponse<unknown>>;
+    /** DF-312 — health-report (stale / orphan / contradiction) */
+    fetchWikiLint(projectId: string, staleDays?: number): Promise<ApiResponse<unknown>>;
     flowSealBackfill(projectId: string): Promise<ApiResponse<unknown>>;
     updateAdrAffectsPaths(adrId: string, paths: string[]): Promise<ApiResponse<unknown>>;
     fetchPendingWork(projectId: string, opts?: {
@@ -181,11 +189,13 @@ export declare class DevFlowClient {
     }): Promise<ApiResponse<unknown>>;
     createKnowledgeResolution(flowId: string, payload: {
         topic: string;
-        resolutionType: 'adr' | 'pattern' | 'runbook' | 'intent_defer' | 'dismiss';
+        resolutionType: 'adr' | 'pattern' | 'runbook' | 'intent_defer' | 'dismiss' | 'extend';
         entityType?: string;
         entityId?: string;
         reason?: string;
         horizon?: string;
+        body?: string;
+        rationale?: string;
     }): Promise<ApiResponse<unknown>>;
     emitDisciplineToken(flowId: string, payload: {
         skillName: string;
