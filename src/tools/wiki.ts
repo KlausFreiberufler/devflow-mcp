@@ -257,6 +257,19 @@ Useful for "what's been happening to the wiki recently" — drives the Activity-
   }
 };
 
+const ideaPromptsGetDef = {
+  name: 'idea_prompts_get',
+  description: `DF-318 — Idea-Prompt-Garage. Returns curated **prompts per area** (Auth, Billing, Performance, …) with wiki-evidence already loaded. The user pastes one of these prompts into a chat with you, and you respond using the devflow-area-ideation skill.
+
+Each area has: name, icon, counts (ADRs/patterns/runbooks in scope), and a ready-to-paste prompt. Use this to find well-grounded next-step ideas for a project domain instead of brainstorming from scratch.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      projectId: { type: 'string', description: 'Project id (defaults to linked project)' }
+    }
+  }
+};
+
 const errorContextGetDef = {
   name: 'error_context_get',
   description: `DF-316 — Error-Driven Wiki Lookup. When you hit an unexpected error / exception / failing test, call this FIRST (via the devflow-error-investigator skill) to pull every wiki signal that's relevant: matching runbooks (FTS), ADRs whose affects_paths cover the error file, recent flows in the same area, related patterns, similar past errors from done-flows, plus a briefing-Markdown.
@@ -341,6 +354,14 @@ async function handleWikiGetLint(args: Record<string, unknown>): Promise<string>
   return JSON.stringify(r.data, null, 2);
 }
 
+async function handleIdeaPromptsGet(args: Record<string, unknown>): Promise<string> {
+  const projectId = resolveProjectId(args);
+  if (!projectId) return 'Error: projectId required (or link a project)';
+  const r = await devFlowClient.fetchIdeaPrompts(projectId);
+  if (!r.success || !r.data) return `Error: ${r.error || 'failed'}`;
+  return JSON.stringify(r.data, null, 2);
+}
+
 async function handleErrorContextGet(args: Record<string, unknown>): Promise<string> {
   const projectId = resolveProjectId(args);
   if (!projectId) return 'Error: projectId required (or link a project)';
@@ -383,5 +404,7 @@ export const tools: ToolModule = {
   // DF-315 — Idea-Backlog
   ideas_get:                { definition: ideasGetDef,              handler: withErrorHandling('ideas_get', handleIdeasGet) },
   // DF-316 — Error-Driven Wiki Lookup
-  error_context_get:        { definition: errorContextGetDef,       handler: withErrorHandling('error_context_get', handleErrorContextGet) }
+  error_context_get:        { definition: errorContextGetDef,       handler: withErrorHandling('error_context_get', handleErrorContextGet) },
+  // DF-318 — Idea-Prompt-Garage
+  idea_prompts_get:         { definition: ideaPromptsGetDef,        handler: withErrorHandling('idea_prompts_get', handleIdeaPromptsGet) }
 };

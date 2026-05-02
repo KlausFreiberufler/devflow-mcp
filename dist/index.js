@@ -21397,7 +21397,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.19.0";
+var MCP_VERSION = "4.20.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -21968,6 +21968,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
   /** DF-315 — Idea-Backlog (5 sources aggregated for Pick&Plan) */
   async fetchIdeasBacklog(projectId) {
     return this.request("GET", `/api/projects/${projectId}/ideas`);
+  }
+  /** DF-318 — Idea-Prompt-Garage (domain-aware prompts mit Wiki-Evidence) */
+  async fetchIdeaPrompts(projectId) {
+    return this.request("GET", `/api/projects/${projectId}/idea-prompts`);
   }
   /** DF-316 — Error-Driven Wiki Lookup */
   async fetchErrorContext(projectId, payload) {
@@ -26146,6 +26150,18 @@ Useful for "what's been happening to the wiki recently" \u2014 drives the Activi
     }
   }
 };
+var ideaPromptsGetDef = {
+  name: "idea_prompts_get",
+  description: `DF-318 \u2014 Idea-Prompt-Garage. Returns curated **prompts per area** (Auth, Billing, Performance, \u2026) with wiki-evidence already loaded. The user pastes one of these prompts into a chat with you, and you respond using the devflow-area-ideation skill.
+
+Each area has: name, icon, counts (ADRs/patterns/runbooks in scope), and a ready-to-paste prompt. Use this to find well-grounded next-step ideas for a project domain instead of brainstorming from scratch.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string", description: "Project id (defaults to linked project)" }
+    }
+  }
+};
 var errorContextGetDef = {
   name: "error_context_get",
   description: `DF-316 \u2014 Error-Driven Wiki Lookup. When you hit an unexpected error / exception / failing test, call this FIRST (via the devflow-error-investigator skill) to pull every wiki signal that's relevant: matching runbooks (FTS), ADRs whose affects_paths cover the error file, recent flows in the same area, related patterns, similar past errors from done-flows, plus a briefing-Markdown.
@@ -26223,6 +26239,13 @@ async function handleWikiGetLint(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return JSON.stringify(r.data, null, 2);
 }
+async function handleIdeaPromptsGet(args) {
+  const projectId = resolveProjectId2(args);
+  if (!projectId) return "Error: projectId required (or link a project)";
+  const r = await devFlowClient.fetchIdeaPrompts(projectId);
+  if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
+  return JSON.stringify(r.data, null, 2);
+}
 async function handleErrorContextGet(args) {
   const projectId = resolveProjectId2(args);
   if (!projectId) return "Error: projectId required (or link a project)";
@@ -26261,7 +26284,9 @@ var tools13 = {
   // DF-315 — Idea-Backlog
   ideas_get: { definition: ideasGetDef, handler: withErrorHandling("ideas_get", handleIdeasGet) },
   // DF-316 — Error-Driven Wiki Lookup
-  error_context_get: { definition: errorContextGetDef, handler: withErrorHandling("error_context_get", handleErrorContextGet) }
+  error_context_get: { definition: errorContextGetDef, handler: withErrorHandling("error_context_get", handleErrorContextGet) },
+  // DF-318 — Idea-Prompt-Garage
+  idea_prompts_get: { definition: ideaPromptsGetDef, handler: withErrorHandling("idea_prompts_get", handleIdeaPromptsGet) }
 };
 
 // src/tools/adrs.ts

@@ -177,6 +177,8 @@ export declare class DevFlowClient {
     fetchWikiLint(projectId: string, staleDays?: number): Promise<ApiResponse<unknown>>;
     /** DF-315 — Idea-Backlog (5 sources aggregated for Pick&Plan) */
     fetchIdeasBacklog(projectId: string): Promise<ApiResponse<unknown>>;
+    /** DF-318 — Idea-Prompt-Garage (domain-aware prompts mit Wiki-Evidence) */
+    fetchIdeaPrompts(projectId: string): Promise<ApiResponse<unknown>>;
     /** DF-316 — Error-Driven Wiki Lookup */
     fetchErrorContext(projectId: string, payload: {
         errorMessage?: string;

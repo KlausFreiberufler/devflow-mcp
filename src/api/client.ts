@@ -753,6 +753,11 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('GET', `/api/projects/${projectId}/ideas`);
   }
 
+  /** DF-318 — Idea-Prompt-Garage (domain-aware prompts mit Wiki-Evidence) */
+  async fetchIdeaPrompts(projectId: string): Promise<ApiResponse<unknown>> {
+    return this.request('GET', `/api/projects/${projectId}/idea-prompts`);
+  }
+
   /** DF-316 — Error-Driven Wiki Lookup */
   async fetchErrorContext(
     projectId: string,
