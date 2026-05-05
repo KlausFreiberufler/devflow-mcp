@@ -78,17 +78,19 @@ Pass existingTags so already-applied tags are excluded from suggestions.`,
 
 const knowledgeCheckResolveDef = {
   name: 'knowledge_check_resolve',
-  description: `Resolve a warning from knowledge_check_flow / knowledge_check_drift so it stops blocking the gate and disappears on the next check.
+  description: `Resolve a single knowledge-check warning manually. In most cases you do NOT need this tool anymore — the pre-tool-use hook on flow_update auto-calls POST /api/projects/:id/knowledge/auto-resolve which applies the Iron Law in bulk (extend > create > intent_defer; never dismiss). Use this manual tool only for surgical overrides.
 
-Six resolution types (Iron Law of the LLM-Wiki: prefer extend over dismiss — knowledge is never thrown away):
-- 'extend'        — append a dated update section to an existing ADR/pattern/runbook (DF-310). Pass entityType + entityId of the existing entry, plus body (the new content) and rationale (one sentence why). Backend appends '## Update YYYY-MM-DD — extended by <flow>' + body to the entry. Hook 1 also injects the wikilink into the plan.
-- 'adr'           — a new/existing ADR covers the topic (pass entityType='adr', entityId=<adrId>)
-- 'pattern'       — existing pattern doc covers it (entityType='doc_page', entityId=<pageId>)
-- 'runbook'       — existing runbook covers it
-- 'intent_defer'  — not doing it now, but deferring as a forward-intent. Seeds an intent doc-page automatically. Optional horizon: 'next-quarter'|'later'.
-- 'dismiss'       — warning is a false positive. Reason recommended. The Iron Law forbids this in normal use — extend an existing entry with a one-line note instead so the next flow doesn't trip on the same false positive.
+Iron Law of the LLM-Wiki: extend > create > intent_defer > NEVER dismiss. The backend now ENFORCES this — calling resolutionType='dismiss' when an extend-target exists returns 400 'iron_law_dismiss_blocked' with the recommended slug.
 
-flowId = the flow the warning is attached to. topic = the warning's topic string (e.g. 'billing', 'cache-invalidation').`,
+Resolution types:
+- 'extend'        — PREFERRED. Append a dated update section to an existing ADR/pattern/runbook. Pass entityType + entityId + body + rationale. Backend appends '## Update YYYY-MM-DD — extended by <flow>'.
+- 'adr'           — link to a NEW/existing ADR (entityType='adr', entityId=<adrId>).
+- 'pattern'       — existing pattern doc covers it (entityType='doc_page', entityId=<pageId>).
+- 'runbook'       — existing runbook covers it.
+- 'intent_defer'  — defer to a later flow. Seeds an intent doc-page; horizon: 'next-quarter'|'later'.
+- 'dismiss'       — LAST RESORT. Backend rejects this whenever an extend-target exists; reserved for genuinely off-topic mentions.
+
+flowId = the flow the warning is attached to. topic = the warning's topic string (e.g. 'billing').`,
   inputSchema: {
     type: 'object' as const,
     properties: {

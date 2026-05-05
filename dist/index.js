@@ -21397,7 +21397,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.20.0";
+var MCP_VERSION = "4.21.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -26821,17 +26821,19 @@ Pass existingTags so already-applied tags are excluded from suggestions.`,
 };
 var knowledgeCheckResolveDef = {
   name: "knowledge_check_resolve",
-  description: `Resolve a warning from knowledge_check_flow / knowledge_check_drift so it stops blocking the gate and disappears on the next check.
+  description: `Resolve a single knowledge-check warning manually. In most cases you do NOT need this tool anymore \u2014 the pre-tool-use hook on flow_update auto-calls POST /api/projects/:id/knowledge/auto-resolve which applies the Iron Law in bulk (extend > create > intent_defer; never dismiss). Use this manual tool only for surgical overrides.
 
-Six resolution types (Iron Law of the LLM-Wiki: prefer extend over dismiss \u2014 knowledge is never thrown away):
-- 'extend'        \u2014 append a dated update section to an existing ADR/pattern/runbook (DF-310). Pass entityType + entityId of the existing entry, plus body (the new content) and rationale (one sentence why). Backend appends '## Update YYYY-MM-DD \u2014 extended by <flow>' + body to the entry. Hook 1 also injects the wikilink into the plan.
-- 'adr'           \u2014 a new/existing ADR covers the topic (pass entityType='adr', entityId=<adrId>)
-- 'pattern'       \u2014 existing pattern doc covers it (entityType='doc_page', entityId=<pageId>)
-- 'runbook'       \u2014 existing runbook covers it
-- 'intent_defer'  \u2014 not doing it now, but deferring as a forward-intent. Seeds an intent doc-page automatically. Optional horizon: 'next-quarter'|'later'.
-- 'dismiss'       \u2014 warning is a false positive. Reason recommended. The Iron Law forbids this in normal use \u2014 extend an existing entry with a one-line note instead so the next flow doesn't trip on the same false positive.
+Iron Law of the LLM-Wiki: extend > create > intent_defer > NEVER dismiss. The backend now ENFORCES this \u2014 calling resolutionType='dismiss' when an extend-target exists returns 400 'iron_law_dismiss_blocked' with the recommended slug.
 
-flowId = the flow the warning is attached to. topic = the warning's topic string (e.g. 'billing', 'cache-invalidation').`,
+Resolution types:
+- 'extend'        \u2014 PREFERRED. Append a dated update section to an existing ADR/pattern/runbook. Pass entityType + entityId + body + rationale. Backend appends '## Update YYYY-MM-DD \u2014 extended by <flow>'.
+- 'adr'           \u2014 link to a NEW/existing ADR (entityType='adr', entityId=<adrId>).
+- 'pattern'       \u2014 existing pattern doc covers it (entityType='doc_page', entityId=<pageId>).
+- 'runbook'       \u2014 existing runbook covers it.
+- 'intent_defer'  \u2014 defer to a later flow. Seeds an intent doc-page; horizon: 'next-quarter'|'later'.
+- 'dismiss'       \u2014 LAST RESORT. Backend rejects this whenever an extend-target exists; reserved for genuinely off-topic mentions.
+
+flowId = the flow the warning is attached to. topic = the warning's topic string (e.g. 'billing').`,
   inputSchema: {
     type: "object",
     properties: {
