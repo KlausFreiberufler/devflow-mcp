@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+/**
+ * DF-320 — Pre-tool-use hook for mcp__devflow__flow_update.
+ *
+ * When the agent submits a flow_update transition to `approval` or
+ * `done` (review→done), call the backend's bulk auto-resolve endpoint
+ * BEFORE the actual flow_update fires. This way the agent never sees
+ * the knowledge-gate failure — gaps are extended (or drafts created)
+ * automatically per the Iron Law.
+ *
+ * Pattern: [[mcp-pre-tool-use-hook-for-state-transition-gates]]
+ *
+ * Behavior:
+ *   - Reads the tool input from stdin (payload.input).
+ *   - Only acts when input.currentState ∈ {'approval','done'}.
+ *   - Resolves the active flowId (input.flowId or from .devflow-active).
+ *   - Resolves the linked projectId from .devflow-active.
+ *   - POST /api/projects/:id/knowledge/auto-resolve { flowId }.
+ *   - Prints a 1-line summary so the user sees what happened.
+ *   - Never blocks: errors are logged silently and pass through.
+ *
+ * Token-merging into the next flow_update is handled by the agent: the
+ * response surfaces `disciplineToken` which is also persisted in the DB
+ * so flow_update reads it server-side.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+let input = '';
+process.stdin.on('data', (chunk) => { input += chunk; });
+process.stdin.on('end', async () => {
+  try {
+    const payload = JSON.parse(input || '{}');
+    if (payload.tool !== 'mcp__devflow__flow_update') return;
+    const args = payload.tool_input || payload.input || {};
+    const targetState = args.currentState;
+    if (targetState !== 'approval' && targetState !== 'done') return;
+
+    const session = readDevFlowActive();
+    const flowId = args.flowId || session?.flowId;
+    const projectId = session?.projectId;
+    const apiBase = session?.apiBase || process.env.DEVFLOW_API_BASE || 'https://api.app.dev-flow.tech';
+    const token = session?.token || process.env.DEVFLOW_API_TOKEN;
+    if (!flowId || !projectId || !token) return;
+
+    const url = `${apiBase}/api/projects/${encodeURIComponent(projectId)}/knowledge/auto-resolve`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ flowId }),
+    });
+    if (!res.ok) {
+      // 404 → backend doesn't have the endpoint yet (older version) → no-op
+      // anything else → silent fall-through, agent's flow_update will still
+      // fire and surface the gate as before.
+      return;
+    }
+    const json = await res.json().catch(() => null);
+    if (!json?.success) return;
+
+    const { resolved = [], pendingDrafts = [], summary = {} } = json.data || {};
+    const counts = [];
+    if (summary.extend) counts.push(`${summary.extend} extend`);
+    if (summary.create_draft) counts.push(`${summary.create_draft} draft`);
+    if (summary.intent_defer) counts.push(`${summary.intent_defer} defer`);
+    if (counts.length === 0) return;
+
+    process.stdout.write(`✨ Wiki auto-resolved: ${counts.join(', ')}\n`);
+  } catch {
+    // Never block flow_update on hook errors
+  }
+});
+
+function readDevFlowActive() {
+  try {
+    const candidates = [
+      path.join(process.cwd(), '.devflow-active'),
+      path.join(os.homedir(), '.devflow-active'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        const raw = fs.readFileSync(p, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}

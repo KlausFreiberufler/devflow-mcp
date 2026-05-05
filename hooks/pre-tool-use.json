@@ -12,6 +12,15 @@
           "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check-architecture-coverage.sh"
         }
       ]
+    },
+    {
+      "matcher": "mcp__devflow__flow_update",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/pre-flow-update-knowledge-auto-resolve.js"
+        }
+      ]
     }
   ]
 }
