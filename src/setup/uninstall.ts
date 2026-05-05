@@ -16,7 +16,11 @@ import { CURSORRULES_MARKER_START, CURSORRULES_MARKER_END } from '../templates/c
 import { AGENTS_MARKER_START, AGENTS_MARKER_END } from '../templates/agents-md.js';
 import { GEMINI_MARKER_START, GEMINI_MARKER_END } from '../templates/gemini-md.js';
 import { WINDSURFRULES_MARKER_START, WINDSURFRULES_MARKER_END } from '../templates/windsurfrules.js';
-import { MARKER_START, MARKER_END } from '../templates/claude-md.js';
+
+// DF-326: legacy CLAUDE.md markers — kept inline for cleanup of pre-DF-326
+// installations. New installs no longer write these.
+const MARKER_START = '<!-- DEVFLOW-RULES-START -->';
+const MARKER_END = '<!-- DEVFLOW-RULES-END -->';
 
 const SUPPORTED_CLIENTS = ['claude', 'cursor', 'codex', 'gemini', 'windsurf', 'droid'] as const;
 type ClientType = typeof SUPPORTED_CLIENTS[number];

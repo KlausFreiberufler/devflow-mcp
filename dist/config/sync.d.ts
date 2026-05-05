@@ -16,6 +16,9 @@ export declare function getConfig(): RemoteConfig;
  * Called once at server startup from index.ts.
  *
  * Precedence: Backend > Cache > Defaults
- * Also auto-updates CLAUDE.md if config changed.
+ *
+ * DF-326: No longer touches CLAUDE.md — the Claude Code plugin (skills + hooks +
+ * MCP tool responses) covers all rules. Project guidelines are reachable via
+ * the project_guidelines_get MCP tool.
  */
 export declare function syncConfig(): Promise<void>;

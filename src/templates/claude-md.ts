@@ -1,8 +1,11 @@
 /**
  * CLAUDE.md Template Generator
  *
- * Generates project-specific CLAUDE.md content with DevFlow rules.
- * The template includes all flow states, mandatory processes, and guardrails.
+ * DF-326: This template is no longer used for the Claude Code client (the plugin
+ * covers rules via skills + hooks). It remains the canonical source for the other
+ * AI clients (Cursor, Codex/AGENTS.md, Gemini, Windsurf) until DF-327 introduces
+ * dedicated plugin bundles per client.
+ *
  * Strictness levels control the rule text that gets generated.
  */
 
@@ -74,7 +77,7 @@ function formatLevel(level: number): string {
 }
 
 /**
- * Generate strictness rules block for CLAUDE.md
+ * Generate strictness rules block.
  */
 function generateStrictnessRules(s: StrictnessConfig): string {
   const rules: string[] = ['## Regeln (Strictness-Level)', ''];
@@ -91,7 +94,7 @@ function generateStrictnessRules(s: StrictnessConfig): string {
   for (const section of sections) {
     const level = s[section.key];
     const ruleText = section.rules[level] || section.rules[3];
-    if (!ruleText) continue; // Skip empty rules (e.g., flowRequired level 1)
+    if (!ruleText) continue;
     rules.push(`### ${section.title}: ${formatLevel(level)}`);
     rules.push(ruleText);
     rules.push('');
@@ -101,7 +104,10 @@ function generateStrictnessRules(s: StrictnessConfig): string {
 }
 
 /**
- * Generate CLAUDE.md content with project-specific information
+ * Generate template content with project-specific information.
+ *
+ * Used by cursor/codex/gemini/windsurf templates to render the same content
+ * into their own rules files. NOT used for Claude Code (DF-326: plugin covers rules).
  */
 export function generateClaudeMdContent(
   projectName: string,
@@ -151,22 +157,5 @@ Review-States (approval, review) sind Wartezustaende.
 Der User muss in der DevFlow-UI genehmigen bevor es weitergeht.
 
 ${generateStrictnessRules(s)}${MARKER_END}
-`;
-}
-
-/**
- * Generate a guidelines block wrapped in markers.
- * Returns empty string if guidelines are empty/null.
- */
-export function generateGuidelinesBlock(guidelines: string): string {
-  if (!guidelines || !guidelines.trim()) {
-    return '';
-  }
-
-  return `${GUIDELINES_MARKER_START}
-## Projekt-Richtlinien
-
-${guidelines.trim()}
-${GUIDELINES_MARKER_END}
 `;
 }

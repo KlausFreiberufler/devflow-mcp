@@ -12,8 +12,6 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { devFlowClient } from '../api/client.js';
 import { type RemoteConfig, type StrictnessConfig, DEFAULT_CONFIG, DEFAULT_STRICTNESS, deriveEnforcementFromStrictness } from './types.js';
-import { setupClaudeMd, syncProjectGuidelines } from '../setup/claude-md-generator.js';
-import { getWorkingDir } from '../utils/working-dir.js';
 
 const CACHE_PATH = join(homedir(), '.devflow', 'config.cache.json');
 
@@ -94,11 +92,12 @@ function parseRemoteConfig(raw: Record<string, unknown>): RemoteConfig {
  * Called once at server startup from index.ts.
  *
  * Precedence: Backend > Cache > Defaults
- * Also auto-updates CLAUDE.md if config changed.
+ *
+ * DF-326: No longer touches CLAUDE.md — the Claude Code plugin (skills + hooks +
+ * MCP tool responses) covers all rules. Project guidelines are reachable via
+ * the project_guidelines_get MCP tool.
  */
 export async function syncConfig(): Promise<void> {
-  const previousVersion = activeConfig.version;
-
   // Try backend first
   try {
     const result = await devFlowClient.getProjectConfig();
@@ -106,14 +105,6 @@ export async function syncConfig(): Promise<void> {
       activeConfig = parseRemoteConfig(result.data);
       await saveCache(activeConfig);
       console.error(`Config synced from backend (version: ${activeConfig.version})`);
-
-      // Auto-update CLAUDE.md if config changed
-      if (activeConfig.version !== previousVersion) {
-        await updateClaudeMd();
-      }
-
-      // Sync project guidelines into CLAUDE.md
-      await syncGuidelinesFromBackend();
       return;
     }
   } catch {
@@ -131,35 +122,4 @@ export async function syncConfig(): Promise<void> {
   // Use defaults
   activeConfig = DEFAULT_CONFIG;
   console.error('Config: using hardcoded defaults');
-}
-
-/**
- * Sync project guidelines from backend into CLAUDE.md.
- */
-async function syncGuidelinesFromBackend(): Promise<void> {
-  try {
-    const result = await devFlowClient.getProjectGuidelines();
-    if (result.success && result.data && result.data.guidelines) {
-      await syncProjectGuidelines(getWorkingDir(), result.data.guidelines);
-      console.error('CLAUDE.md guidelines synced from backend');
-    }
-  } catch {
-    // Non-critical: guidelines sync failure doesn't block startup
-  }
-}
-
-/**
- * Auto-update CLAUDE.md in the working directory.
- * Uses the project name from the linked project config.
- */
-async function updateClaudeMd(): Promise<void> {
-  const projectName = devFlowClient.getLinkedProjectName();
-  if (!projectName) return;
-
-  try {
-    await setupClaudeMd(getWorkingDir(), projectName, undefined, activeConfig.strictness);
-    console.error('CLAUDE.md auto-updated from config');
-  } catch {
-    // Non-critical: CLAUDE.md update failure doesn't block startup
-  }
 }

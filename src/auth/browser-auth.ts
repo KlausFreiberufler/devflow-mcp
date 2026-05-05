@@ -10,8 +10,6 @@ import { writeFile, readFile, mkdir, chmod, stat } from 'fs/promises';
 import { homedir } from 'os';
 import { getWorkingDir } from '../utils/working-dir.js';
 import { join } from 'path';
-import { setupClaudeMd, fetchProjectTechStack } from '../setup/claude-md-generator.js';
-
 interface AuthResult {
   token: string;
   projectId?: string;
@@ -220,16 +218,9 @@ export async function authenticateViaBrowser(baseUrl: string, workingDir?: strin
   await saveCredentials(result.token);
 
   // Save project configuration if project was selected
+  // DF-326: No longer writes CLAUDE.md — the plugin covers rules.
   if (result.projectId && result.projectName) {
     await saveProjectConfig(dir, result.projectId, result.projectName);
-
-    // Setup CLAUDE.md with flow rules
-    try {
-      const techStack = await fetchProjectTechStack(baseUrl, result.token, result.projectId);
-      await setupClaudeMd(dir, result.projectName, techStack);
-    } catch (error) {
-      console.error('Warning: Could not setup CLAUDE.md:', error instanceof Error ? error.message : error);
-    }
   }
 
   console.error('Authentication successful! Token saved.');

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.23.0] - 2026-05-05
+
+### Changed (DF-326)
+
+The plugin no longer modifies `CLAUDE.md`. Since DF-302 introduced the Claude Code plugin (skills + hooks + MCP tool responses), the `<!-- DEVFLOW-RULES-START -->` block in `CLAUDE.md` was triple-redundant — every MCP restart, every `devflow_status`, every `devflow_connect` re-wrote it for nothing.
+
+- `syncConfig` no longer calls `setupClaudeMd` or `syncProjectGuidelines`. Project guidelines remain reachable via the `project_guidelines_get` MCP tool.
+- `browser-auth.ts` no longer writes `CLAUDE.md` after first login.
+- `project_guidelines_update` no longer syncs the result into a local file — guidelines are stored in the backend only.
+- `setup` for `--client claude` (and `--client droid`) no longer writes `CLAUDE.md`. Cursor/Codex/Gemini/Windsurf still get their respective rules-files until DF-327 introduces dedicated plugin bundles per client.
+- `setup/claude-md-generator.ts` removed. `templates/claude-md.ts` retained as the canonical content source for the other clients' rules-files.
+- `uninstall.ts` keeps the legacy `CLAUDE.md` cleanup path for pre-4.23 installs (markers defined inline now).
+
+### Removed (DF-326)
+
+- `flow_seal_backfill` MCP-tool. It was a one-shot migration from DF-255 — done-flows now seal automatically. The backend endpoint (`POST /api/projects/:id/flow-seal-backfill`) remains for manual curl invocation.
+- `scripts/check-architecture-coverage.sh` and its hook entry. Advisory-only with hardcoded path-to-module mappings — no one acted on the hint, drift-prone.
+
 ## [4.14.1] - 2026-04-26
 
 ### Fixed (DF-282)

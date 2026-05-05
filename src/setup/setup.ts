@@ -21,7 +21,6 @@ import { generateCursorrulesContent, CURSORRULES_MARKER_START, CURSORRULES_MARKE
 import { generateAgentsMdContent, AGENTS_MARKER_START, AGENTS_MARKER_END } from '../templates/agents-md.js';
 import { generateGeminiMdContent, GEMINI_MARKER_START, GEMINI_MARKER_END } from '../templates/gemini-md.js';
 import { generateWindsurfrulesContent, WINDSURFRULES_MARKER_START, WINDSURFRULES_MARKER_END } from '../templates/windsurfrules.js';
-import { generateClaudeMdContent, MARKER_START, MARKER_END } from '../templates/claude-md.js';
 
 const DEFAULT_URL = 'https://api.app.dev-flow.tech';
 const SUPPORTED_CLIENTS = ['claude', 'cursor', 'codex', 'gemini', 'windsurf', 'droid'] as const;
@@ -273,13 +272,10 @@ interface InstructionFileConfig {
   markerEnd: string;
 }
 
-const INSTRUCTION_FILES: Record<ClientType, InstructionFileConfig> = {
-  claude: {
-    fileName: 'CLAUDE.md',
-    generate: (name, tech) => generateClaudeMdContent(name, tech),
-    markerStart: MARKER_START,
-    markerEnd: MARKER_END,
-  },
+// DF-326: Claude + Droid removed — the Claude Code plugin (skills + hooks)
+// covers their rules. Cursor/Codex/Gemini/Windsurf still get rules-files until
+// DF-327 introduces dedicated plugin bundles for them.
+const INSTRUCTION_FILES: Partial<Record<ClientType, InstructionFileConfig>> = {
   cursor: {
     fileName: '.cursorrules',
     generate: (name, tech) => generateCursorrulesContent(name, tech),
@@ -303,12 +299,6 @@ const INSTRUCTION_FILES: Record<ClientType, InstructionFileConfig> = {
     generate: (name, tech) => generateWindsurfrulesContent(name, tech),
     markerStart: WINDSURFRULES_MARKER_START,
     markerEnd: WINDSURFRULES_MARKER_END,
-  },
-  droid: {
-    fileName: 'CLAUDE.md',
-    generate: (name, tech) => generateClaudeMdContent(name, tech),
-    markerStart: MARKER_START,
-    markerEnd: MARKER_END,
   },
 };
 
