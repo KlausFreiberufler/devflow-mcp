@@ -27,6 +27,8 @@ DevFlow is listed in the official Claude Code community marketplace. Install in 
 
 This installs everything in one shot: MCP server (auto-registered via `mcpServers` in the plugin manifest), enforcement hooks, state-specific skills, and slash commands (`/devflow-start`, `/devflow-status`, `/devflow-next`, `/devflow-tasks`, `/devflow-create`, `/devflow-list`, `/devflow-review`). No separate MCP setup step needed.
 
+> **Since 4.23.0:** the MCP server no longer modifies your `CLAUDE.md`. The plugin's skills, hooks, and MCP tool responses cover the rules that the old `<!-- DEVFLOW-RULES-START -->` block used to inject. If you have an existing block from a pre-4.23 install and want it cleaned up, run `npx @dev-flow-tech/mcp-server uninstall --client claude` once.
+
 Updates: `/plugin update devflow`.
 
 ### Manual Setup (fallback)
