@@ -6,10 +6,6 @@
         {
           "type": "command",
           "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check-active-flow.sh"
-        },
-        {
-          "type": "command",
-          "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check-architecture-coverage.sh"
         }
       ]
     },

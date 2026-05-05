@@ -7,16 +7,13 @@ import { devFlowClient } from '../api/client.js';
 import type { ProjectGuidelines } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
-import { syncProjectGuidelines } from '../setup/claude-md-generator.js';
-import { getWorkingDir } from '../utils/working-dir.js';
 
 // ============ Tool Definitions ============
 
 const projectGuidelinesGetDef = {
   name: 'project_guidelines_get',
-  description: `Get project-specific CLAUDE.md guidelines.
-Returns guidelines that are automatically synced into the project's CLAUDE.md file.
-These guidelines are managed by the user via the DevFlow UI.
+  description: `Get project-specific guidelines (markdown).
+Guidelines are managed by the user via the DevFlow UI and stored in the backend.
 
 Automatically uses the linked project if no projectId is provided.`,
   inputSchema: {
@@ -32,9 +29,8 @@ Automatically uses the linked project if no projectId is provided.`,
 
 const projectGuidelinesUpdateDef = {
   name: 'project_guidelines_update',
-  description: `Update project-specific CLAUDE.md guidelines.
-Updates the guidelines in the backend and immediately syncs them into the local CLAUDE.md file.
-The guidelines field accepts markdown content.
+  description: `Update project-specific guidelines (markdown).
+Guidelines are stored in the backend and visible in the DevFlow UI.
 
 Automatically uses the linked project if no projectId is provided.`,
   inputSchema: {
@@ -89,13 +85,6 @@ async function handleProjectGuidelinesUpdate(args: Record<string, unknown>): Pro
     return `Error: ${result.error || 'Failed to update project guidelines'}`;
   }
 
-  // Sync to local CLAUDE.md immediately
-  try {
-    await syncProjectGuidelines(getWorkingDir(), guidelines);
-  } catch {
-    // Non-critical: local sync failure doesn't block the update
-  }
-
   return `Project guidelines updated successfully.\n\n${formatGuidelines(result.data as ProjectGuidelines, projectId)}`;
 }
 
@@ -120,7 +109,7 @@ function formatGuidelines(data: ProjectGuidelines, projectId?: string): string {
     lines.push('## Content\n');
     lines.push(data.guidelines);
   } else {
-    lines.push('*No guidelines stored yet. Use project_guidelines_update to add project-specific CLAUDE.md guidelines, or edit them in the DevFlow UI.*');
+    lines.push('*No guidelines stored yet. Use project_guidelines_update to add project-specific guidelines, or edit them in the DevFlow UI.*');
   }
 
   return lines.join('\n');

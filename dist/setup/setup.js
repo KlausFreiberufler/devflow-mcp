@@ -443,12 +443,6 @@ function setupDroid(wrapperPath, devflowUrl, scope = "project") {
   }
 }
 var INSTRUCTION_FILES = {
-  claude: {
-    fileName: "CLAUDE.md",
-    generate: (name, tech) => generateClaudeMdContent(name, tech),
-    markerStart: MARKER_START,
-    markerEnd: MARKER_END
-  },
   cursor: {
     fileName: ".cursorrules",
     generate: (name, tech) => generateCursorrulesContent(name, tech),
@@ -472,12 +466,6 @@ var INSTRUCTION_FILES = {
     generate: (name, tech) => generateWindsurfrulesContent(name, tech),
     markerStart: WINDSURFRULES_MARKER_START,
     markerEnd: WINDSURFRULES_MARKER_END
-  },
-  droid: {
-    fileName: "CLAUDE.md",
-    generate: (name, tech) => generateClaudeMdContent(name, tech),
-    markerStart: MARKER_START,
-    markerEnd: MARKER_END
   }
 };
 function writeInstructionFile(client, projectName) {
