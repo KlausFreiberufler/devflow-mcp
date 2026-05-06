@@ -29,6 +29,8 @@ This installs everything in one shot: MCP server (auto-registered via `mcpServer
 
 > **Since 4.23.0:** the MCP server no longer modifies your `CLAUDE.md`. The plugin's skills, hooks, and MCP tool responses cover the rules that the old `<!-- DEVFLOW-RULES-START -->` block used to inject. If you have an existing block from a pre-4.23 install and want it cleaned up, run `npx @dev-flow-tech/mcp-server uninstall --client claude` once.
 
+> **Since 4.26.0 (DF-339):** Two new auto-review skills fire when transitioning state. `devflow-plan-critic` reminds at `planning → approval` to deep-review the plan against 7 dimensions. `devflow-code-critic` does the same at `in_progress → review` for the implementation. Both support iterative loop (max 3), trivial-flow-skip, and auto-approve-gate based on `project_configs.allow_agent_self_approval`.
+
 Updates: `/plugin update devflow`.
 
 ### Manual Setup (fallback)
