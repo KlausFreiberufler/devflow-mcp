@@ -1,0 +1,14 @@
+{
+  "hooks": [
+    {
+      "event": "BeforeTool",
+      "matcher": "apply_patch|edit|write",
+      "command": "${CODEX_PLUGIN_ROOT}/hooks/pre-tool-use.sh"
+    },
+    {
+      "event": "BeforeTool",
+      "matcher": "mcp__devflow.*__flow_update",
+      "command": "${CODEX_PLUGIN_ROOT}/hooks/pre-flow-update.sh"
+    }
+  ]
+}

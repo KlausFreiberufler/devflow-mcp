@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (DF-336)
+
+- **Codex CLI Plugin Scaffold:** `.codex-plugin/` Bundle mit `plugin.json`, `.mcp.json` (referenziert `devflow-mcp-flows` + `devflow-mcp-wiki`), `hooks/` (BeforeTool-Adapter via Bash → bestehende Claude-Plugin-Scripts), `commands/` + `skills/` (build-time-copy aus canonical Quellen).
+- `scripts/build-codex-plugin.js` — kopiert Skills + Commands in den Codex-Bundle.
+- `__tests__/codex-plugin.test.js` — 6 Tests pinnen plugin.json-schema, MCP-refs, Hook-Bash-Syntax, Skills-Count, Commands-Count.
+- README dokumentiert Setup für Codex CLI v0.128+ (DE+EN).
+- **Disclaimer:** Format-Compatibility mit Codex CLI muss bei erstem lokalen Install verifiziert werden — Phase-2-Patch falls Drift.
+
 ### Added (DF-334)
 
 - **MCP-Server-Split:** Drei Entry-Points statt einem.
