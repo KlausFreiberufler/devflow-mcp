@@ -1,0 +1,35 @@
+{
+  "name": "@dev-flow-tech/skills",
+  "version": "1.0.0",
+  "description": "DevFlow Skills — Single-Source for all client plugins (Claude, Codex, Gemini, Cursor)",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.json",
+  "files": [
+    "skills",
+    "index.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build:index": "node scripts/build-index.js",
+    "test": "node --test __tests__/skill-schema.test.js"
+  },
+  "keywords": [
+    "devflow",
+    "skills",
+    "ai-development",
+    "claude-code",
+    "codex",
+    "gemini",
+    "cursor"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KlausFreiberufler/devflow-mcp.git",
+    "directory": "packages/skills"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "private": false
+}
