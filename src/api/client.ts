@@ -443,6 +443,11 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return result as ApiResponse<Flow>;
   }
 
+  // DF-332 — Flow comments / discussion thread
+  async listFlowComments(flowId: string): Promise<ApiResponse<FlowDiscussionComment[]>> {
+    return this.request<FlowDiscussionComment[]>('GET', `/api/flows/${flowId}/comments`);
+  }
+
   async updateFlow(
     flowId: string,
     update: FlowUpdate
@@ -1166,6 +1171,25 @@ export interface FlowAttachment {
   fileSize: number;
   url: string;
   createdAt: string;
+}
+
+// DF-332 — Discussion / Flow-Comments
+export interface FlowDiscussionComment {
+  id: string;
+  flowId: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+  updatedAt?: string | null;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  deletedAt?: string | null;
+  // Author info as embedded by the backend (DF-274)
+  author?: {
+    id: string;
+    username?: string | null;
+    displayName?: string | null;
+  };
 }
 
 export interface FlowFeedback {
