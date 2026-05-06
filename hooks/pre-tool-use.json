@@ -18,6 +18,14 @@
         },
         {
           "type": "command",
+          "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/pre-flow-update-plan-critic.js"
+        },
+        {
+          "type": "command",
+          "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/pre-flow-update-code-critic.js"
+        },
+        {
+          "type": "command",
           "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/pre-flow-update-self-approval.js"
         }
       ]

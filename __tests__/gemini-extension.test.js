@@ -56,7 +56,7 @@ test('skills/ populated by build (19 dirs)', () => {
   const dirs = readdirSync(skillsDir).filter(n => {
     try { return statSync(join(skillsDir, n)).isDirectory() } catch { return false }
   })
-  assert.equal(dirs.length, 19, `expected 19 skills, found ${dirs.length}`)
+  assert.equal(dirs.length, 21, `expected 21 skills, found ${dirs.length}`)
   assert.ok(dirs.includes('devflow-tdd'))
 })
 

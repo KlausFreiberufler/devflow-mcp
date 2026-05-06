@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.26.0] - 2026-05-06
+
+### Added (DF-339)
+
+- **Auto-Review Skills (Phase 1-5):** Zwei neue Skills für deep self-critique vor State-Übergängen:
+  - `devflow-plan-critic` — fires bei `planning → approval`. 7 Dimensionen (AC-Coverage, Task-Granularität, Edge-Cases, Wiki-Coverage, Past-Flow-Anchor, Architektur-Risiken, Test-Strategie).
+  - `devflow-code-critic` — fires bei `in_progress → review`. 7 Dimensionen (AC-Implementation, Test-Coverage, Iron-Laws, ADR-Compliance, Plan-Reconciliation, Knowledge-Drafts, Code-Quality).
+- **Pre-tool-use Hooks:** Zwei neue Skripts (`pre-flow-update-plan-critic.js` + `pre-flow-update-code-critic.js`) reminden den Agent, den Critic-Skill vor dem Übergang zu invoken.
+- **Loop-Semantik im Skill (Phase 2):** Max 3 Iterationen, Early-Exit nach 2 zero-high-iterationen, No-Improvement-Detection.
+- **Skip-Rules im Skill (Phase 5):** Trivial-Flow-Detection für `verdict='approved-trivial'` (tasks ≤ 2, no schema-change, no new endpoint, no security/breaking tag).
+- **Discussion-Integration (Phase 4):** Skills instruieren Agent, Findings via `flow_update({planFeedback})` zu posten.
+- **Auto-Approve-Gate (Phase 5):** Skills lesen `project_configs.allow_agent_self_approval` — ON → Tokens emittieren + weiter; OFF → halt für manuelle User-Approval.
+
 ## [Unreleased]
 
 ### Added (DF-338)

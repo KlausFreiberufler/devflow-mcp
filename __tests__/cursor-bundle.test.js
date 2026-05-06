@@ -55,7 +55,7 @@ test('skills/ populated (19 dirs)', () => {
   const dirs = readdirSync(skillsDir).filter(n => {
     try { return statSync(join(skillsDir, n)).isDirectory() } catch { return false }
   })
-  assert.equal(dirs.length, 19)
+  assert.equal(dirs.length, 21)
   assert.ok(dirs.includes('devflow-tdd'))
 })
 
