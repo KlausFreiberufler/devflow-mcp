@@ -4,7 +4,7 @@ Structured AI development workflows for Google Gemini CLI. Provides 19 skills, b
 
 ## Status
 
-**Scaffold (DF-337, shipped 2026-05-06).** 80% reuse from `.codex-plugin/` (DF-336). Format-compatibility with current Gemini CLI to be verified on first install.
+**Scaffold (DF-337, shipped 2026-05-06, PR #45).** 80% reuse from `.codex-plugin/` (DF-336). Format-compatibility with current Gemini CLI to be verified on first install.
 
 ## Installation
 
