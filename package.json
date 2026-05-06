@@ -11,7 +11,12 @@
     "packages/skills/index.json",
     "packages/skills/package.json",
     "packages/skills/README.md",
-    "skills"
+    "skills",
+    ".codex-plugin/plugin.json",
+    ".codex-plugin/.mcp.json",
+    ".codex-plugin/hooks/",
+    ".codex-plugin/README.md",
+    ".codex-plugin/assets/"
   ],
   "workspaces": [
     "packages/*"
@@ -32,9 +37,10 @@
     "start": "node dist/index.js",
     "setup": "node dist/setup/setup.js",
     "prepare": "npm run build",
-    "test": "vitest run && node --test packages/skills/__tests__/skill-schema.test.js __tests__/server-split.test.js",
+    "test": "vitest run && npm run build:codex-plugin && node --test packages/skills/__tests__/skill-schema.test.js __tests__/server-split.test.js __tests__/codex-plugin.test.js",
     "test:watch": "vitest",
     "skills:build-index": "node packages/skills/scripts/build-index.js",
+    "build:codex-plugin": "node scripts/build-codex-plugin.js",
     "version:check": "node scripts/check-versions.js",
     "version:bump": "node scripts/bump-version.js",
     "publish:npm": "npm run version:check && npm run build && npm publish"
