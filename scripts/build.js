@@ -14,6 +14,8 @@ await rm(dist, { recursive: true, force: true });
 await build({
   entryPoints: {
     index: 'src/index.ts',
+    'index-flows': 'src/index-flows.ts',
+    'index-wiki': 'src/index-wiki.ts',
     'setup/setup': 'src/setup/setup.ts',
   },
   bundle: true,
@@ -34,6 +36,8 @@ await build({
 
 // chmod +x on bin entries (banner already injects shebang)
 await chmod(join(dist, 'index.js'), 0o755);
+await chmod(join(dist, 'index-flows.js'), 0o755);
+await chmod(join(dist, 'index-wiki.js'), 0o755);
 await chmod(join(dist, 'setup', 'setup.js'), 0o755);
 
 // Type declarations: tsc emits *.d.ts only, no JS (we already wrote those).

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * DevFlow MCP Server — version defined in config/version.ts
+ * DevFlow MCP Server — combined entry-point (BC default).
  *
- * Enforced flow development with Init-Gate.
- * Tools are gated: devflow_init must be called first.
+ * Registers all 19 tool modules. For Cursor (40-tool/server cap) prefer
+ * `devflow-mcp-flows` + `devflow-mcp-wiki` (DF-334).
  *
  * Subcommands:
- *   devflow-mcp         → Start MCP server (default)
- *   devflow-mcp setup   → Run setup wizard
+ *   devflow-mcp           → Start combined MCP server (default)
+ *   devflow-mcp setup     → Run setup wizard
+ *   devflow-mcp uninstall → Remove DevFlow config from a client
  */
 export {};
