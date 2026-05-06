@@ -4,7 +4,7 @@ Structured AI development workflows for OpenAI Codex CLI. Provides 19 skills, bl
 
 ## Status
 
-**Scaffold (DF-336).** Format-compatibility with Codex CLI v0.128+ to be verified on first install.
+**Scaffold (DF-336, shipped 2026-05-06).** Format-compatibility with Codex CLI v0.128+ to be verified on first install. Sister-flow: DF-337 (Gemini-Plugin).
 
 ## Installation
 
