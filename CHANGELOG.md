@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (DF-334)
+
+- **MCP-Server-Split:** Drei Entry-Points statt einem.
+  - `devflow-mcp` (combined, BC-default, ~65 tools) — bestehende Claude-Plugin-Installationen unverändert
+  - `devflow-mcp-flows` (workflow-domain, ≤40 tools) — für Cursor und andere mit 40-tool-cap
+  - `devflow-mcp-wiki` (knowledge-domain, ≤40 tools) — knowledge ohne workflow-control
+- Shared `src/server/start-server.ts` — Boilerplate für alle drei Entry-Points
+- `__tests__/server-split.test.js` — 4 Tests pinnen Tool-Counts und Cursor-Cap-Compliance
+
 ### Changed (DF-335)
 
 - **Skills-Mono-Repo:** Skills extracted into `packages/skills/` als `@dev-flow-tech/skills@1.0.0` workspace-package. Backwards-compat via symlink `skills/` → `packages/skills/skills/` — Claude-Plugin findet sie unverändert.
