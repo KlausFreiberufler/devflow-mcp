@@ -10,3 +10,5 @@ node_modules/
 .codex-plugin/commands/
 .gemini-extension/skills/
 .gemini-extension/commands/
+.cursor/skills/
+.cursor/commands/

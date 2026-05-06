@@ -20,7 +20,20 @@
     ".gemini-extension/gemini-extension.json",
     ".gemini-extension/GEMINI.md",
     ".gemini-extension/hooks/",
-    ".gemini-extension/README.md"
+    ".gemini-extension/README.md",
+    ".cursor/rules/",
+    ".cursor/mcp.json",
+    ".cursor/hooks.json",
+    ".cursor/hooks/",
+    ".cursor/README.md",
+    "scripts/setup-cursor.sh",
+    "scripts/check-active-flow.sh",
+    "scripts/pre-flow-update-knowledge-auto-resolve.js",
+    "scripts/pre-flow-update-self-approval.js",
+    "scripts/post-flow-update.js",
+    "scripts/session-start-info.sh",
+    "scripts/stop-check.js",
+    "scripts/lib/"
   ],
   "workspaces": [
     "packages/*"
@@ -41,11 +54,12 @@
     "start": "node dist/index.js",
     "setup": "node dist/setup/setup.js",
     "prepare": "npm run build",
-    "test": "vitest run && npm run build:codex-plugin && npm run build:gemini-extension && node --test packages/skills/__tests__/skill-schema.test.js __tests__/server-split.test.js __tests__/codex-plugin.test.js __tests__/gemini-extension.test.js",
+    "test": "vitest run && npm run build:codex-plugin && npm run build:gemini-extension && npm run build:cursor-bundle && node --test packages/skills/__tests__/skill-schema.test.js __tests__/server-split.test.js __tests__/codex-plugin.test.js __tests__/gemini-extension.test.js __tests__/cursor-bundle.test.js",
     "test:watch": "vitest",
     "skills:build-index": "node packages/skills/scripts/build-index.js",
     "build:codex-plugin": "node scripts/build-codex-plugin.js",
     "build:gemini-extension": "node scripts/build-gemini-extension.js",
+    "build:cursor-bundle": "node scripts/build-cursor-bundle.js",
     "version:check": "node scripts/check-versions.js",
     "version:bump": "node scripts/bump-version.js",
     "publish:npm": "npm run version:check && npm run build && npm publish"

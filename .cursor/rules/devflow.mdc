@@ -1,0 +1,31 @@
+---
+description: DevFlow workflow enforcement — flow_init required before code changes
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# DevFlow
+
+This project uses **DevFlow** for structured AI development workflows.
+
+## Quick Start
+
+1. `devflow_status()` → check connection (browser opens for first auth)
+2. `flow_list()` → find a free flow, OR `flow_create({summary})` to start one
+3. `devflow_init({flowId})` → begin your session — **without this, edits are blocked**
+4. Follow `allowedActions` and `nextStep` from each tool response
+
+## Flow States
+
+```
+idea → planning → approval → ready → in_progress → review → done
+```
+
+Review states wait for user-approval in the DevFlow UI.
+
+## Iron Laws
+
+- **No code changes without active flow.** Hooks block `apply_patch` / `edit` / `write` until `.devflow-active` exists.
+- **Plan first, code second.** Submit `implementation_plan` via `flow_update({currentState: "approval"})` before implementing.
+- **TDD for changes that introduce behavior.** Failing test → green → refactor.
+- **Knowledge-extend > create > defer > NEVER dismiss.** When the wiki has a relevant ADR/pattern, extend it instead of creating a new one.

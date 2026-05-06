@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (DF-338)
+
+- **Cursor Bundle Scaffold:** `.cursor/` Bundle für Cursor 2.4+ — Tier-2 plugin per DF-327. Manual install via `scripts/setup-cursor.sh`.
+- Components: `mcp.json` (refs devflow-mcp-flows + devflow-mcp-wiki), `hooks.json` (PreToolUse gating), `rules/devflow.mdc` (MDC-Frontmatter mit alwaysApply), Hook-Bash-Adapter (Reuse von DF-336/337), build-script + 6 tests.
+- Setup-Script kann lokal aus devflow-mcp-checkout oder remote via curl-pipe gerufen werden.
+- **Watch-Item:** Cursor "Agent Plugins"-FR — falls shipped, migrate zum offiziellen Bundle-Format.
+
 ### Added (DF-337)
 
 - **Gemini CLI Extension Scaffold:** `.gemini-extension/` Bundle mit `gemini-extension.json` (Manifest mit kombinierten mcpServers + contextFileName + hooks/skills/commands refs), `GEMINI.md` (Context-file), Hook-Bash-Adapter (Reuse von DF-336 Codex), build-script + 6 tests.
