@@ -27,9 +27,15 @@ const MAX_INLINE_TEXT_BYTES = 512 * 1024;
 
 const flowListDef = {
   name: 'flow_list',
-  description: `List all flows, optionally filtered by project.
-Returns flows with their current state (idea, planning, approval, ready, in_progress, review, done).
-Use this to find flows to work on.`,
+  description: `List flows as a Markdown table (ID | State | Assignee | Titel).
+
+Conventions enforced uniformly across the plugin (skill: devflow-flow-display):
+- ⭐ prefix marks flows assigned to / created by the current user
+- 🔒 marks active agent sessions; idle flows have no lock-marker
+- Done-flows are hidden by default (focus on open work). Pass includeDone=true to see them.
+- Order matches the browser FlowsPage default (kanban_sort_order ASC for project-scope, updated_at DESC for cross-project).
+
+Use this to find flows to work on or to brief the user on the backlog.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -41,6 +47,14 @@ Use this to find flows to work on.`,
         type: 'string',
         enum: ['idea', 'planning', 'approval', 'ready', 'in_progress', 'review', 'done'],
         description: 'Optional state filter'
+      },
+      mine: {
+        type: 'boolean',
+        description: 'If true, only return flows assigned to / created by the current user.'
+      },
+      includeDone: {
+        type: 'boolean',
+        description: 'If true, include done-flows. Default: false (open backlog only).'
       }
     }
   }
@@ -234,6 +248,8 @@ import { formatStrictnessLevel } from '../config/types.js';
 async function handleFlowList(args: Record<string, unknown>): Promise<string> {
   const projectId = args.projectId as string | undefined;
   const state = args.state as string | undefined;
+  const mineOnly = args.mine === true;
+  const includeDone = args.includeDone === true;
 
   const result = await devFlowClient.listFlows(projectId);
 
@@ -247,6 +263,10 @@ async function handleFlowList(args: Record<string, unknown>): Promise<string> {
     flows = flows.filter(w => w.currentState === state);
   }
 
+  if (mineOnly) {
+    flows = flows.filter(w => w.isMine === true);
+  }
+
   const linkedProject = devFlowClient.getLinkedProjectName();
   const contextInfo = linkedProject
     ? `*Showing flows for project: ${linkedProject}*\n\n`
@@ -256,7 +276,7 @@ async function handleFlowList(args: Record<string, unknown>): Promise<string> {
     return contextInfo + 'No flows found matching the criteria.';
   }
 
-  return contextInfo + formatFlowList(flows);
+  return contextInfo + formatFlowList(flows, { includeDone });
 }
 
 async function handleFlowGet(args: Record<string, unknown>): Promise<ToolHandlerResult> {
@@ -693,50 +713,61 @@ async function handleFlowGetFeedback(args: Record<string, unknown>): Promise<str
 
 // ============ Formatters ============
 
-function formatFlowList(flows: Flow[]): string {
-  const lines = ['# Flows\n'];
-
-  const byState: Record<string, Flow[]> = {
-    idea: [], planning: [], approval: [], ready: [],
-    in_progress: [], review: [], done: []
+/**
+ * DF-329 — Uniform flow-list rendering for the plugin.
+ *
+ * Iron Laws (enforced by `devflow-flow-display` skill):
+ *   1. Markdown table with columns: ID | State | Assignee | Titel
+ *   2. Own flows (isMine=true) get ⭐ prefix on the ID
+ *   3. Active sessions get 🔒, idle = no marker (replaces noisy „(frei)")
+ *   4. Done-flows hidden by default — backlog focus is on open work
+ *
+ * Pass `includeDone: true` if the caller explicitly wants them.
+ */
+function formatFlowList(flows: Flow[], opts: { includeDone?: boolean } = {}): string {
+  const stateEmoji: Record<string, string> = {
+    idea: '💡', planning: '📋', approval: '🔒', ready: '▶️',
+    in_progress: '🔨', review: '🔍', done: '✅'
   };
+  const stateOrder = ['idea', 'planning', 'approval', 'ready', 'in_progress', 'review', 'done'];
 
-  for (const w of flows) {
-    byState[w.currentState]?.push(w);
+  // DF-329 IL#4: only open flows by default
+  const visible = opts.includeDone ? flows : flows.filter(f => f.currentState !== 'done');
+
+  // Sort: state-priority, then preserve incoming order (which is backend's
+  // kanban_sort_order ASC / updated_at DESC depending on scope)
+  const sorted = [...visible].sort((a, b) =>
+    stateOrder.indexOf(a.currentState) - stateOrder.indexOf(b.currentState)
+  );
+
+  if (sorted.length === 0) {
+    return '# Flows\n\n*No open flows. Use `flow_create` to start one, or pass `includeDone: true` to see archived work.*\n';
   }
 
-  for (const [state, wfs] of Object.entries(byState)) {
-    if (wfs.length === 0) continue;
+  const lines = ['# Flows\n'];
+  lines.push('| ID | State | Assignee | Titel |');
+  lines.push('|---|---|---|---|');
 
-    const emoji: Record<string, string> = {
-      idea: '💡', planning: '📋', approval: '🔒', ready: '▶️',
-      in_progress: '🔨', review: '🔍', done: '✅'
-    };
+  for (const w of sorted) {
+    const idLabel = w.displayId || w.id;
+    // DF-329 IL#2: ⭐ for own flows
+    const id = w.isMine ? `⭐ **${idLabel}**` : `**${idLabel}**`;
 
-    const stateLabels: Record<string, string> = {
-      idea: 'Idea', planning: 'Planning', approval: 'Approval', ready: 'Ready',
-      in_progress: 'In Progress', review: 'Review', done: 'Done'
-    };
-    const label = stateLabels[state] || state.charAt(0).toUpperCase() + state.slice(1);
+    const stateLabel = `${stateEmoji[w.currentState] || ''} ${w.currentState}`.trim();
 
-    lines.push(`## ${emoji[state] || '📌'} ${label} (${wfs.length})\n`);
+    // DF-329 IL#3: assignee separate from lock-status
+    const assigneeName = w.assignee?.name || w.assigneeName || '—';
+    const lockSuffix = w.agentStatus && w.agentStatus !== 'idle' ? ' 🔒' : '';
+    const assignee = `${assigneeName}${lockSuffix}`;
 
-    for (const w of wfs) {
-      const displayId = w.displayId ? `**${w.displayId}**` : `**${w.id}**`;
-      const ticket = w.ticketKey ? `[${w.ticketKey}] ` : '';
-      const assignee = w.assigneeName ? ` → @${w.assigneeName}` : '';
-      const lockInfo = (w.agentStatus && w.agentStatus !== 'idle')
-        ? ` [🔒 ${w.agentStatus}]`
-        : ' (frei)';
-      lines.push(`- ${displayId}: ${ticket}${w.summary}${assignee}${lockInfo}`);
-      if (w.agentMessage) {
-        lines.push(`  └─ ${w.agentMessage}`);
-      }
-    }
-    lines.push('');
+    const ticket = w.ticketKey ? `[${w.ticketKey}] ` : '';
+    // Pipe-escape the title in case it contains the column separator
+    const title = `${ticket}${w.summary}`.replace(/\|/g, '\\|');
+
+    lines.push(`| ${id} | ${stateLabel} | ${assignee} | ${title} |`);
   }
 
-  return lines.join('\n');
+  return lines.join('\n') + '\n';
 }
 
 function formatFlowDetail(flow: Flow, opts: { skipEmbeddedImages?: boolean } = {}): string {

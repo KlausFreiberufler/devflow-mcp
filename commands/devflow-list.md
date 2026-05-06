@@ -1,12 +1,14 @@
 ---
-description: List flows (optionally filter by state)
+description: List open flows as a Markdown table (⭐ marks own flows)
 argument-hint: [state]
 ---
 
-If `$1` is provided, use it as the state filter (e.g. `planning`, `in_progress`).
-Otherwise list all non-done flows.
+Call `mcp__devflow__flow_list` with `{ state: $1 }` if `$1` is provided (e.g. `planning`, `in_progress`), otherwise no args.
 
-Call `mcp__devflow__flow_list` with `{ state: $1 }` or no args for default.
+The MCP-tool returns the rendered table directly — pass it through verbatim, do **not** re-render or strip the format.
 
-Render as a table: `displayId | state | assignee | summary`.
-Sort by state (idea → planning → approval → ready → in_progress → review), then by displayId.
+Conventions (see `devflow-flow-display` skill):
+- Columns: `ID | State | Assignee | Titel`
+- ⭐ prefix on the ID = flow is yours (assignee or creator = current user)
+- 🔒 suffix on the assignee = active agent session
+- Done-flows are hidden by default. To include them: append `(includeDone)` to the user prompt and pass `{ includeDone: true }` to the tool.

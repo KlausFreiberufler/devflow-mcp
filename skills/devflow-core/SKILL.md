@@ -92,3 +92,7 @@ For deeper instructions on a specific state, use the matching skill:
 - Planning → `devflow-planning`
 - In progress → `devflow-executing`
 - Review → `devflow-reviewing`
+
+## Output Conventions
+
+When listing or summarizing flows for the user, use the `devflow-flow-display` skill — it pins the Markdown-table format with ⭐ for own flows, separated lock-status, and hidden done-flows by default. Don't roll your own flow-list format.

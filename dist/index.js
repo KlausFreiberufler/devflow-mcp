@@ -21168,7 +21168,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.23.0";
+var MCP_VERSION = "4.24.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -23358,9 +23358,15 @@ var MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 var MAX_INLINE_TEXT_BYTES = 512 * 1024;
 var flowListDef = {
   name: "flow_list",
-  description: `List all flows, optionally filtered by project.
-Returns flows with their current state (idea, planning, approval, ready, in_progress, review, done).
-Use this to find flows to work on.`,
+  description: `List flows as a Markdown table (ID | State | Assignee | Titel).
+
+Conventions enforced uniformly across the plugin (skill: devflow-flow-display):
+- \u2B50 prefix marks flows assigned to / created by the current user
+- \u{1F512} marks active agent sessions; idle flows have no lock-marker
+- Done-flows are hidden by default (focus on open work). Pass includeDone=true to see them.
+- Order matches the browser FlowsPage default (kanban_sort_order ASC for project-scope, updated_at DESC for cross-project).
+
+Use this to find flows to work on or to brief the user on the backlog.`,
   inputSchema: {
     type: "object",
     properties: {
@@ -23372,6 +23378,14 @@ Use this to find flows to work on.`,
         type: "string",
         enum: ["idea", "planning", "approval", "ready", "in_progress", "review", "done"],
         description: "Optional state filter"
+      },
+      mine: {
+        type: "boolean",
+        description: "If true, only return flows assigned to / created by the current user."
+      },
+      includeDone: {
+        type: "boolean",
+        description: "If true, include done-flows. Default: false (open backlog only)."
       }
     }
   }
@@ -23553,6 +23567,8 @@ If feedback exists, you should address it before continuing work.`,
 async function handleFlowList(args) {
   const projectId = args.projectId;
   const state = args.state;
+  const mineOnly = args.mine === true;
+  const includeDone = args.includeDone === true;
   const result = await devFlowClient.listFlows(projectId);
   if (!result.success || !result.data) {
     return `Error: ${result.error || "Failed to list flows"}`;
@@ -23561,6 +23577,9 @@ async function handleFlowList(args) {
   if (state) {
     flows = flows.filter((w) => w.currentState === state);
   }
+  if (mineOnly) {
+    flows = flows.filter((w) => w.isMine === true);
+  }
   const linkedProject = devFlowClient.getLinkedProjectName();
   const contextInfo = linkedProject ? `*Showing flows for project: ${linkedProject}*
 
@@ -23568,7 +23587,7 @@ async function handleFlowList(args) {
   if (flows.length === 0) {
     return contextInfo + "No flows found matching the criteria.";
   }
-  return contextInfo + formatFlowList(flows);
+  return contextInfo + formatFlowList(flows, { includeDone });
 }
 async function handleFlowGet(args) {
   const flowId = args.flowId;
@@ -23931,56 +23950,39 @@ async function handleFlowGetFeedback(args) {
   }
   return lines.join("\n");
 }
-function formatFlowList(flows) {
-  const lines = ["# Flows\n"];
-  const byState = {
-    idea: [],
-    planning: [],
-    approval: [],
-    ready: [],
-    in_progress: [],
-    review: [],
-    done: []
+function formatFlowList(flows, opts = {}) {
+  const stateEmoji = {
+    idea: "\u{1F4A1}",
+    planning: "\u{1F4CB}",
+    approval: "\u{1F512}",
+    ready: "\u25B6\uFE0F",
+    in_progress: "\u{1F528}",
+    review: "\u{1F50D}",
+    done: "\u2705"
   };
-  for (const w of flows) {
-    byState[w.currentState]?.push(w);
+  const stateOrder = ["idea", "planning", "approval", "ready", "in_progress", "review", "done"];
+  const visible = opts.includeDone ? flows : flows.filter((f) => f.currentState !== "done");
+  const sorted = [...visible].sort(
+    (a, b) => stateOrder.indexOf(a.currentState) - stateOrder.indexOf(b.currentState)
+  );
+  if (sorted.length === 0) {
+    return "# Flows\n\n*No open flows. Use `flow_create` to start one, or pass `includeDone: true` to see archived work.*\n";
   }
-  for (const [state, wfs] of Object.entries(byState)) {
-    if (wfs.length === 0) continue;
-    const emoji3 = {
-      idea: "\u{1F4A1}",
-      planning: "\u{1F4CB}",
-      approval: "\u{1F512}",
-      ready: "\u25B6\uFE0F",
-      in_progress: "\u{1F528}",
-      review: "\u{1F50D}",
-      done: "\u2705"
-    };
-    const stateLabels = {
-      idea: "Idea",
-      planning: "Planning",
-      approval: "Approval",
-      ready: "Ready",
-      in_progress: "In Progress",
-      review: "Review",
-      done: "Done"
-    };
-    const label = stateLabels[state] || state.charAt(0).toUpperCase() + state.slice(1);
-    lines.push(`## ${emoji3[state] || "\u{1F4CC}"} ${label} (${wfs.length})
-`);
-    for (const w of wfs) {
-      const displayId = w.displayId ? `**${w.displayId}**` : `**${w.id}**`;
-      const ticket = w.ticketKey ? `[${w.ticketKey}] ` : "";
-      const assignee = w.assigneeName ? ` \u2192 @${w.assigneeName}` : "";
-      const lockInfo = w.agentStatus && w.agentStatus !== "idle" ? ` [\u{1F512} ${w.agentStatus}]` : " (frei)";
-      lines.push(`- ${displayId}: ${ticket}${w.summary}${assignee}${lockInfo}`);
-      if (w.agentMessage) {
-        lines.push(`  \u2514\u2500 ${w.agentMessage}`);
-      }
-    }
-    lines.push("");
+  const lines = ["# Flows\n"];
+  lines.push("| ID | State | Assignee | Titel |");
+  lines.push("|---|---|---|---|");
+  for (const w of sorted) {
+    const idLabel = w.displayId || w.id;
+    const id = w.isMine ? `\u2B50 **${idLabel}**` : `**${idLabel}**`;
+    const stateLabel = `${stateEmoji[w.currentState] || ""} ${w.currentState}`.trim();
+    const assigneeName = w.assignee?.name || w.assigneeName || "\u2014";
+    const lockSuffix = w.agentStatus && w.agentStatus !== "idle" ? " \u{1F512}" : "";
+    const assignee = `${assigneeName}${lockSuffix}`;
+    const ticket = w.ticketKey ? `[${w.ticketKey}] ` : "";
+    const title = `${ticket}${w.summary}`.replace(/\|/g, "\\|");
+    lines.push(`| ${id} | ${stateLabel} | ${assignee} | ${title} |`);
   }
-  return lines.join("\n");
+  return lines.join("\n") + "\n";
 }
 function formatFlowDetail(flow, opts = {}) {
   const lines = [

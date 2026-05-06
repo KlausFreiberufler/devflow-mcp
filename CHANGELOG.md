@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.24.0] - 2026-05-06
+
+### Added (DF-329)
+
+Uniform flow-list display across MCP, slash-commands, and free-form agent responses. The user gets the same Markdown-table everywhere — not three different rendering styles depending on entry-point.
+
+- `flow_list` MCP-tool now renders a Markdown table (`ID | State | Assignee | Titel`) instead of a per-state bullet-list.
+- ⭐ prefix marks own flows (`isMine === true`) — server-computed in `formatFlowResponse(flow, currentUserId)`.
+- 🔒 suffix on the assignee column shows active agent sessions; idle flows have no marker (replaces noisy `(frei)`).
+- Done-flows are hidden by default; opt-in via `flow_list({ includeDone: true })`.
+- New `mine` filter: `flow_list({ mine: true })` returns only own flows.
+- New plugin skill `devflow-flow-display` enforces the convention whenever Claude lists or summarizes flows — even outside the MCP-tool path.
+- `/devflow-list` slash-command updated to pass MCP-tool output through verbatim.
+- `devflow-core` skill cross-links to `devflow-flow-display` under "Output Conventions".
+
+### Changed (DF-329)
+
+Backend `GET /api/flows` response shape:
+- New `isMine: boolean` per flow.
+- `assignee` is now a structured object `{ id, name, email | null } | null` (legacy `assignee_name` flat string preserved for back-compat).
+- Test pin: `tests/api/flows-list-display.test.ts` (6 ACs).
+
 ## [4.23.0] - 2026-05-05
 
 ### Changed (DF-326)
