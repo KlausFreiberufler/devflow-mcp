@@ -4,3 +4,9 @@ node_modules/
 *.tgz
 .devflow.json
 .devflow-active
+
+# DF-336/337 — Plugin bundles: build-time copies from canonical sources
+.codex-plugin/skills/
+.codex-plugin/commands/
+.gemini-extension/skills/
+.gemini-extension/commands/

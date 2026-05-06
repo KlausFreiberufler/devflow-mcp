@@ -1,0 +1,14 @@
+{
+  "hooks": [
+    {
+      "event": "BeforeTool",
+      "matcher": "edit|write|apply_patch",
+      "command": "${GEMINI_EXTENSION_ROOT}/hooks/pre-tool-use.sh"
+    },
+    {
+      "event": "BeforeTool",
+      "matcher": "mcp__devflow.*__flow_update",
+      "command": "${GEMINI_EXTENSION_ROOT}/hooks/pre-flow-update.sh"
+    }
+  ]
+}

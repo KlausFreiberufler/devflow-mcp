@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (DF-337)
+
+- **Gemini CLI Extension Scaffold:** `.gemini-extension/` Bundle mit `gemini-extension.json` (Manifest mit kombinierten mcpServers + contextFileName + hooks/skills/commands refs), `GEMINI.md` (Context-file), Hook-Bash-Adapter (Reuse von DF-336 Codex), build-script + 6 tests.
+- 80% Reuse aus DF-336: hook-wrapper-Logik identisch, build-script-Template identisch, test-Template identisch. Differenzen nur Manifest-Schema (Gemini hat mcpServers inline statt separater .mcp.json) und Event-Names (Gemini's 11 events, MVP nutzt nur BeforeTool).
+- **Disclaimer:** Format-Compatibility mit Gemini CLI muss bei erstem lokalen Install verifiziert werden.
+
 ### Added (DF-336)
 
 - **Codex CLI Plugin Scaffold:** `.codex-plugin/` Bundle mit `plugin.json`, `.mcp.json` (referenziert `devflow-mcp-flows` + `devflow-mcp-wiki`), `hooks/` (BeforeTool-Adapter via Bash → bestehende Claude-Plugin-Scripts), `commands/` + `skills/` (build-time-copy aus canonical Quellen).
