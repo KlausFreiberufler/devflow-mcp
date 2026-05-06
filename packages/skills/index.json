@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-06T16:36:32.365Z",
+  "count": 19,
+  "skills": [
+    {
+      "name": "devflow-adr-compliance",
+      "slug": "devflow-adr-compliance",
+      "description": "Use during the review state of a flow with file changes. Compares the diff against accepted ADRs' affects_paths globs, persists per-file violations, and emits a discipline-token only when every violation is either resolved or explicitly marked break-by-design with a reason ≥ 10 characters. Implements Knowledge-Hook 6 of the Knowledge-Gated Workflow.",
+      "flow_state": "review",
+      "hooks": [
+        6
+      ],
+      "discipline_token": "devflow-adr-compliance",
+      "iron_laws_count": 1
+    },
+    {
+      "name": "devflow-area-ideation",
+      "slug": "devflow-area-ideation",
+      "description": "Use when the user pasted an Area-Idea-Hunt-Prompt from the IdeasPage Garage. Drives a Wiki-grounded ideation routine — never out-of-thin-air-brainstorming, every idea must reference real wiki entries. Output is 3 Pick&Plan-ready proposals as JSON.",
+      "flow_state": "any",
+      "hooks": [],
+      "discipline_token": "devflow-area-ideation",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-collision-acknowledged",
+      "slug": "devflow-collision-acknowledged",
+      "description": "Use during planning state to walk the user through the awareness list (pending_work + planning_context) so every in-flight flow, open intent, proposed ADR, and pending draft in the topic-scope receives an explicit user decision (✓ keep / ✗ irrelevant / ↺ later). Emits a discipline-token at the end as proof for agent_with_discipline self-approval.",
+      "flow_state": "planning",
+      "hooks": [
+        1
+      ],
+      "discipline_token": "devflow-collision-acknowledged",
+      "iron_laws_count": 1
+    },
+    {
+      "name": "devflow-core",
+      "slug": "devflow-core",
+      "description": "Use whenever working in a DevFlow-managed project (CLAUDE.md contains devflow_init). Explains the flow-state machine, init requirements, and error recovery.",
+      "flow_state": null,
+      "hooks": [],
+      "discipline_token": null,
+      "iron_laws_count": 0
+    },
+    {
+      "name": "devflow-debugging",
+      "slug": "devflow-debugging",
+      "description": "Use when an unexpected behavior, failing test, or production-error needs to be diagnosed. Walks through four phases — Investigation → Pattern → Hypothesis → Fix — with an explicit Knowledge-Hook 4 runbook-match before the Hypothesis phase to avoid double-debugging known incidents.",
+      "flow_state": "in_progress",
+      "hooks": [
+        4
+      ],
+      "discipline_token": "devflow-debugging",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-error-investigator",
+      "slug": "devflow-error-investigator",
+      "description": "Use FIRST when you encounter an unexpected error / exception / failing test that's not immediately obvious. Calls `error_context_get` to pull all wiki signals relevant to the error (runbooks, ADRs touching the file, recent flows, patterns, similar past errors). Iron Law of compounding wikis: every novel failure mode produces a new runbook on the way out.",
+      "flow_state": "any",
+      "hooks": [
+        4
+      ],
+      "discipline_token": "devflow-error-investigator",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-executing",
+      "slug": "devflow-executing",
+      "description": "Use when the active DevFlow flow is in 'in_progress' state. Guides implementing the approved plan with tasks, commits, and TDD discipline.",
+      "flow_state": null,
+      "hooks": [],
+      "discipline_token": null,
+      "iron_laws_count": 0
+    },
+    {
+      "name": "devflow-flow-display",
+      "slug": "devflow-flow-display",
+      "description": "Use whenever listing flows, presenting flow status, or summarizing the flow backlog. Enforces a uniform Markdown-table format across MCP-tool, slash-commands, and free-form agent responses so the user gets a consistent view everywhere.",
+      "flow_state": null,
+      "hooks": [],
+      "discipline_token": null,
+      "iron_laws_count": 0
+    },
+    {
+      "name": "devflow-idea-curator",
+      "slug": "devflow-idea-curator",
+      "description": "Use periodically (monthly cadence is plenty) to curate the project's idea backlog. Reads `GET /api/projects/:id/ideas` — five sources of organic ideas (intents, stale, orphans, contradictions, hotspots). For each item: pick & plan into a flow, defer with a substantive horizon, or reject with a reason. Iron Law: no idea sits unaddressed for more than 90 days.",
+      "flow_state": "any",
+      "hooks": [],
+      "discipline_token": "devflow-idea-curator",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-knowledge-completer",
+      "slug": "devflow-knowledge-completer",
+      "description": "Use during planning, before submitting to approval, and again before review→done. Walks the gaps from `wiki-context` and ensures each gap is closed with `extend` (preferred), a new entry, or a deferred intent — never `dismiss`. The wiki is a compounding artifact: knowledge is never thrown away.",
+      "flow_state": [
+        "planning",
+        "in_progress",
+        "review"
+      ],
+      "hooks": [
+        1,
+        7
+      ],
+      "discipline_token": "devflow-knowledge-completer",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-pattern-reuse",
+      "slug": "devflow-pattern-reuse",
+      "description": "Use during the planning state to surface existing project patterns that match the flow's tag-scope, so the implementation plan re-uses proven solutions instead of inventing parallel ones. Cites each accepted pattern via `[[pattern:slug]]` wiki-link in the plan.",
+      "flow_state": "planning",
+      "hooks": [
+        2
+      ],
+      "discipline_token": "devflow-pattern-reuse",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-plan-reconciliation",
+      "slug": "devflow-plan-reconciliation",
+      "description": "Use during the review state, before devflow-verification-gate, to reconcile the approved implementation_plan against what was actually implemented. Produces a per-AC and per-section table — done / partial / missing / extra — and forces the agent to address every gap (either fix it now, file an intent, or document why it's deferred). Without this skill the review only proves AC-by-AC, not that the plan as a whole was respected.",
+      "flow_state": "review",
+      "hooks": [],
+      "discipline_token": "devflow-plan-reconciliation",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-planning",
+      "slug": "devflow-planning",
+      "description": "Use when the active DevFlow flow is in 'planning' state. Guides creating an implementation plan with acceptance criteria before submitting for approval.",
+      "flow_state": null,
+      "hooks": [],
+      "discipline_token": null,
+      "iron_laws_count": 0
+    },
+    {
+      "name": "devflow-receiving-review",
+      "slug": "devflow-receiving-review",
+      "description": "Use when receiving a code-review (from a subagent dispatch or a human reviewer) to triage every finding into Critical / Important / Minor with a deliberate decision per item. Each finding is technically verified before accept-or-reject — never blind acceptance, never blind rejection.",
+      "flow_state": "review",
+      "hooks": [],
+      "discipline_token": "devflow-receiving-review",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-reviewing",
+      "slug": "devflow-reviewing",
+      "description": "Use when the active DevFlow flow is in 'review' state. Guides self-review via diff analysis and writes the agent summary + testing instructions.",
+      "flow_state": null,
+      "hooks": [],
+      "discipline_token": null,
+      "iron_laws_count": 0
+    },
+    {
+      "name": "devflow-tdd",
+      "slug": "devflow-tdd",
+      "description": "Use during implementation to drive every change through Test-Driven Development. Before writing production code, query existing test-patterns from the LLM-Wiki (Hook 3) for the relevant tag-scope, then write a failing test (RED), make it pass (GREEN), and refactor (REFACTOR). Emits a discipline-token only when each cycle has the prescribed evidence.",
+      "flow_state": "in_progress",
+      "hooks": [
+        3
+      ],
+      "discipline_token": "devflow-tdd",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-verification-gate",
+      "slug": "devflow-verification-gate",
+      "description": "Use during the review state to prove every acceptance criterion with a captured evidence command. No \"should work\" claims — each AC gets a real shell/test/curl invocation whose stdout is recorded into the flow's testingInstructions. Emits the discipline-token that makes review→done possible under agent_with_discipline self-approval (DF-292).",
+      "flow_state": "review",
+      "hooks": [],
+      "discipline_token": "devflow-verification-gate",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-wiki-lint",
+      "slug": "devflow-wiki-lint",
+      "description": "Use periodically (or on demand from the Wiki page health-bar) to keep the LLM-Wiki clean. Reads `GET /api/projects/:id/wiki-lint` and addresses every reported stale, orphan, and contradiction — never let any of them linger. Iron Law: orphans get cross-linked or marked as `intent`, contradictions are resolved at the ADR-status level, stale entries are reviewed and either extended or superseded.",
+      "flow_state": "any",
+      "hooks": [],
+      "discipline_token": "devflow-wiki-lint",
+      "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-worktrees",
+      "slug": "devflow-worktrees",
+      "description": "Use at the start of implementation (or when picking up an existing flow) to set up a dedicated git-worktree under .claude/worktrees/<displayId>-<slug>. Each flow gets its own working directory — branch isolation prevents cross-flow contamination, and the path is predictable for re-init / cross-session recovery.",
+      "flow_state": "ready",
+      "hooks": [],
+      "discipline_token": "devflow-worktrees",
+      "iron_laws_count": 3
+    }
+  ]
+}
