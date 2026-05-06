@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.25.0] - 2026-05-06
+
+### Added (DF-332)
+
+- `flow_get` now appends a `## Discussion (N)`-section with all live comments (deleted/tombstoned comments are skipped). Resolved comments get a `[✓ resolved]` marker.
+- New MCP tool **`flow_comments_get(flowId)`** for an explicit reload of just the discussion thread — useful when the user said something new in the UI and you want fresh context without re-fetching the entire flow + attachments.
+- Comments are rendered chronologically as Markdown blockquotes with author + timestamp. Wikilinks (`[[adr-134]]`) and `@mentions` in the body stay raw — use `wiki_get_page` if you need to resolve them.
+
+### Changed (DF-332)
+
+- `client.ts` adds `listFlowComments(flowId)` wrapper around the existing `GET /api/flows/:id/comments` endpoint (DF-274). No backend changes required.
+- New exported type `FlowDiscussionComment` with embedded `author` info.
+
 ## [4.24.0] - 2026-05-06
 
 ### Added (DF-329)

@@ -3,7 +3,7 @@
  * Tools for listing, getting, creating, and updating flows in DevFlow
  */
 
-import { devFlowClient, type Flow, type FlowAttachment } from '../api/client.js';
+import { devFlowClient, type Flow, type FlowAttachment, type FlowDiscussionComment } from '../api/client.js';
 import type { ToolContentBlock, ToolHandlerResult, ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
@@ -349,13 +349,26 @@ async function handleFlowGet(args: Record<string, unknown>): Promise<ToolHandler
     }
   }
 
-  // Build text response: flow detail + inline attachments + remaining attachment list
+  // DF-332: load comments / discussion thread (parallel-friendly, but kept after image
+  // fetching so we don't double the latency on flows with embedded images)
+  let discussionSection = '';
+  try {
+    const commentsResult = await devFlowClient.listFlowComments(resolvedId);
+    if (commentsResult.success && Array.isArray(commentsResult.data)) {
+      discussionSection = formatDiscussionSection(commentsResult.data);
+    }
+  } catch { /* discussion is best-effort context, never block flow_get */ }
+
+  // Build text response: flow detail + inline attachments + remaining attachment list + discussion
   let output = formatFlowDetail(flow, { skipEmbeddedImages: true });
   if (inlineTextSections.length > 0) {
     output += '\n\n' + inlineTextSections.join('\n\n');
   }
   if (otherAttachments.length > 0) {
     output += '\n\n' + formatAttachmentList(otherAttachments);
+  }
+  if (discussionSection) {
+    output += '\n\n' + discussionSection;
   }
 
   // If no images were loaded, keep backwards-compat: return string
@@ -770,6 +783,50 @@ function formatFlowList(flows: Flow[], opts: { includeDone?: boolean } = {}): st
   return lines.join('\n') + '\n';
 }
 
+/**
+ * DF-332 — Render the flow's comments/discussion thread as a Markdown section.
+ *
+ * Returns empty string when there are no live comments (deletedAt is set on
+ * tombstoned comments — those are skipped to keep the agent's context focused
+ * on what's still actionable).
+ *
+ * Format per comment:
+ *   **@username (Display Name)** · 2026-05-06T08:30:12 [✓ resolved]
+ *   > body line 1
+ *   > body line 2
+ */
+function formatDiscussionSection(comments: FlowDiscussionComment[]): string {
+  const live = comments.filter(c => !c.deletedAt);
+  if (live.length === 0) return '';
+
+  const lines: string[] = [`## Discussion (${live.length})`, ''];
+
+  // Sort by createdAt asc — chronological reading
+  const sorted = [...live].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
+  for (const c of sorted) {
+    const username = c.author?.username || c.authorId;
+    const display = c.author?.displayName ? ` (${c.author.displayName})` : '';
+    const ts = c.createdAt ? c.createdAt.replace(/\.\d{3}Z$/, 'Z') : '';
+    const resolved = c.resolvedAt ? ' [✓ resolved]' : '';
+
+    lines.push(`**@${username}${display}** · ${ts}${resolved}`);
+    lines.push('');
+    // Quote body — handle multi-line + empty body
+    const body = (c.body || '').trim();
+    if (body) {
+      for (const bodyLine of body.split('\n')) {
+        lines.push(`> ${bodyLine}`);
+      }
+    } else {
+      lines.push('> *(empty)*');
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n').trimEnd() + '\n';
+}
+
 function formatFlowDetail(flow: Flow, opts: { skipEmbeddedImages?: boolean } = {}): string {
   const lines = [
     `# Flow: ${flow.summary}`,
@@ -889,6 +946,48 @@ function formatFlowDetail(flow: Flow, opts: { skipEmbeddedImages?: boolean } = {
   return lines.join('\n');
 }
 
+// ============ DF-332 — flow_comments_get ============
+
+const flowCommentsGetDef = {
+  name: 'flow_comments_get',
+  description: `Reload only the discussion (comments) for a flow as a Markdown section.
+
+Returns the same "## Discussion (N)"-section that flow_get appends. Useful when:
+- The user said something new in the UI and you want fresh context without re-fetching the entire flow + attachments.
+- You want a focused view of resolution status across comments.
+
+Resolved comments are marked with [✓ resolved]. Body is rendered verbatim — wikilinks like [[adr-134]] stay raw (use wiki_get_page to resolve them).`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      flowId: {
+        type: 'string',
+        description: 'The flow ID (e.g. "DF-329" or full ID).'
+      }
+    },
+    required: ['flowId']
+  }
+};
+
+async function handleFlowCommentsGet(args: Record<string, unknown>): Promise<string> {
+  const flowId = args.flowId as string;
+  const resolvedId = await resolveFlowId(flowId);
+  if (!resolvedId) {
+    return `Error: Flow not found (tried exact and prefix match for "${flowId}")`;
+  }
+
+  const result = await devFlowClient.listFlowComments(resolvedId);
+  if (!result.success || !Array.isArray(result.data)) {
+    return `Error: ${result.error || 'Failed to load comments'}`;
+  }
+
+  const section = formatDiscussionSection(result.data);
+  if (!section) {
+    return '*No discussion yet for this flow.*';
+  }
+  return section;
+}
+
 // ============ Tool Registry Export ============
 
 export const tools: ToolModule = {
@@ -911,5 +1010,9 @@ export const tools: ToolModule = {
   flow_get_feedback: {
     definition: flowGetFeedbackDef,
     handler: withErrorHandling('flow_get_feedback', handleFlowGetFeedback),
+  },
+  flow_comments_get: {
+    definition: flowCommentsGetDef,
+    handler: withErrorHandling('flow_comments_get', handleFlowCommentsGet),
   },
 };

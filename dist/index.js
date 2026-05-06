@@ -21168,7 +21168,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.24.0";
+var MCP_VERSION = "4.25.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -21509,6 +21509,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
       return { success: true, data: transformFlow(result.data) };
     }
     return result;
+  }
+  // DF-332 — Flow comments / discussion thread
+  async listFlowComments(flowId) {
+    return this.request("GET", `/api/flows/${flowId}/comments`);
   }
   async updateFlow(flowId, update) {
     const result = await this.request("PATCH", `/api/flows/${flowId}`, update);
@@ -23650,12 +23654,23 @@ async function handleFlowGet(args) {
       }
     }
   }
+  let discussionSection = "";
+  try {
+    const commentsResult = await devFlowClient.listFlowComments(resolvedId);
+    if (commentsResult.success && Array.isArray(commentsResult.data)) {
+      discussionSection = formatDiscussionSection(commentsResult.data);
+    }
+  } catch {
+  }
   let output = formatFlowDetail(flow, { skipEmbeddedImages: true });
   if (inlineTextSections.length > 0) {
     output += "\n\n" + inlineTextSections.join("\n\n");
   }
   if (otherAttachments.length > 0) {
     output += "\n\n" + formatAttachmentList(otherAttachments);
+  }
+  if (discussionSection) {
+    output += "\n\n" + discussionSection;
   }
   if (imageBlocks.length === 0) {
     return output;
@@ -23984,6 +23999,30 @@ function formatFlowList(flows, opts = {}) {
   }
   return lines.join("\n") + "\n";
 }
+function formatDiscussionSection(comments) {
+  const live = comments.filter((c) => !c.deletedAt);
+  if (live.length === 0) return "";
+  const lines = [`## Discussion (${live.length})`, ""];
+  const sorted = [...live].sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+  for (const c of sorted) {
+    const username = c.author?.username || c.authorId;
+    const display = c.author?.displayName ? ` (${c.author.displayName})` : "";
+    const ts = c.createdAt ? c.createdAt.replace(/\.\d{3}Z$/, "Z") : "";
+    const resolved = c.resolvedAt ? " [\u2713 resolved]" : "";
+    lines.push(`**@${username}${display}** \xB7 ${ts}${resolved}`);
+    lines.push("");
+    const body = (c.body || "").trim();
+    if (body) {
+      for (const bodyLine of body.split("\n")) {
+        lines.push(`> ${bodyLine}`);
+      }
+    } else {
+      lines.push("> *(empty)*");
+    }
+    lines.push("");
+  }
+  return lines.join("\n").trimEnd() + "\n";
+}
 function formatFlowDetail(flow, opts = {}) {
   const lines = [
     `# Flow: ${flow.summary}`,
@@ -24079,6 +24118,42 @@ function formatFlowDetail(flow, opts = {}) {
   }
   return lines.join("\n");
 }
+var flowCommentsGetDef = {
+  name: "flow_comments_get",
+  description: `Reload only the discussion (comments) for a flow as a Markdown section.
+
+Returns the same "## Discussion (N)"-section that flow_get appends. Useful when:
+- The user said something new in the UI and you want fresh context without re-fetching the entire flow + attachments.
+- You want a focused view of resolution status across comments.
+
+Resolved comments are marked with [\u2713 resolved]. Body is rendered verbatim \u2014 wikilinks like [[adr-134]] stay raw (use wiki_get_page to resolve them).`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      flowId: {
+        type: "string",
+        description: 'The flow ID (e.g. "DF-329" or full ID).'
+      }
+    },
+    required: ["flowId"]
+  }
+};
+async function handleFlowCommentsGet(args) {
+  const flowId = args.flowId;
+  const resolvedId = await resolveFlowId(flowId);
+  if (!resolvedId) {
+    return `Error: Flow not found (tried exact and prefix match for "${flowId}")`;
+  }
+  const result = await devFlowClient.listFlowComments(resolvedId);
+  if (!result.success || !Array.isArray(result.data)) {
+    return `Error: ${result.error || "Failed to load comments"}`;
+  }
+  const section = formatDiscussionSection(result.data);
+  if (!section) {
+    return "*No discussion yet for this flow.*";
+  }
+  return section;
+}
 var tools2 = {
   flow_list: {
     definition: flowListDef,
@@ -24099,6 +24174,10 @@ var tools2 = {
   flow_get_feedback: {
     definition: flowGetFeedbackDef,
     handler: withErrorHandling("flow_get_feedback", handleFlowGetFeedback)
+  },
+  flow_comments_get: {
+    definition: flowCommentsGetDef,
+    handler: withErrorHandling("flow_comments_get", handleFlowCommentsGet)
   }
 };
 

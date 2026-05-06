@@ -85,6 +85,7 @@ export declare class DevFlowClient {
     listFlows(projectId?: string): Promise<ApiResponse<Flow[]>>;
     createFlow(flow: FlowCreate): Promise<ApiResponse<Flow>>;
     getFlow(flowId: string): Promise<ApiResponse<Flow>>;
+    listFlowComments(flowId: string): Promise<ApiResponse<FlowDiscussionComment[]>>;
     updateFlow(flowId: string, update: FlowUpdate): Promise<ApiResponse<Flow>>;
     getFlowFeedback(flowId: string): Promise<ApiResponse<FlowFeedback>>;
     getAttachments(flowId: string): Promise<ApiResponse<FlowAttachment[]>>;
@@ -400,6 +401,22 @@ export interface FlowAttachment {
     fileSize: number;
     url: string;
     createdAt: string;
+}
+export interface FlowDiscussionComment {
+    id: string;
+    flowId: string;
+    authorId: string;
+    body: string;
+    createdAt: string;
+    updatedAt?: string | null;
+    resolvedAt?: string | null;
+    resolvedBy?: string | null;
+    deletedAt?: string | null;
+    author?: {
+        id: string;
+        username?: string | null;
+        displayName?: string | null;
+    };
 }
 export interface FlowFeedback {
     planFeedback: string | null;
