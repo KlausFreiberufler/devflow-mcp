@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "edit|write|apply_patch",
+        "command": "${CURSOR_PROJECT_ROOT}/.cursor/hooks/pre-tool-use.sh"
+      },
+      {
+        "matcher": "mcp__devflow.*__flow_update",
+        "command": "${CURSOR_PROJECT_ROOT}/.cursor/hooks/pre-flow-update.sh"
+      }
+    ]
+  }
+}

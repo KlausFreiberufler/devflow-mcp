@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "devflow-flows": {
+      "command": "npx",
+      "args": ["-y", "@dev-flow-tech/mcp-server", "devflow-mcp-flows"],
+      "env": {}
+    },
+    "devflow-wiki": {
+      "command": "npx",
+      "args": ["-y", "@dev-flow-tech/mcp-server", "devflow-mcp-wiki"],
+      "env": {}
+    }
+  }
+}
