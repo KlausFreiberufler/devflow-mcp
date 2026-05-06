@@ -353,6 +353,12 @@ export interface Flow {
     codeApprovedBy?: string;
     codeApprovedAt?: string;
     assigneeName?: string;
+    assignee?: {
+        id: string;
+        name: string;
+        email: string | null;
+    } | null;
+    isMine?: boolean;
     branchName?: string;
     branchCreated?: boolean;
     prUrl?: string;

@@ -1123,8 +1123,10 @@ export interface Flow {
   planApprovedAt?: string;
   codeApprovedBy?: string;
   codeApprovedAt?: string;
-  // Assignment
+  // Assignment (DF-329 — assignee as structured object + isMine flag for uniform display)
   assigneeName?: string;
+  assignee?: { id: string; name: string; email: string | null } | null;
+  isMine?: boolean;
   // Git workflow fields
   branchName?: string;
   branchCreated?: boolean;
