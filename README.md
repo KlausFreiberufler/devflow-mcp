@@ -61,6 +61,29 @@ npx github:KlausFreiberufler/devflow-mcp setup --client windsurf
 
 **Restart your AI client after setup.**
 
+### Server-Split (since DF-334)
+
+For clients with per-server tool-caps (e.g. Cursor 40-tool/server cap), DevFlow ships **three** entry-points:
+
+| Bin | Domain | Tool-Count |
+|---|---|---|
+| `devflow-mcp` | combined (default, BC) | ~65 |
+| `devflow-mcp-flows` | workflow (flow_*, task_*, agent_session_*, devflow_*, release_*) | ≤40 |
+| `devflow-mcp-wiki` | knowledge (adr_*, wiki_*, doc_page_*, knowledge_*, planning_context) | ≤40 |
+
+Cursor (or any cap'd client) registers BOTH split-bins to get full tool-coverage:
+
+```json
+{
+  "mcpServers": {
+    "devflow-flows": { "command": "npx", "args": ["-y", "@dev-flow-tech/mcp-server", "devflow-mcp-flows"] },
+    "devflow-wiki":  { "command": "npx", "args": ["-y", "@dev-flow-tech/mcp-server", "devflow-mcp-wiki"]  }
+  }
+}
+```
+
+Claude Code uses the combined `devflow-mcp` bin (no cap, simpler config).
+
 ## Getting Started
 
 1. Run `devflow_status()` to check the connection
