@@ -1,0 +1,36 @@
+{
+  "name": "devflow",
+  "version": "1.0.0",
+  "description": "Structured AI development workflows with enforced planning, task tracking, and code review gates — Gemini CLI extension",
+  "author": {
+    "name": "DevFlow",
+    "url": "https://dev-flow.tech"
+  },
+  "homepage": "https://dev-flow.tech",
+  "repository": "https://github.com/KlausFreiberufler/devflow-mcp",
+  "license": "MIT",
+  "keywords": [
+    "devflow",
+    "workflow",
+    "mcp",
+    "gemini",
+    "ai-development",
+    "project-management"
+  ],
+  "contextFileName": "GEMINI.md",
+  "skills": "skills/",
+  "hooks": "hooks/hooks.json",
+  "commands": "commands/",
+  "mcpServers": {
+    "devflow-flows": {
+      "command": "npx",
+      "args": ["-y", "@dev-flow-tech/mcp-server", "devflow-mcp-flows"],
+      "env": {}
+    },
+    "devflow-wiki": {
+      "command": "npx",
+      "args": ["-y", "@dev-flow-tech/mcp-server", "devflow-mcp-wiki"],
+      "env": {}
+    }
+  }
+}
