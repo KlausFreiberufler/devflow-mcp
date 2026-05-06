@@ -4,7 +4,7 @@ Manual-install bundle for Cursor 2.4+. Provides 19 skills, blocking hooks, slash
 
 ## Status
 
-**Scaffold (DF-338, shipped 2026-05-06).** Tier-2 plugin per DF-327. Cursor has no plugin-bundle-format yet — install via setup-script.
+**Scaffold (DF-338, shipped 2026-05-06, PR #47).** Tier-2 plugin per DF-327. Cursor has no plugin-bundle-format yet — install via setup-script.
 
 ## Installation
 
