@@ -90,5 +90,5 @@ Versionsbump: `packages/skills/package.json` `version` field.
 ## Related
 
 - Parent-Decision: DF-327 (Multi-Client Plugin-Strategie)
-- Implementation-Flow: DF-335
+- Implementation-Flow: DF-335 (this — shipped 2026-05-06)
 - Future: DF-336 (Codex), DF-337 (Gemini), DF-338 (Cursor)
