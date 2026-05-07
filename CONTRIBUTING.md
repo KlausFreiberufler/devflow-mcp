@@ -108,6 +108,10 @@ The client in `api/client.ts` handles:
 - Automatic retries on 5xx errors
 - snake_case to camelCase transformation of API responses
 
+### Hooks
+
+`hooks/` contains the Claude Code hook configs that drive the workflow. See [`hooks/README.md`](hooks/README.md) for the matcher convention. Critical rule: tool-name matchers must use the regex suffix `.*__flow_update$` so they match every host's namespacing (Claude Code namespaces MCP tools as `mcp__plugin_<plugin>_<server>__<tool>`). Each pre-hook script also has an internal `endsWith('__flow_update')` guard as a safety net. Tests in `scripts/tests/hooks-matcher.test.js` pin both.
+
 ## npm Package
 
 ### Check Package Contents

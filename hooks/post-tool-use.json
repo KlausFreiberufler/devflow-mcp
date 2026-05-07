@@ -1,7 +1,7 @@
 {
   "hooks": [
     {
-      "matcher": "mcp__devflow__flow_update",
+      "matcher": ".*__flow_update$",
       "hooks": [
         {
           "type": "command",

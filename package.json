@@ -1,6 +1,6 @@
 {
   "name": "@dev-flow-tech/mcp-server",
-  "version": "4.26.0",
+  "version": "4.27.0",
   "description": "MCP Server for DevFlow - Claude Code Integration",
   "license": "MIT",
   "type": "module",
@@ -54,7 +54,7 @@
     "start": "node dist/index.js",
     "setup": "node dist/setup/setup.js",
     "prepare": "npm run build",
-    "test": "vitest run && npm run build:codex-plugin && npm run build:gemini-extension && npm run build:cursor-bundle && node --test packages/skills/__tests__/skill-schema.test.js __tests__/server-split.test.js __tests__/codex-plugin.test.js __tests__/gemini-extension.test.js __tests__/cursor-bundle.test.js",
+    "test": "vitest run && npm run build:codex-plugin && npm run build:gemini-extension && npm run build:cursor-bundle && node --test packages/skills/__tests__/skill-schema.test.js __tests__/server-split.test.js __tests__/codex-plugin.test.js __tests__/gemini-extension.test.js __tests__/cursor-bundle.test.js scripts/tests/hooks-matcher.test.js scripts/tests/pre-flow-update-suffix-match.test.js scripts/tests/post-flow-update.test.js",
     "test:watch": "vitest",
     "skills:build-index": "node packages/skills/scripts/build-index.js",
     "build:codex-plugin": "node scripts/build-codex-plugin.js",
