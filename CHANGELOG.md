@@ -19,8 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `scripts/tests/hooks-matcher.test.js` — pins the matcher regex and verifies it accepts every plausible host namespace variant (legacy, plugin-namespaced, future renamings).
 - `scripts/tests/pre-flow-update-suffix-match.test.js` — per-script regression tests for namespace acceptance and override-arg respect.
-- `hooks/README.md` — documents the matcher convention, the belt-and-braces guard, and how to add new hooks.
-- `docs/SKILL-ACTIVATION-AUDIT.md` — Phase 5 audit of all 21 skills, their activation kinds, and the reliability uplift from this fix.
+- `hooks/README.md` — documents the matcher convention, the belt-and-braces guard, and how to add new hooks. See also `CONTRIBUTING.md` § Hooks.
+- `docs/SKILL-ACTIVATION-AUDIT.md` — Phase 5 audit of all 21 skills, their activation kinds, and the reliability uplift from this fix. Cross-referenced from `hooks/README.md`.
 
 ## [4.26.0] - 2026-05-06
 
