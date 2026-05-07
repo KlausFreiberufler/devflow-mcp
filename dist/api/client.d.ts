@@ -166,7 +166,7 @@ export declare class DevFlowClient {
     acceptKnowledgeDraft(id: string): Promise<ApiResponse<unknown>>;
     rejectKnowledgeDraft(id: string, notes?: string): Promise<ApiResponse<unknown>>;
     prepareKnowledgeHarvest(flowId: string): Promise<ApiResponse<unknown>>;
-    prepareKnowledgeCheck(flowId: string): Promise<ApiResponse<unknown>>;
+    prepareKnowledgeCheck(flowId: string, format?: 'compact' | 'full'): Promise<ApiResponse<unknown>>;
     fetchPlanningContext(flowId: string): Promise<ApiResponse<unknown>>;
     /** DF-310 — per-flow Wiki briefing (drives the WikiBriefingPanel UI) */
     fetchWikiContext(flowId: string): Promise<ApiResponse<unknown>>;

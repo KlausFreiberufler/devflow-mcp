@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.27.0] - 2026-05-07
+
+### Fixed (DF-357)
+
+- **Pre-tool-use hooks now actually fire.** The matcher in `hooks/pre-tool-use.json` and `post-tool-use.json` was the literal `mcp__devflow__flow_update`, which did not match Claude Code's plugin-namespaced tool name `mcp__plugin_devflow_devflow__flow_update`. The hooks were silent in every flow of the DF-345..356 audit sprint.
+  - Matcher is now the regex suffix `.*__flow_update$` — namespace-immune against future host renamings.
+  - All five scripts (`pre-flow-update-knowledge-auto-resolve.js`, `pre-flow-update-plan-critic.js`, `pre-flow-update-code-critic.js`, `pre-flow-update-self-approval.js`, `post-flow-update.js`) now apply a belt-and-braces internal guard `endsWith('__flow_update')`.
+  - Two scripts (`pre-flow-update-knowledge-auto-resolve.js`, `pre-flow-update-self-approval.js`) used CommonJS `require()` in an ESM-only repo — they would have crashed at runtime even if the matcher had fired. Migrated to `import` syntax.
+- **`knowledge_check_flow` no longer floods context.** The `prepareKnowledgeCheck` API client now requests `?format=compact` by default (backend route updated). The compact response is a bounded ~5 KB digest (`{flow, gaps[], briefingSummary≤2000chars, totalAdrCount, projectDraftCount}`) instead of every ADR's first 2000 chars (~150 KB). Pass `format='full'` to opt back into the legacy shape for debugging.
+
+### Added (DF-357)
+
+- `scripts/tests/hooks-matcher.test.js` — pins the matcher regex and verifies it accepts every plausible host namespace variant (legacy, plugin-namespaced, future renamings).
+- `scripts/tests/pre-flow-update-suffix-match.test.js` — per-script regression tests for namespace acceptance and override-arg respect.
+- `hooks/README.md` — documents the matcher convention, the belt-and-braces guard, and how to add new hooks.
+- `docs/SKILL-ACTIVATION-AUDIT.md` — Phase 5 audit of all 21 skills, their activation kinds, and the reliability uplift from this fix.
+
 ## [4.26.0] - 2026-05-06
 
 ### Added (DF-339)

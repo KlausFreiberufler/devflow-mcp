@@ -723,8 +723,10 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('GET', `/api/flows/${flowId}/knowledge-harvest/prepare`);
   }
 
-  async prepareKnowledgeCheck(flowId: string): Promise<ApiResponse<unknown>> {
-    return this.request('GET', `/api/flows/${flowId}/knowledge-check/prepare`);
+  async prepareKnowledgeCheck(flowId: string, format: 'compact' | 'full' = 'compact'): Promise<ApiResponse<unknown>> {
+    // DF-357: compact-mode is default — backend returns ~5 KB digest instead of
+    // ~150 KB ADR-content dump. Pass format='full' for legacy debug behavior.
+    return this.request('GET', `/api/flows/${flowId}/knowledge-check/prepare?format=${format}`);
   }
 
   async fetchPlanningContext(flowId: string): Promise<ApiResponse<unknown>> {

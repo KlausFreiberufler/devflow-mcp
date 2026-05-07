@@ -29,7 +29,8 @@ process.stdin.on('data', (chunk) => { input += chunk })
 process.stdin.on('end', () => {
   try {
     const payload = JSON.parse(input || '{}')
-    if (payload.tool !== 'mcp__devflow__flow_update') return
+    // DF-357 — accept any host's flow_update tool (devflow, plugin_devflow_devflow, etc.)
+    if (!payload.tool || !payload.tool.endsWith('__flow_update')) return
 
     const args = payload.tool_input || payload.input || {}
     const targetState = args.currentState

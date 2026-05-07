@@ -24,16 +24,17 @@
  * so flow_update reads it server-side.
  */
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
 process.stdin.on('end', async () => {
   try {
     const payload = JSON.parse(input || '{}');
-    if (payload.tool !== 'mcp__devflow__flow_update') return;
+    // DF-357 — accept any host's flow_update tool (devflow, plugin_devflow_devflow, etc.)
+    if (!payload.tool || !payload.tool.endsWith('__flow_update')) return;
     const args = payload.tool_input || payload.input || {};
     const targetState = args.currentState;
     if (targetState !== 'approval' && targetState !== 'done') return;

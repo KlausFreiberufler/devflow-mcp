@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.26.0";
+var MCP_VERSION = "4.27.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -7544,8 +7544,8 @@ Or set: export DEVFLOW_TOKEN="your-token"
   async prepareKnowledgeHarvest(flowId) {
     return this.request("GET", `/api/flows/${flowId}/knowledge-harvest/prepare`);
   }
-  async prepareKnowledgeCheck(flowId) {
-    return this.request("GET", `/api/flows/${flowId}/knowledge-check/prepare`);
+  async prepareKnowledgeCheck(flowId, format = "compact") {
+    return this.request("GET", `/api/flows/${flowId}/knowledge-check/prepare?format=${format}`);
   }
   async fetchPlanningContext(flowId) {
     return this.request("GET", `/api/flows/${flowId}/planning-context`);
