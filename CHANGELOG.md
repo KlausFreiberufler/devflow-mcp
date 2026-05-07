@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.28.0] - 2026-05-07
+
+### Added (DF-358)
+
+- **Plugin update notification on session start.** A new hook `scripts/check-plugin-update.js` runs at every Claude Code session start. It reads the installed version from `.claude-plugin/plugin.json`, fetches the latest published version from `https://registry.npmjs.org/@dev-flow-tech/mcp-server/latest` (3s timeout), compares them, and prints a one-line banner if a newer version is available:
+  ```
+  ⬆️  DevFlow plugin v4.29.0 available (current: v4.28.0) — restart Claude Code to update.
+  ```
+- 1-hour file cache at `~/.cache/devflow-mcp/version-check.json` keeps the npm registry hit rate down (max 24/day/machine). All errors (no internet, registry down, corrupt cache, missing plugin.json) are swallowed silently.
+- Pure-function lib `scripts/lib/version-check.js` exports `compareVersions`, `decideBanner`, `readCurrentVersion`, `readCache`, `writeCache`, `isCacheFresh`, `fetchLatestVersion` so the behavior is unit-testable and reusable.
+- Hook entry appended to `hooks/session-start.json` (existing `session-start-info.sh` wiring is preserved).
+- 28 new TDD tests covering pure-function semver compare, cache TTL boundary, banner format, and end-to-end runs against a local mock registry (`scripts/tests/version-check-lib.test.js`, `scripts/tests/check-plugin-update.test.js`, `scripts/tests/session-start-config.test.js`).
+
+### Privacy
+
+The session-start update check makes one outbound HTTPS request per hour per machine to `registry.npmjs.org` — the same host that `npm install` already contacts. Disable by setting `DEVFLOW_VERSION_CHECK_URL=` to an empty string and ignoring the silent failure, or by removing the second hook entry from `hooks/session-start.json`.
+
 ## [4.27.0] - 2026-05-07
 
 ### Fixed (DF-357)

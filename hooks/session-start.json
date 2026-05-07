@@ -6,6 +6,10 @@
         {
           "type": "command",
           "command": "${CLAUDE_PLUGIN_ROOT}/scripts/session-start-info.sh"
+        },
+        {
+          "type": "command",
+          "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/check-plugin-update.js"
         }
       ]
     }

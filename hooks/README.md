@@ -8,7 +8,7 @@ This directory ships the [Claude Code hook](https://docs.claude.com/en/docs/clau
 |---|---|
 | `pre-tool-use.json` | Fires **before** a matching tool call. Enforces `.devflow-active` for `Edit/Write/NotebookEdit` and runs the four `flow_update` pre-hooks (knowledge auto-resolve, plan-critic, code-critic, self-approval). |
 | `post-tool-use.json` | Fires **after** a `flow_update`. Reminds the agent to call `devflow_init` after a state transition. |
-| `session-start.json` | Renders the bootstrap banner on each Claude Code session start. |
+| `session-start.json` | Two hooks fire at session start: (1) `session-start-info.sh` shows the active flow context; (2) `check-plugin-update.js` (DF-358) prints a one-line banner if a newer plugin version is on npm (1-hour cache at `~/.cache/devflow-mcp/version-check.json`, all errors silent). |
 | `stop.json` | Reminds the agent of unfinished tasks before stop. |
 
 ## Matcher convention (DF-357)
