@@ -48,7 +48,7 @@ test('hooks/hooks.json valid + bash scripts pass syntax-check', () => {
   }
 })
 
-test('skills/ populated by build (19 dirs)', () => {
+test('skills/ populated by build (22 dirs)', () => {
   const skillsDir = join(EXT_DIR, 'skills')
   if (!existsSync(skillsDir)) {
     assert.fail('Run `node scripts/build-gemini-extension.js` first')
@@ -56,7 +56,7 @@ test('skills/ populated by build (19 dirs)', () => {
   const dirs = readdirSync(skillsDir).filter(n => {
     try { return statSync(join(skillsDir, n)).isDirectory() } catch { return false }
   })
-  assert.equal(dirs.length, 21, `expected 21 skills, found ${dirs.length}`)
+  assert.equal(dirs.length, 22, `expected 22 skills, found ${dirs.length}`)
   assert.ok(dirs.includes('devflow-tdd'))
 })
 

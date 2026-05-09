@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.29.0] - 2026-05-09
+
+### Added (DF-365)
+
+- **`flow_upload_file` MCP-Tool** — attach binary files (images, PDFs, large exports) to a flow from a disk path. Reads the file with `fs.readFile`, detects mime-type from the extension, posts as multipart/form-data with auth. Backend now accepts up to **50 MB** per file.
+  ```
+  flow_upload_file({ flowId: "DF-XXX", filePath: "/tmp/cover.png", kind: "notes" })
+  ```
+- **`devflow-flow-attachment` skill** — trigger-description so the agent knows when to fire (DE + EN trigger phrases) plus a decision tree for `flow_upload` (text content) vs `flow_upload_file` (disk file). Includes kind-auto-detection table and an Iron Law: never silently compress or truncate — fail loud over corrupt-silently.
+- API client method `uploadAttachmentFile(flowId, filePath, kind?)` covers the same path for SDK consumers.
+
+### Notes
+
+- Backend `flow_upload`-text content endpoint unchanged. The new tool is additive — existing `flow_upload({filename, content, kind})` calls keep working.
+- DevFlow backend bumped Multer + express.json from 10 MB → 50 MB to match. iPhone-sized photos now fit.
+- DF-358 update-banner will surface this v4.29.0 to existing installs at next session start.
+
 ## [4.28.0] - 2026-05-07
 
 ### Added (DF-358)
