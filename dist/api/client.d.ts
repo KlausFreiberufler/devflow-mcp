@@ -91,6 +91,14 @@ export declare class DevFlowClient {
     getAttachments(flowId: string): Promise<ApiResponse<FlowAttachment[]>>;
     uploadAttachment(flowId: string, filename: string, content: string, mimeType?: string, kind?: 'plan' | 'summary' | 'design' | 'decision' | 'notes'): Promise<ApiResponse<FlowAttachment>>;
     /**
+     * DF-365 — Upload a file from disk as a flow attachment. Reads the file, detects
+     * mime-type from the extension, and POSTs as multipart/form-data with auth.
+     *
+     * Backend supports up to 50 MB per file (DF-365). Mime types must be in the
+     * server allowlist (images / PDF / text / markdown / HTML / JSON / YAML / CSV).
+     */
+    uploadAttachmentFile(flowId: string, filePath: string, kind?: 'plan' | 'summary' | 'design' | 'decision' | 'notes'): Promise<ApiResponse<FlowAttachment>>;
+    /**
      * DF-208: Fetch raw attachment content from the auth-protected endpoint.
      * Returns either text (for text-like MIME types) or base64 (for binary).
      */

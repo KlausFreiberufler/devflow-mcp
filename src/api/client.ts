@@ -499,6 +499,76 @@ Or set: export DEVFLOW_TOKEN="your-token"
   }
 
   /**
+   * DF-365 — Upload a file from disk as a flow attachment. Reads the file, detects
+   * mime-type from the extension, and POSTs as multipart/form-data with auth.
+   *
+   * Backend supports up to 50 MB per file (DF-365). Mime types must be in the
+   * server allowlist (images / PDF / text / markdown / HTML / JSON / YAML / CSV).
+   */
+  async uploadAttachmentFile(
+    flowId: string,
+    filePath: string,
+    kind?: 'plan' | 'summary' | 'design' | 'decision' | 'notes',
+  ): Promise<ApiResponse<FlowAttachment>> {
+    if (!this.credentials) {
+      return { success: false, error: 'Not authenticated.' };
+    }
+
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+
+    let buf: Buffer;
+    try {
+      buf = await fs.readFile(filePath);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: `Could not read file at ${filePath}: ${msg}` };
+    }
+
+    const filename = path.basename(filePath);
+    const ext = path.extname(filename).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.pdf': 'application/pdf',
+      '.txt': 'text/plain',
+      '.md': 'text/markdown',
+      '.markdown': 'text/markdown',
+      '.html': 'text/html',
+      '.htm': 'text/html',
+      '.json': 'application/json',
+      '.yaml': 'application/yaml',
+      '.yml': 'application/yaml',
+      '.csv': 'text/csv',
+    };
+    const mimeType = mimeMap[ext] || 'application/octet-stream';
+
+    // Cast through Uint8Array to satisfy BlobPart in strict TS configs.
+    const blob = new Blob([new Uint8Array(buf)], { type: mimeType });
+    const formData = new FormData();
+    formData.append('file', blob, filename);
+    if (kind) formData.append('kind', kind);
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.credentials.accessToken}`,
+    };
+    if (this.agentSessionId) {
+      headers['X-Agent-Session'] = this.agentSessionId;
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/flows/${flowId}/attachments`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return response.json();
+  }
+
+  /**
    * DF-208: Fetch raw attachment content from the auth-protected endpoint.
    * Returns either text (for text-like MIME types) or base64 (for binary).
    */

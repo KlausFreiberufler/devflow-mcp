@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.28.0";
+var MCP_VERSION = "4.29.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -7359,6 +7359,64 @@ Or set: export DEVFLOW_TOKEN="your-token"
       return { success: false, error: "Not authenticated." };
     }
     const blob = new Blob([content], { type: mimeType });
+    const formData = new FormData();
+    formData.append("file", blob, filename);
+    if (kind) formData.append("kind", kind);
+    const headers = {
+      "Authorization": `Bearer ${this.credentials.accessToken}`
+    };
+    if (this.agentSessionId) {
+      headers["X-Agent-Session"] = this.agentSessionId;
+    }
+    const response = await fetch(`${this.baseUrl}/api/flows/${flowId}/attachments`, {
+      method: "POST",
+      headers,
+      body: formData
+    });
+    return response.json();
+  }
+  /**
+   * DF-365 — Upload a file from disk as a flow attachment. Reads the file, detects
+   * mime-type from the extension, and POSTs as multipart/form-data with auth.
+   *
+   * Backend supports up to 50 MB per file (DF-365). Mime types must be in the
+   * server allowlist (images / PDF / text / markdown / HTML / JSON / YAML / CSV).
+   */
+  async uploadAttachmentFile(flowId, filePath, kind) {
+    if (!this.credentials) {
+      return { success: false, error: "Not authenticated." };
+    }
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    let buf;
+    try {
+      buf = await fs.readFile(filePath);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: `Could not read file at ${filePath}: ${msg}` };
+    }
+    const filename = path.basename(filePath);
+    const ext = path.extname(filename).toLowerCase();
+    const mimeMap = {
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+      ".svg": "image/svg+xml",
+      ".pdf": "application/pdf",
+      ".txt": "text/plain",
+      ".md": "text/markdown",
+      ".markdown": "text/markdown",
+      ".html": "text/html",
+      ".htm": "text/html",
+      ".json": "application/json",
+      ".yaml": "application/yaml",
+      ".yml": "application/yaml",
+      ".csv": "text/csv"
+    };
+    const mimeType = mimeMap[ext] || "application/octet-stream";
+    const blob = new Blob([new Uint8Array(buf)], { type: mimeType });
     const formData = new FormData();
     formData.append("file", blob, filename);
     if (kind) formData.append("kind", kind);
@@ -10986,10 +11044,66 @@ async function handleFlowUpload(args) {
 Kind: ${kind}` : ""}
 URL: ${url2}${planHint}`;
 }
+var flowUploadFileDef = {
+  name: "flow_upload_file",
+  description: "Attach a file from disk to the current flow. Use this for images / PDFs / large files (up to 50 MB).\n\nFor agent-written text content (markdown plans, summaries, notes), prefer `flow_upload` which takes the content as a string.\n\nThe file is read from `filePath`, the mime-type is detected from the extension, and the upload is sent as multipart/form-data with auth.\n\nCommon use cases:\n- Attach a screenshot, photo, or generated cover image to a flow\n- Attach a PDF report or design doc the user has on disk\n- Attach large CSV / YAML / JSON exports that exceed the 100 KB string-content boundary",
+  inputSchema: {
+    type: "object",
+    properties: {
+      flowId: {
+        type: "string",
+        description: "The flow ID to attach the file to. If omitted, uses the current flow."
+      },
+      filePath: {
+        type: "string",
+        description: 'Absolute path to the file on disk (e.g. "/tmp/cover.png").'
+      },
+      kind: {
+        type: "string",
+        enum: [...ALLOWED_KINDS],
+        description: `Optional classification. kind="plan" also links the file as the flow's implementation plan.`
+      }
+    },
+    required: ["filePath"]
+  }
+};
+async function handleFlowUploadFile(args) {
+  const flowId = args.flowId || sessionContext.getFlowId();
+  const filePath = args.filePath;
+  const kindArg = typeof args.kind === "string" ? args.kind.toLowerCase() : void 0;
+  const kind = kindArg && ALLOWED_KINDS.includes(kindArg) ? kindArg : void 0;
+  if (!flowId) {
+    return "Error: No flowId provided and no active flow session. Call devflow_init first.";
+  }
+  if (!filePath) {
+    return "Error: filePath is required (absolute path to the file on disk).";
+  }
+  if (kindArg && !kind) {
+    return `Error: Invalid kind "${kindArg}". Allowed: ${ALLOWED_KINDS.join(", ")}`;
+  }
+  const result = await devFlowClient.uploadAttachmentFile(flowId, filePath, kind);
+  if (!result.success) {
+    return `Error uploading file: ${result.error || "Unknown error"}`;
+  }
+  const att = result.data;
+  const baseUrl = process.env.DEVFLOW_URL || "https://api.app.dev-flow.tech";
+  const url2 = att?.url?.startsWith("http") ? att.url : `${baseUrl}${att?.url || ""}`;
+  const sizeKb = att?.fileSize ? `${(att.fileSize / 1024).toFixed(1)} KB` : "size unknown";
+  const planHint = kind === "plan" ? "\n\nThe file is now linked as the flow's implementation plan." : "";
+  return `File attached.
+
+**${att?.originalName ?? "file"}** (${att?.mimeType ?? "unknown"}, ${sizeKb})${kind ? `
+Kind: ${kind}` : ""}
+URL: ${url2}${planHint}`;
+}
 var tools9 = {
   flow_upload: {
     definition: flowUploadDef,
     handler: withErrorHandling("flow_upload", handleFlowUpload)
+  },
+  flow_upload_file: {
+    definition: flowUploadFileDef,
+    handler: withErrorHandling("flow_upload_file", handleFlowUploadFile)
   }
 };
 

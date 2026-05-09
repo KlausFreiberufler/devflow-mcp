@@ -5,7 +5,7 @@
  * - plugin.json schema-valid (required fields)
  * - .mcp.json referenziert beide DevFlow-Server (flows + wiki)
  * - hooks/hooks.json existiert und ist valid JSON
- * - skills/ wurde build-time gefüllt (19 dirs)
+ * - skills/ wurde build-time gefüllt (22 dirs)
  * - commands/ wurde build-time gefüllt (mind. 4 .md files)
  * - hook-shell-scripts haben gültige Bash-Syntax
  */
@@ -56,7 +56,7 @@ test('hook-shell scripts have valid bash syntax', () => {
   }
 })
 
-test('skills/ folder populated by build (19 dirs)', () => {
+test('skills/ folder populated by build (22 dirs)', () => {
   const skillsDir = join(PLUGIN_DIR, 'skills')
   if (!existsSync(skillsDir)) {
     // Build wasn't run yet — fail with helpful hint
@@ -65,7 +65,7 @@ test('skills/ folder populated by build (19 dirs)', () => {
   const dirs = readdirSync(skillsDir).filter(n => {
     try { return statSync(join(skillsDir, n)).isDirectory() } catch { return false }
   })
-  assert.equal(dirs.length, 21, `expected 21 skill folders, found ${dirs.length}`)
+  assert.equal(dirs.length, 22, `expected 22 skill folders, found ${dirs.length}`)
   // canonical reference
   assert.ok(dirs.includes('devflow-tdd'), 'devflow-tdd skill must be present')
 })

@@ -1,5 +1,8 @@
 /**
- * flow_upload — Upload files as attachments to a flow
+ * flow_upload + flow_upload_file — Upload files as attachments to a flow.
+ *
+ * - flow_upload     : text content (string-based). For markdown/JSON/text written by the agent.
+ * - flow_upload_file: binary file from disk path. For images/PDFs/large files. (DF-365)
  */
 
 import { devFlowClient } from '../api/client.js';
@@ -96,9 +99,82 @@ async function handleFlowUpload(args: Record<string, unknown>): Promise<string> 
   return `File uploaded successfully.\n\n**${filename}** (${mimeType}, ${content.length} bytes)${kind ? `\nKind: ${kind}` : ''}\nURL: ${url}${planHint}`;
 }
 
+// ===========================================
+// DF-365 — flow_upload_file (binary file from disk)
+// ===========================================
+
+const flowUploadFileDef = {
+  name: 'flow_upload_file',
+  description:
+    'Attach a file from disk to the current flow. Use this for images / PDFs / large files (up to 50 MB).\n\n' +
+    'For agent-written text content (markdown plans, summaries, notes), prefer `flow_upload` which takes the content as a string.\n\n' +
+    'The file is read from `filePath`, the mime-type is detected from the extension, and the upload is sent as multipart/form-data with auth.\n\n' +
+    'Common use cases:\n' +
+    '- Attach a screenshot, photo, or generated cover image to a flow\n' +
+    '- Attach a PDF report or design doc the user has on disk\n' +
+    '- Attach large CSV / YAML / JSON exports that exceed the 100 KB string-content boundary',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      flowId: {
+        type: 'string',
+        description: 'The flow ID to attach the file to. If omitted, uses the current flow.',
+      },
+      filePath: {
+        type: 'string',
+        description: 'Absolute path to the file on disk (e.g. "/tmp/cover.png").',
+      },
+      kind: {
+        type: 'string',
+        enum: [...ALLOWED_KINDS],
+        description: 'Optional classification. kind="plan" also links the file as the flow\'s implementation plan.',
+      },
+    },
+    required: ['filePath'],
+  },
+};
+
+async function handleFlowUploadFile(args: Record<string, unknown>): Promise<string> {
+  const flowId = (args.flowId as string) || sessionContext.getFlowId();
+  const filePath = args.filePath as string;
+  const kindArg = typeof args.kind === 'string' ? args.kind.toLowerCase() : undefined;
+  const kind = (kindArg && ALLOWED_KINDS.includes(kindArg as AttachmentKind))
+    ? (kindArg as AttachmentKind)
+    : undefined;
+
+  if (!flowId) {
+    return 'Error: No flowId provided and no active flow session. Call devflow_init first.';
+  }
+  if (!filePath) {
+    return 'Error: filePath is required (absolute path to the file on disk).';
+  }
+  if (kindArg && !kind) {
+    return `Error: Invalid kind "${kindArg}". Allowed: ${ALLOWED_KINDS.join(', ')}`;
+  }
+
+  const result = await devFlowClient.uploadAttachmentFile(flowId, filePath, kind);
+  if (!result.success) {
+    return `Error uploading file: ${result.error || 'Unknown error'}`;
+  }
+
+  const att = result.data;
+  const baseUrl = process.env.DEVFLOW_URL || 'https://api.app.dev-flow.tech';
+  const url = att?.url?.startsWith('http') ? att.url : `${baseUrl}${att?.url || ''}`;
+  const sizeKb = att?.fileSize ? `${(att.fileSize / 1024).toFixed(1)} KB` : 'size unknown';
+  const planHint = kind === 'plan'
+    ? '\n\nThe file is now linked as the flow\'s implementation plan.'
+    : '';
+
+  return `File attached.\n\n**${att?.originalName ?? 'file'}** (${att?.mimeType ?? 'unknown'}, ${sizeKb})${kind ? `\nKind: ${kind}` : ''}\nURL: ${url}${planHint}`;
+}
+
 export const tools: ToolModule = {
   flow_upload: {
     definition: flowUploadDef,
     handler: withErrorHandling('flow_upload', handleFlowUpload),
+  },
+  flow_upload_file: {
+    definition: flowUploadFileDef,
+    handler: withErrorHandling('flow_upload_file', handleFlowUploadFile),
   },
 };
