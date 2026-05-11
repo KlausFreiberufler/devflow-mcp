@@ -510,23 +510,24 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
     // Strictness-based enforcement (beyond requiredFields)
     const strictness = getConfig().strictness;
 
-    // Task tracking enforcement: check tasks exist before review
+    // DF-377 — Client-side strictness checks are now informational warnings only.
+    // The DevFlow backend (DF-374 unified flow-gate service) is the authoritative
+    // gate for state transitions. The plugin still surfaces hints so the agent
+    // gets immediate feedback, but it no longer hard-blocks — the backend's 409
+    // response is the source of truth.
+
+    // Task tracking — informational
     if (currentState === 'review' && strictness.taskTracking >= 3) {
       try {
         const taskResult = await devFlowClient.listTasks(resolvedId);
         const tasks = taskResult.success ? taskResult.data || [] : [];
         if (tasks.length === 0) {
-          if (strictness.taskTracking >= 4) {
-            // Strict/Maximum: block transition
-            return `⛔ Strictness ${formatStrictnessLevel(strictness.taskTracking)} erfordert mindestens einen Task.\nErstelle Tasks mit task_create() bevor du zu review wechselst.`;
-          }
-          // Balanced: warn but don't block
-          warnings.push('⚠️ Keine Tasks angelegt. Bei Balanced-Strictness wird empfohlen, Tasks zu erstellen um die Arbeit nachvollziehbar zu machen.');
+          warnings.push(`📋 Strictness ${formatStrictnessLevel(strictness.taskTracking)} suggests creating tasks. Use task_create() — the backend may also block if project_configs.task_enforcement='gate'.`);
         }
         if (strictness.taskTracking >= 5) {
           const incomplete = tasks.filter(t => !t.isCompleted);
           if (incomplete.length > 0) {
-            return `⛔ Strictness ${formatStrictnessLevel(strictness.taskTracking)} erfordert dass alle Tasks abgeschlossen sind.\n${incomplete.length} Task(s) noch offen: ${incomplete.map(t => t.summary).join(', ')}`;
+            warnings.push(`📋 ${incomplete.length} task(s) still open: ${incomplete.map(t => t.summary).join(', ')}. Strictness ${formatStrictnessLevel(strictness.taskTracking)} suggests completing them before review.`);
           }
         }
       } catch {
@@ -534,9 +535,8 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
       }
     }
 
-    // Docs update enforcement when transitioning to review
+    // Docs update — informational
     if (currentState === 'review' && strictness.docsUpdate >= 3) {
-      // Check if docs were already updated: commits with 'docs' in message, or doc_page_update in session logs
       const flowData = currentFlow.success ? currentFlow.data as unknown as Record<string, unknown> : null;
       const existingCommits = flowData?.commits
         ? (typeof flowData.commits === 'string' ? JSON.parse(flowData.commits as string) : flowData.commits) as { message: string }[]
@@ -546,31 +546,27 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
         /\bdocs?\b/i.test(c.message)
       );
 
-      if (strictness.docsUpdate >= 5 && !hasDocsCommit) {
-        return `⛔ Strictness ${formatStrictnessLevel(strictness.docsUpdate)} erfordert Docs-Update vor Review.\nPruefe und aktualisiere alle relevanten Docs (EN + DE). Nutze doc_page_list() und doc_page_update() um betroffene Seiten zu finden und zu aktualisieren.\nAlternativ: Committe Docs-Aenderungen mit 'docs' im Commit-Message.`;
-      }
       if (!hasDocsCommit) {
-        warnings.push('📖 Docs-Hinweis: Pruefe ob Dokumentation aktualisiert werden muss. Nutze doc_page_list() oder committe Docs-Aenderungen.');
+        warnings.push(`📖 Strictness ${formatStrictnessLevel(strictness.docsUpdate)} suggests a docs update. Use doc_page_list() / doc_page_update(), or commit with 'docs' in the message. The backend may also block at Strictness 5.`);
       }
     }
 
-    // Git discipline enforcement: check branch/commits before review (only when git is enabled)
+    // Git discipline — informational
     const gitEnabled = getConfig().gitEnabled;
     if (currentState === 'review' && gitEnabled && strictness.gitDiscipline >= 4) {
       if (currentFlow.success && currentFlow.data) {
         if (!currentFlow.data.branchName && !branchName) {
-          return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert einen Branch.\nMelde den Branch mit flow_update({ branchName: "..." }) bevor du zu review wechselst.`;
+          warnings.push(`🌿 Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} suggests reporting a branch via flow_update({ branchName }).`);
         }
       }
       if (strictness.gitDiscipline >= 5) {
         if (!prUrl && !currentFlow.data?.prUrl) {
-          return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert eine PR-URL.\nErstelle eine PR und melde sie mit flow_update({ prUrl: "...", currentState: "review" }).`;
+          warnings.push(`🔗 Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} suggests a PR URL. Create the PR and report it via flow_update({ prUrl }).`);
         }
-        // Check that commits are reported — either in this call, or previously persisted on the flow.
         const persistedCommits = currentFlow.data?.commits ?? [];
         const totalCommits = [...persistedCommits, ...(commits || [])];
         if (totalCommits.length === 0) {
-          return `⛔ Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert Commits.\nMelde Commits mit flow_update({ commits: [{ hash: "...", message: "..." }] }) — idealerweise im selben Call wie die Review-Transition.`;
+          warnings.push(`📦 Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} suggests reporting commits via flow_update({ commits }) — ideally in the same call as the review transition.`);
         }
       }
     }

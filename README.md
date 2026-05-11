@@ -31,6 +31,8 @@ This installs everything in one shot: MCP server (auto-registered via `mcpServer
 
 > **Since 4.26.0 (DF-339):** Two new auto-review skills fire when transitioning state. `devflow-plan-critic` reminds at `planning → approval` to deep-review the plan against 7 dimensions. `devflow-code-critic` does the same at `in_progress → review` for the implementation. Both support iterative loop (max 3), trivial-flow-skip, and auto-approve-gate based on `project_configs.allow_agent_self_approval`.
 
+> **Since 4.30.0 (DF-374/DF-377):** The DevFlow backend is the primary gate for state-transitions (unified `flowGate` service with conditions like `plan-required`, `tasks-required`, `agent-summary`, `testing-instructions`, `knowledge-gaps-resolved`, `pr-state-consistent`, `adr-compliance-clean`). The plugin's strictness checks are now informational warnings — the backend's `409 gate.failures[]` response is the source of truth. This makes Multi-Client setups (Claude Code, Codex, Cursor, Gemini) consistent — the gate behavior is the same regardless of which client connects.
+
 Updates: `/plugin update devflow`.
 
 ### Manual Setup (fallback)

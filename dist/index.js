@@ -9760,17 +9760,12 @@ ${required2.message}`;
         const taskResult = await devFlowClient.listTasks(resolvedId);
         const tasks = taskResult.success ? taskResult.data || [] : [];
         if (tasks.length === 0) {
-          if (strictness.taskTracking >= 4) {
-            return `\u26D4 Strictness ${formatStrictnessLevel(strictness.taskTracking)} erfordert mindestens einen Task.
-Erstelle Tasks mit task_create() bevor du zu review wechselst.`;
-          }
-          warnings.push("\u26A0\uFE0F Keine Tasks angelegt. Bei Balanced-Strictness wird empfohlen, Tasks zu erstellen um die Arbeit nachvollziehbar zu machen.");
+          warnings.push(`\u{1F4CB} Strictness ${formatStrictnessLevel(strictness.taskTracking)} suggests creating tasks. Use task_create() \u2014 the backend may also block if project_configs.task_enforcement='gate'.`);
         }
         if (strictness.taskTracking >= 5) {
           const incomplete = tasks.filter((t) => !t.isCompleted);
           if (incomplete.length > 0) {
-            return `\u26D4 Strictness ${formatStrictnessLevel(strictness.taskTracking)} erfordert dass alle Tasks abgeschlossen sind.
-${incomplete.length} Task(s) noch offen: ${incomplete.map((t) => t.summary).join(", ")}`;
+            warnings.push(`\u{1F4CB} ${incomplete.length} task(s) still open: ${incomplete.map((t) => t.summary).join(", ")}. Strictness ${formatStrictnessLevel(strictness.taskTracking)} suggests completing them before review.`);
           }
         }
       } catch {
@@ -9783,33 +9778,25 @@ ${incomplete.length} Task(s) noch offen: ${incomplete.map((t) => t.summary).join
       const hasDocsCommit = allCommits.some(
         (c) => /\bdocs?\b/i.test(c.message)
       );
-      if (strictness.docsUpdate >= 5 && !hasDocsCommit) {
-        return `\u26D4 Strictness ${formatStrictnessLevel(strictness.docsUpdate)} erfordert Docs-Update vor Review.
-Pruefe und aktualisiere alle relevanten Docs (EN + DE). Nutze doc_page_list() und doc_page_update() um betroffene Seiten zu finden und zu aktualisieren.
-Alternativ: Committe Docs-Aenderungen mit 'docs' im Commit-Message.`;
-      }
       if (!hasDocsCommit) {
-        warnings.push("\u{1F4D6} Docs-Hinweis: Pruefe ob Dokumentation aktualisiert werden muss. Nutze doc_page_list() oder committe Docs-Aenderungen.");
+        warnings.push(`\u{1F4D6} Strictness ${formatStrictnessLevel(strictness.docsUpdate)} suggests a docs update. Use doc_page_list() / doc_page_update(), or commit with 'docs' in the message. The backend may also block at Strictness 5.`);
       }
     }
     const gitEnabled = getConfig().gitEnabled;
     if (currentState === "review" && gitEnabled && strictness.gitDiscipline >= 4) {
       if (currentFlow.success && currentFlow.data) {
         if (!currentFlow.data.branchName && !branchName) {
-          return `\u26D4 Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert einen Branch.
-Melde den Branch mit flow_update({ branchName: "..." }) bevor du zu review wechselst.`;
+          warnings.push(`\u{1F33F} Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} suggests reporting a branch via flow_update({ branchName }).`);
         }
       }
       if (strictness.gitDiscipline >= 5) {
         if (!prUrl && !currentFlow.data?.prUrl) {
-          return `\u26D4 Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert eine PR-URL.
-Erstelle eine PR und melde sie mit flow_update({ prUrl: "...", currentState: "review" }).`;
+          warnings.push(`\u{1F517} Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} suggests a PR URL. Create the PR and report it via flow_update({ prUrl }).`);
         }
         const persistedCommits = currentFlow.data?.commits ?? [];
         const totalCommits = [...persistedCommits, ...commits || []];
         if (totalCommits.length === 0) {
-          return `\u26D4 Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} erfordert Commits.
-Melde Commits mit flow_update({ commits: [{ hash: "...", message: "..." }] }) \u2014 idealerweise im selben Call wie die Review-Transition.`;
+          warnings.push(`\u{1F4E6} Strictness ${formatStrictnessLevel(strictness.gitDiscipline)} suggests reporting commits via flow_update({ commits }) \u2014 ideally in the same call as the review transition.`);
         }
       }
     }
