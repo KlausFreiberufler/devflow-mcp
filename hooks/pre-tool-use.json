@@ -10,6 +10,15 @@
       ]
     },
     {
+      "matcher": ".*__flow_create$",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/pre-flow-create-validate.js"
+        }
+      ]
+    },
+    {
       "matcher": ".*__flow_update$",
       "hooks": [
         {

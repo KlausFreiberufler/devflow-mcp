@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.31.0] - 2026-05-13
+
+### Added (DF-378)
+
+- **`flow_create` tool-schema hardening** — `summary`, `description`, and `acceptanceCriteria` are now all `required`. The tool-description spells out the limits (summary 3..80 chars, description ≥ 30 chars, AC ≥ 1 item × ≥ 10 chars each) so agents stop packing entire descriptions into the title.
+- **`pre-flow-create-validate.js` Pre-Tool-Use hook** — surfaces actionable 1-line hints to the agent BEFORE the tool-call is sent to the backend, so a too-long summary or missing description is caught without a 400-roundtrip. Pattern: `[[mcp-pre-tool-use-hook-for-state-transition-gates]]`.
+- New Pre-Tool-Use matcher `.*__flow_create$` registered in `hooks/pre-tool-use.json` so every host (devflow, plugin_devflow_devflow, …) picks it up.
+
+### Notes
+
+- Backend (DevFlow 2.13.0+) enforces the same limits in POST `/api/flows`, PATCH `/api/flows/:id` (`ticketSummary`), and the idea-exit state-transition guard. The structured response shape `{ success:false, error:'flow_input_invalid'\|'metadata_incomplete', validationErrors:[{ field, code, message, hint, limit?, actual? }] }` is consumed identically by the UI and the MCP hook.
+- Stub-create (`summary='Untitled'`, no description, no acceptanceCriteria) is intentionally allowed in the backend POST so the `+ Create Flow` click-and-edit UX keeps working — but the flow cannot leave the `idea`-state until the triple is filled in.
+
 ## [4.29.0] - 2026-05-09
 
 ### Added (DF-365)

@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.29.0";
+var MCP_VERSION = "4.31.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -9142,7 +9142,15 @@ var flowCreateDef = {
 Use this to create new feature requests, bug reports, or tasks.
 The flow starts in 'idea' state by default.
 
-Requires a projectId (use project_list to find it) and a summary.`,
+DF-378 \u2014 Valid metadata triple required:
+  - summary: short one-line title, 3..80 characters (NOT a paragraph)
+  - description: detailed body, \u2265 30 characters (the goal, motivation, constraints)
+  - acceptanceCriteria: at least 1 testable success criterion, each \u2265 10 characters
+
+If your text is long, put the title into \`summary\` (\u2264 80 chars) and the body into \`description\`.
+The backend rejects payloads that violate these limits with a structured 400 \`flow_input_invalid\`.
+
+Requires a projectId (use project_list to find it).`,
   inputSchema: {
     type: "object",
     properties: {
@@ -9152,11 +9160,11 @@ Requires a projectId (use project_list to find it) and a summary.`,
       },
       summary: {
         type: "string",
-        description: "Brief summary/title of the flow"
+        description: "Brief one-line title (3..80 chars). Long text belongs in `description`, not here."
       },
       description: {
         type: "string",
-        description: "Detailed description of what needs to be done"
+        description: "Detailed body explaining the goal, motivation, and constraints (\u2265 30 chars)."
       },
       flowType: {
         type: "string",
@@ -9166,10 +9174,10 @@ Requires a projectId (use project_list to find it) and a summary.`,
       acceptanceCriteria: {
         type: "array",
         items: { type: "string" },
-        description: "List of acceptance criteria"
+        description: "List of acceptance criteria (\u2265 1 item, each \u2265 10 chars)."
       }
     },
-    required: ["summary"]
+    required: ["summary", "description", "acceptanceCriteria"]
   }
 };
 var flowUpdateDef = {
