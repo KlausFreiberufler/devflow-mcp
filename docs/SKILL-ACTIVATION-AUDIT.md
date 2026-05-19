@@ -6,7 +6,7 @@ Snapshot of how each of the 21 skills currently gets in front of the agent. **Au
 |---|---|---|---|
 | `devflow-core` | description-match | high | Always-on foundation (CLAUDE.md anchor). |
 | `devflow-flow-display` | description-match (`listing flows`) | medium | Heavily relies on the agent recognizing "list flows" context. Often skipped on terse prompts. |
-| `devflow-planning` | description-match (state=planning) | high | Anchored in `devflow_init` response. |
+| `devflow-planning` | description-match (state=planning) | high | Anchored in `devflow_init` response. **Post-DF-406 (v4.32.1)**: external agent-delegation patterns (`superpowers:*`) removed, no more turn-by-turn user-question loop. Iron Law dokumentiert: "Plan goes to the flow, not the repo" — plan inline via `flow_update({implementationPlan})`, backend auto-uploads as `implementation-plan.md` attachment (DF-212 mechanism). |
 | `devflow-collision-acknowledged` | discipline-token gate | **high — after DF-357** | Required token for approval. Pre-tool-use hook now actually fires (was dormant). |
 | `devflow-pattern-reuse` | discipline-token gate | **high — after DF-357** | Same. |
 | `devflow-knowledge-completer` | discipline-token gate + DF-320 hook | **high — after DF-357** | Knowledge auto-resolve hook now actually fires. |
