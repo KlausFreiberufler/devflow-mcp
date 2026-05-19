@@ -21,11 +21,21 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
-@test "blocks when CLAUDE.md has marker but .devflow-active missing" {
+@test "blocks with exit 2 when CLAUDE.md has marker but .devflow-active missing" {
   echo "# Use devflow_init" > CLAUDE.md
   run bash "${BATS_TEST_DIRNAME}/../check-active-flow.sh"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"No active flow"* ]]
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"No active flow"* ]] || [[ "$output" == *"No active flow"* ]]
+}
+
+@test "reinject offers all three recovery options" {
+  echo "# Use devflow_init" > CLAUDE.md
+  run bash "${BATS_TEST_DIRNAME}/../check-active-flow.sh"
+  [ "$status" -eq 2 ]
+  combined="${stderr}${output}"
+  [[ "$combined" == *"/devflow-start"* ]]
+  [[ "$combined" == *"/devflow-list"* ]]
+  [[ "$combined" == *"/devflow-create"* ]]
 }
 
 @test "allows when .devflow-active exists" {
