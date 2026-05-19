@@ -16,6 +16,9 @@ const TOOL_NAMES_THAT_MUST_MATCH = [
   'mcp__some_future_host_devflow__flow_update',
 ];
 
+// Tool names that must NOT match the flow_update matcher.
+// Note: since DF-378 there's a separate flow_create matcher (`.*__flow_create$`),
+// so we check exclusively against the flow_update entry, not "any non-Edit entry".
 const TOOL_NAMES_THAT_MUST_NOT_MATCH = [
   'mcp__devflow__flow_get',
   'mcp__plugin_devflow_devflow__flow_create',
@@ -38,16 +41,17 @@ function findMatcherForTool(config, toolName) {
   return null;
 }
 
+// Locate the specific flow_update hook entry (skips Edit and other tool matchers).
+function findFlowUpdateEntry(cfg) {
+  return (cfg.hooks || []).find(h => h.matcher === EXPECTED_MATCHER);
+}
+
 test('pre-tool-use matcher pins the namespace-immune pattern', () => {
   const cfg = readJSON('pre-tool-use.json');
-  const flowUpdateEntry = (cfg.hooks || []).find(
-    h => h.matcher && h.matcher !== 'Edit|Write|NotebookEdit'
-  );
-  assert.ok(flowUpdateEntry, 'flow_update hook entry must exist');
-  assert.strictEqual(
-    flowUpdateEntry.matcher,
-    EXPECTED_MATCHER,
-    `Matcher drift: pre-tool-use.json expects "${EXPECTED_MATCHER}" — got "${flowUpdateEntry.matcher}". ` +
+  const flowUpdateEntry = findFlowUpdateEntry(cfg);
+  assert.ok(
+    flowUpdateEntry,
+    `flow_update hook entry must exist with matcher "${EXPECTED_MATCHER}". ` +
       `Bug: hooks fire in 0 of N flows when matcher does not match plugin-namespaced tool names.`
   );
 });
@@ -70,23 +74,24 @@ test('matcher accepts all known flow_update tool name variants', () => {
   }
 });
 
-test('matcher rejects unrelated tool names', () => {
+test('flow_update matcher rejects unrelated tool names', () => {
   const cfg = readJSON('pre-tool-use.json');
+  const flowUpdateEntry = findFlowUpdateEntry(cfg);
+  assert.ok(flowUpdateEntry, 'flow_update entry must exist');
+  const re = new RegExp(flowUpdateEntry.matcher);
   for (const tool of TOOL_NAMES_THAT_MUST_NOT_MATCH) {
-    const matched = findMatcherForTool(cfg, tool);
     assert.strictEqual(
-      matched,
-      null,
-      `Tool "${tool}" must NOT match the flow_update hook entry — got "${matched}".`
+      re.test(tool),
+      false,
+      `Tool "${tool}" must NOT match the flow_update matcher "${flowUpdateEntry.matcher}".`
     );
   }
 });
 
 test('all 4 pre-flow-update scripts are wired', () => {
   const cfg = readJSON('pre-tool-use.json');
-  const flowUpdateEntry = (cfg.hooks || []).find(
-    h => h.matcher && h.matcher !== 'Edit|Write|NotebookEdit'
-  );
+  const flowUpdateEntry = findFlowUpdateEntry(cfg);
+  assert.ok(flowUpdateEntry, 'flow_update entry must exist');
   const cmds = (flowUpdateEntry.hooks || []).map(h => h.command);
   for (const expected of [
     'pre-flow-update-knowledge-auto-resolve.js',

@@ -42,10 +42,13 @@ describe('Git Strictness Matrix', () => {
   })
 
   describe('gitDiscipline Level 4 (branch required)', () => {
-    it('blocks review without branchName', async () => {
+    it('warns (soft) without branchName — transition still succeeds', async () => {
+      // Since DF-377 / v4.30.0 the plugin emits informational warnings instead of
+      // hard-blocking; the backend may still enforce a gate at this strictness level.
       mockConfig = buildMockConfig({ gitDiscipline: 4, docsUpdate: 1 }, { gitEnabled: true })
       const result = await handleFlowUpdate({ flowId: 'test-flow', currentState: 'review' })
-      expect(result).toMatch(/⛔.*erfordert einen Branch/)
+      expect(result).toMatch(/Flow updated successfully/)
+      expect(result).toMatch(/🌿.*branchName/)
     })
 
     it('passes with branchName set in the call', async () => {
@@ -71,24 +74,26 @@ describe('Git Strictness Matrix', () => {
       mockClient.flow.branchName = 'feature/DF-218-test'
     })
 
-    it('blocks review without prUrl', async () => {
+    it('warns (soft) without prUrl — transition still succeeds', async () => {
       mockConfig = buildMockConfig({ gitDiscipline: 5, docsUpdate: 1 }, { gitEnabled: true })
       const result = await handleFlowUpdate({
         flowId: 'test-flow',
         currentState: 'review',
         commits: [{ hash: 'abc', message: 'feat: x' }],
       })
-      expect(result).toMatch(/⛔.*PR-URL/)
+      expect(result).toMatch(/Flow updated successfully/)
+      expect(result).toMatch(/🔗.*prUrl/)
     })
 
-    it('blocks review without any commits (neither in call nor persisted)', async () => {
+    it('warns (soft) without any commits — transition still succeeds', async () => {
       mockConfig = buildMockConfig({ gitDiscipline: 5, docsUpdate: 1 }, { gitEnabled: true })
       const result = await handleFlowUpdate({
         flowId: 'test-flow',
         currentState: 'review',
         prUrl: 'https://github.com/x/y/pull/1',
       })
-      expect(result).toMatch(/⛔.*Commits/)
+      expect(result).toMatch(/Flow updated successfully/)
+      expect(result).toMatch(/📦.*commits/)
     })
 
     it('passes with branch + prUrl + commits all in same call', async () => {
