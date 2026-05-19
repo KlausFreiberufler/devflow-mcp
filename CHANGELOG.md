@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > - `scripts/tests/hooks-matcher.test.js`: 3 tests broke when DF-378 added a `.*__flow_create$` matcher next to the existing `.*__flow_update$` entry — the "find first non-Edit matcher" heuristic returned the wrong entry. Tests now look up the flow_update matcher specifically.
 > - **Effect**: `npm test` 95/95 pass. `release.yml` CI no longer blocks the 4.32.x tag-push.
 
+## [4.32.0] - 2026-05-19
+
+### Changed — BREAKING (DF-405)
+
+- **`scripts/stop-check.js` blockt Session-Exit jetzt hart** wenn der aktive Flow in einem non-wait state ist (`idea` / `planning` / `ready` / `in_progress`). Hook gibt `exit 2` zurück und reinjected einen präzisen `flow_update`-Call inkl. `flowId`, Target-State und Required-Fields (`agentSummary` + `testingInstructions` bei `in_progress → review`). Vorher: stdout-Warning + impliziter `exit 0` — Claude Code interpretierte das als "passed", und der Agent konnte ohne Block beenden. Foundation für „Agent läuft bis fertig"-Loops.
+- **`scripts/check-active-flow.sh` blockt Edits ohne aktive Flow-Session jetzt hart** in DevFlow-managed Projekten. Hook gibt `exit 2` zurück und nennt drei Recovery-Optionen im stderr (`/devflow-start`, `/devflow-list`, `/devflow-create`). Vorher: `exit 1`, was Claude Code als "hook crashed, continue anyway" wertete — Edits gingen still durch.
+
+### Migration
+
+- **Escape-Hatch für 1 Version**: `DEVFLOW_STOP_HOOK_SOFT=1` schaltet den Stop-Hook in soft-mode (Warning auf stderr, `exit 0`). **Wird in 4.33.0 entfernt.**
+- `check-active-flow.sh` hat keinen Soft-Hatch — die Änderung `exit 1 → exit 2` ist eine reine Hook-Protokoll-Korrektur ohne neues Verhalten.
+- **CI-Nutzer in DevFlow-Projekten**: Falls eure Pipeline `devflow_init` aufruft und der Job in einem non-wait state endet, setzt `DEVFLOW_STOP_HOOK_SOFT=1` in der CI-Env (oder beendet den Flow sauber vor dem CI-Ende).
+
+### Notes
+
+- Hook-Protokoll-Hintergrund: Claude Code blockiert ein Tool/Stop nur bei `exit 2`. `exit 1` wird als "hook error, continue anyway" gewertet. `stderr` wird in den Agent-Kontext reinjected; `stdout` ist silent.
+- Reference: ADR-112 (Flow-Enforcement via PreToolUse-Hook) etabliert das Exit-2-Protokoll für Edits — DF-405 erweitert es auf die Stop-Phase.
+- Test-Coverage erweitert: 13 Tests in `scripts/tests/stop-check.test.js` (jeder State, SOFT-Hatch, corrupt active-file, non-DevFlow-Pass) und 5 in `scripts/tests/check-active-flow.bats` (recovery-message-coverage, exit-2-Pinning).
+
 ## [4.31.0] - 2026-05-13
 
 ### Added (DF-378)
