@@ -6,10 +6,24 @@ This directory ships the [Claude Code hook](https://docs.claude.com/en/docs/clau
 
 | File | Purpose |
 |---|---|
-| `pre-tool-use.json` | Fires **before** a matching tool call. Enforces `.devflow-active` for `Edit/Write/NotebookEdit` and runs the four `flow_update` pre-hooks (knowledge auto-resolve, plan-critic, code-critic, self-approval). |
+| `pre-tool-use.json` | Fires **before** a matching tool call. Enforces `.devflow-active` for `Edit/Write/NotebookEdit` (since DF-405: **blocks with exit 2 + 3 recovery options** if no active flow). Also runs the four `flow_update` pre-hooks (knowledge auto-resolve, plan-critic, code-critic, self-approval) and the `flow_create` validation hint. |
 | `post-tool-use.json` | Fires **after** a `flow_update`. Reminds the agent to call `devflow_init` after a state transition. |
 | `session-start.json` | Two hooks fire at session start: (1) `session-start-info.sh` shows the active flow context; (2) `check-plugin-update.js` (DF-358) prints a one-line banner if a newer plugin version is on npm (1-hour cache at `~/.cache/devflow-mcp/version-check.json`, all errors silent). |
-| `stop.json` | Reminds the agent of unfinished tasks before stop. |
+| `stop.json` | Since DF-405: **blocks session exit (exit 2) with a precise `flow_update` reinject** when the active flow is in a non-wait state (`idea` / `planning` / `ready` / `in_progress`). Wait states (`approval` / `review` / `done`) pass through. Set `DEVFLOW_STOP_HOOK_SOFT=1` to opt out for one version (removed in 4.33.0). |
+
+## Hook exit-code protocol (DF-405)
+
+Claude Code respects only three paths in a hook:
+
+| Exit code | Stream | Effect |
+|---|---|---|
+| **0** | (any) | Hook passed. Tool / stop proceeds. |
+| **1** | (any) | "Hook crashed, continue anyway." Tool proceeds. |
+| **2** | **stderr** | **BLOCK.** stderr is reinjected into the agent's context. |
+
+**`stdout` is silent.** Writing to stdout + `exit 2` does not surface the message to the agent. Use `process.stderr.write(...)` (Node) or `>&2` (bash) for any message you want the agent to see, and pair it with `exit 2`.
+
+Both `stop-check.js` and `check-active-flow.sh` returned exit 1 / stdout warnings before DF-405 — Claude Code treated that as silent pass. The fix uses exit 2 + stderr + a precise next-call template (filled with `flowId`, target state, required fields from `.devflow-active`). See [[Hook Exit-Code Protocol in Claude Code]] runbook and [[Pre-Stop Reinject mit präzisem next-call-template]] pattern in the wiki for the deeper why.
 
 ## Matcher convention (DF-357)
 
@@ -49,7 +63,10 @@ The Codex (`.codex-plugin/hooks/hooks.json`), Gemini (`.gemini-extension/hooks/h
 ```bash
 node --test scripts/tests/hooks-matcher.test.js \
             scripts/tests/pre-flow-update-suffix-match.test.js \
-            scripts/tests/post-flow-update.test.js
+            scripts/tests/post-flow-update.test.js \
+            scripts/tests/stop-check.test.js
+
+bats scripts/tests/check-active-flow.bats
 ```
 
-These tests are part of `npm test` in CI.
+`hooks-matcher`, `pre-flow-update-suffix-match`, `post-flow-update`, and (since DF-405) `stop-check` are part of `npm test`. The bats suite for `check-active-flow.sh` runs separately — it requires `bats` (`brew install bats-core`).
