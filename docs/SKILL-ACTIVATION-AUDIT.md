@@ -44,6 +44,10 @@ Snapshot of how each of the 21 skills currently gets in front of the agent. **Au
 
 The four pre-tool-use hooks were silent in every flow of the DF-345..356 audit sprint because the matcher pattern `mcp__devflow__flow_update` did not match the plugin-namespaced tool name `mcp__plugin_devflow_devflow__flow_update`. After DF-357 the matcher is namespace-immune (`.*__flow_update$`) and the internal guards use `endsWith('__flow_update')`.
 
+## Test-drift hygiene (post-DF-407)
+
+When the plugin's behavior is intentionally refactored (e.g. DF-377 made Strictness-warnings informational, DF-378 added a second hook matcher), the pin tests in `tests/strictness/` and `scripts/tests/hooks-matcher.test.js` must follow. **`npm test` red on main = `release.yml` CI red at next tag-push.** See CHANGELOG > "Internal test-drift fix (DF-407)" for the canonical example of both drift classes (hard-block vs soft-warn, matcher-find-heuristic).
+
 ## Out-of-scope follow-up candidates
 
 These are intentionally **not** addressed in DF-357. Each is its own scoped flow.

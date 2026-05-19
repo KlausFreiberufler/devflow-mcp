@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Internal test-drift fix (DF-407, 2026-05-19)** — no user-facing change, no version bump.
+>
+> - `tests/strictness/{git,rules}.test.ts`: 6 tests pinned the pre-DF-377 hard-block assertions (`/⛔.*Block/`). Plugin emits informational warnings since v4.30.0 (intentional, post-DF-302 settings simplification). Tests now assert the actual `📋 / 📖 / 🌿 / 🔗 / 📦` soft-warn output and that the transition still succeeds.
+> - `scripts/tests/hooks-matcher.test.js`: 3 tests broke when DF-378 added a `.*__flow_create$` matcher next to the existing `.*__flow_update$` entry — the "find first non-Edit matcher" heuristic returned the wrong entry. Tests now look up the flow_update matcher specifically.
+> - **Effect**: `npm test` 95/95 pass. `release.yml` CI no longer blocks the 4.32.x tag-push.
+
 ## [4.31.0] - 2026-05-13
 
 ### Added (DF-378)

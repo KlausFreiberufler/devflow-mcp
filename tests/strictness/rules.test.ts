@@ -73,20 +73,25 @@ describe('Rules Strictness Matrix', () => {
       expect(result).not.toMatch(/⛔/)
     })
 
-    it('Level 4: blocks review when no tasks', async () => {
+    it('Level 4: warns (soft) when no tasks — transition still succeeds', async () => {
+      // Since DF-377 / v4.30.0 the plugin emits informational warnings instead
+      // of hard-blocking; the backend may still enforce a gate at task_enforcement='gate'.
       mockConfig = buildMockConfig({ taskTracking: 4, docsUpdate: 1 })
       const result = await handleFlowUpdate({ flowId: 'test-flow', currentState: 'review' })
-      expect(result).toMatch(/⛔.*mindestens einen Task/)
+      expect(result).toMatch(/Flow updated successfully/)
+      expect(result).toMatch(/📋.*task_create/)
     })
 
-    it('Level 5: blocks review when tasks incomplete', async () => {
+    it('Level 5: warns (soft) when tasks incomplete — transition still succeeds', async () => {
       mockConfig = buildMockConfig({ taskTracking: 5, docsUpdate: 1 })
       mockClient.tasks.push(
         { id: 't1', isCompleted: false, summary: 'offen' },
         { id: 't2', isCompleted: true, summary: 'fertig' },
       )
       const result = await handleFlowUpdate({ flowId: 'test-flow', currentState: 'review' })
-      expect(result).toMatch(/⛔.*Tasks.*abgeschlossen/)
+      expect(result).toMatch(/Flow updated successfully/)
+      expect(result).toMatch(/📋.*open/)
+      expect(result).toMatch(/offen/)
     })
 
     it('Level 5: passes review when all tasks done', async () => {
@@ -106,10 +111,13 @@ describe('Rules Strictness Matrix', () => {
       mockClient.tasks.push({ id: 't1', isCompleted: true, summary: 'fertig' })
     })
 
-    it('Level 5: blocks review without any docs commit', async () => {
+    it('Level 5: warns (soft) without any docs commit — transition still succeeds', async () => {
+      // Since DF-377 / v4.30.0 the plugin emits informational warnings; the backend
+      // may still hard-block at Strictness 5 (docs gate), but the plugin itself does not.
       mockConfig = buildMockConfig({ docsUpdate: 5 })
       const result = await handleFlowUpdate({ flowId: 'test-flow', currentState: 'review' })
-      expect(result).toMatch(/⛔.*Docs-Update/)
+      expect(result).toMatch(/Flow updated successfully/)
+      expect(result).toMatch(/📖.*docs.update/)
     })
 
     it('Level 5: passes review when docs commit is in SAME call', async () => {
