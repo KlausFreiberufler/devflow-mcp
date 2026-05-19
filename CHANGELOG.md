@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > - `scripts/tests/hooks-matcher.test.js`: 3 tests broke when DF-378 added a `.*__flow_create$` matcher next to the existing `.*__flow_update$` entry — the "find first non-Edit matcher" heuristic returned the wrong entry. Tests now look up the flow_update matcher specifically.
 > - **Effect**: `npm test` 95/95 pass. `release.yml` CI no longer blocks the 4.32.x tag-push.
 
+## [4.32.1] - 2026-05-19
+
+### Changed (DF-406)
+
+- **`devflow-planning` Skill bereinigt** — externe Agent-Delegation-Patterns + interaktiver Frage-Dialog entfernt. Kein turn-by-turn-Clarification-Loop mehr vor dem Plan, keine Plan-Files mehr im Repo. **Iron Law: "Plan goes to the flow, not the repo."** Der Plan wird direkt im Skill-Body geschrieben und via `flow_update({implementationPlan: <markdown>})` submittet — der Backend macht das `implementation-plan.md` Attachment automatisch (Mechanism aus DF-212, April 2026).
+- Plan-Template ist jetzt der primäre Path (vorher fallback). Knowledge-Check pre-flight + Submitting-for-Approval Sections bleiben funktional, klarer dokumentiert (DF-313 Self-Approval-Mode, vier Discipline-Skills für `approval → ready`).
+- Cross-Refs: DF-212 (Plan-as-Attachment Mechanism, April 2026), ADR-032 (Flow-Attachment-Schema Plan/Design/Decision), DF-313 (Self-Approval default ON).
+
+### Notes
+
+- **Kein BREAKING** — API unverändert (`flow_update({implementationPlan})` funktioniert weiter, der Auto-Upload als Attachment passiert wie seit DF-212). Nur Skill-Doc + Agent-Behavior bereinigt.
+- Benutzer die `superpowers:*` Skills installiert hatten verlieren die optionale Delegation aus `devflow-planning`. Sie können `superpowers:*` weiterhin manuell invoken, aber `devflow-planning` selbst tut es nicht mehr.
+
 ## [4.32.0] - 2026-05-19
 
 ### Changed — BREAKING (DF-405)
