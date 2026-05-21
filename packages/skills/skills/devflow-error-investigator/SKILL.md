@@ -4,6 +4,7 @@ description: Use FIRST when you encounter an unexpected error / exception / fail
 flow_state: any
 hooks: [4]
 discipline_token: devflow-error-investigator
+optional: true
 ported_from: NEW (DF-316)
 iron_laws:
   - No novel error is investigated without a wiki-lookup first. The wiki has likely seen something similar.

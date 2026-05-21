@@ -4,6 +4,7 @@ description: Use during planning state, before submitting flow_update({currentSt
 flow_state: planning
 hooks: [3]
 discipline_token: devflow-plan-critic
+optional: true
 ported_from: superpowers:critic-pattern (DevFlow-original)
 iron_laws:
   - All 7 dimensions must be checked before emitting a verdict.

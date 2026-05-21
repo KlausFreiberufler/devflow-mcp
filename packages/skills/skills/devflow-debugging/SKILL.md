@@ -4,6 +4,7 @@ description: Use when an unexpected behavior, failing test, or production-error 
 flow_state: in_progress
 hooks: [4]
 discipline_token: devflow-debugging
+optional: true
 ported_from: superpowers:systematic-debugging
 iron_laws:
   - Reproduce the bug *before* hypothesizing — never debug what you cannot trigger.

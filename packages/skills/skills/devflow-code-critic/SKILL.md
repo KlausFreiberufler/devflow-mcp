@@ -4,6 +4,7 @@ description: Use during in_progress state, before submitting flow_update({curren
 flow_state: in_progress
 hooks: [3]
 discipline_token: devflow-code-critic
+optional: true
 ported_from: superpowers:critic-pattern (DevFlow-original, sister to devflow-plan-critic)
 iron_laws:
   - All 7 dimensions must be checked before emitting a verdict.
