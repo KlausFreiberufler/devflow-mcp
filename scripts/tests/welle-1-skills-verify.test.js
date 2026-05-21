@@ -45,3 +45,13 @@ test('AC-5 (Paket E): auto-resolve hook prints topic snippet when resolved has i
   assert.match(content, /resolved\.slice\(0,\s*3\)/, 'topic-preview limit of 3');
   assert.match(content, /topics:/, 'stdout line contains the "topics:" prefix');
 });
+
+test('DF-422 (Welle 2b): self-approval hook surfaces SKILL.md paths', () => {
+  const hookPath = path.join(ROOT, 'scripts', 'pre-flow-update-self-approval.js');
+  const content = fs.readFileSync(hookPath, 'utf8');
+  // DF-422 enhancement: skill-file paths are listed so the agent can read
+  // each Iron Law SKILL.md, not just the names.
+  assert.match(content, /DF-422/, 'DF-422 marker for greppability');
+  assert.match(content, /packages\/skills\/skills\/\$\{s\}\/SKILL\.md/, 'skill-path template present');
+  assert.match(content, /Read Iron Laws/, 'stdout line "Read Iron Laws" prefix');
+});
