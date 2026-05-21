@@ -88,13 +88,14 @@ test('flow_update matcher rejects unrelated tool names', () => {
   }
 });
 
-test('all 4 pre-flow-update scripts are wired', () => {
+test('all 5 pre-flow-update scripts are wired', () => {
   const cfg = readJSON('pre-tool-use.json');
   const flowUpdateEntry = findFlowUpdateEntry(cfg);
   assert.ok(flowUpdateEntry, 'flow_update entry must exist');
   const cmds = (flowUpdateEntry.hooks || []).map(h => h.command);
   for (const expected of [
     'pre-flow-update-knowledge-auto-resolve.js',
+    'pre-flow-update-adr-compliance.js',
     'pre-flow-update-plan-critic.js',
     'pre-flow-update-code-critic.js',
     'pre-flow-update-self-approval.js',

@@ -9,6 +9,7 @@ const scriptsDir = path.join(__dirname, '..');
 
 const SCRIPTS = [
   'pre-flow-update-knowledge-auto-resolve.js',
+  'pre-flow-update-adr-compliance.js',
   'pre-flow-update-plan-critic.js',
   'pre-flow-update-code-critic.js',
   'pre-flow-update-self-approval.js',
