@@ -4,6 +4,7 @@ description: Use when receiving a code-review (from a subagent dispatch or a hum
 flow_state: review
 hooks: []
 discipline_token: devflow-receiving-review
+optional: true
 ported_from: superpowers:receiving-code-review
 iron_laws:
   - Verify each finding technically — read the cited code, run a check command if applicable.

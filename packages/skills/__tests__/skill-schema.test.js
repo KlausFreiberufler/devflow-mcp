@@ -58,3 +58,60 @@ for (const slug of skillDirs) {
 test('devflow-tdd is present (canonical reference skill)', () => {
   assert.ok(skillDirs.includes('devflow-tdd'), 'devflow-tdd skill must exist')
 })
+
+// DF-418 — `optional: true` convention for skills that emit a discipline_token
+// but are NOT in HARDCODED_REQUIRED_SKILLS (DRIFT #9 from DF-413 lifecycle audit).
+//
+// Source-of-truth for required skills: backend/src/services/pipelineOrchestrator.js
+//   HARDCODED_REQUIRED_SKILLS = {
+//     approval: ['devflow-collision-acknowledged','devflow-pattern-reuse','devflow-tdd','devflow-knowledge-completer'],
+//     testing:  ['devflow-verification-gate','devflow-adr-compliance','devflow-plan-reconciliation','devflow-knowledge-completer'],
+//   }
+// Mirror below is the deduped union (7 unique slugs). Keep in sync when the
+// backend constant changes — the anti-drift assertion below guards against
+// silent promotion of a required skill to optional.
+const HARDCODED_REQUIRED_MIRROR = [
+  'devflow-collision-acknowledged',
+  'devflow-pattern-reuse',
+  'devflow-tdd',
+  'devflow-knowledge-completer',
+  'devflow-verification-gate',
+  'devflow-adr-compliance',
+  'devflow-plan-reconciliation',
+]
+
+for (const slug of skillDirs) {
+  test(`skill ${slug}: optional, if present, must equal literal 'true'`, () => {
+    const md = readFileSync(join(SKILLS_DIR, slug, 'SKILL.md'), 'utf8')
+    const fm = parseFrontmatter(md)
+    if (Object.prototype.hasOwnProperty.call(fm, 'optional')) {
+      assert.equal(
+        fm.optional,
+        'true',
+        `${slug}: optional must be literal 'true', got '${fm.optional}'`
+      )
+    }
+  })
+}
+
+test('hardcoded-required skills (anti-drift pin) MUST NOT carry optional=true', () => {
+  for (const slug of HARDCODED_REQUIRED_MIRROR) {
+    const skillMd = join(SKILLS_DIR, slug, 'SKILL.md')
+    let md
+    try {
+      md = readFileSync(skillMd, 'utf8')
+    } catch {
+      assert.fail(
+        `HARDCODED_REQUIRED_MIRROR slug '${slug}' has no SKILL.md — ` +
+        `update the mirror or restore the skill.`
+      )
+    }
+    const fm = parseFrontmatter(md)
+    assert.ok(fm, `${slug}: SKILL.md has no frontmatter block`)
+    assert.notEqual(
+      fm.optional,
+      'true',
+      `${slug} is hardcoded-required in pipelineOrchestrator.js but carries optional=true — drift detected.`
+    )
+  }
+})

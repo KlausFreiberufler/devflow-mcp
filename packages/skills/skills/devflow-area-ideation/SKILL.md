@@ -4,6 +4,7 @@ description: Use when the user pasted an Area-Idea-Hunt-Prompt from the IdeasPag
 flow_state: any
 hooks: []
 discipline_token: devflow-area-ideation
+optional: true
 ported_from: NEW (DF-318)
 iron_laws:
   - Every idea must cite at least one real ADR / pattern / runbook from the wiki — no hallucinated entities.
