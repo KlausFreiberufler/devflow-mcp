@@ -7,15 +7,14 @@ description: Use when the active DevFlow flow is in 'in_progress' state. Guides 
 
 You are in `in_progress`. The plan has been approved. Your job: implement it task by task, tracking progress via `task_list` / `task_update`, then submit for review.
 
-## Superpowers Integration
+## Iron Law — Execution stays in the flow
 
-If `superpowers:subagent-driven-development` is available, **invoke it** for subagent-per-task execution.
-If `superpowers:executing-plans` is available, **invoke it** for inline batch execution with checkpoints.
-If `superpowers:test-driven-development` is available, **use it** for test-first discipline.
+- **Work the plan, not the inbox.** The implementation plan is the single source of work order. No mid-flow scope creep — file new flows for out-of-scope discoveries.
+- **No external agent-delegation.** Don't farm tasks out to other tool-skill systems; run the loop below, with `task_list` / `task_update` as the progress marker.
+- **TDD per task.** Failing test first, then minimal code, then verify — captured in the `devflow-tdd` discipline-skill (token-emitted when each cycle has its evidence).
+- **One commit per task** when `gitEnabled: true` — keeps the diff auditable + lets the flow attach commits via `flow_update({commits})`.
 
-If none are available, follow the inline loop below.
-
-## Inline Execution Loop (fallback)
+## Execution Loop
 
 1. Call `task_list` to get the current task state
 2. For each open task:

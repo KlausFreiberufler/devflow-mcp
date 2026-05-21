@@ -7,12 +7,13 @@ description: Use when the active DevFlow flow is in 'review' state. Guides self-
 
 The flow is `review`. The agent has submitted work; you are checking it and preparing handover notes for the user.
 
-## Superpowers Integration
+## Iron Law — Review stays in the flow
 
-If `superpowers:code-review` is available, **use it** for the diff analysis.
-Otherwise, do an inline self-review following the steps below.
+- **No external delegation.** Run the diff analysis inline. Don't farm out to other tool-skill systems; the review must be auditable as part of the flow's agent-trace.
+- **Verify, don't trust.** Every acceptance criterion gets a real verification command (`devflow-verification-gate` skill governs this) — no "should work" claims.
+- **Document for the user.** Write `agentSummary` + `testingInstructions` so the user can re-verify in 2 minutes without re-reading the diff.
 
-## Inline Self-Review (fallback)
+## Self-Review Steps
 
 How you read the diff depends on `gitEnabled` (see `devflow-core` Git Mode):
 
@@ -49,7 +50,7 @@ You may self-transition by emitting discipline-tokens for every skill in `gate.r
 2. Then `flow_update({ flowId, currentState: 'done', selfApproved: true, disciplineTokens: [<token1>, <token2>, ...] })`
 3. The audit-trail will record `code_approved_by: 'agent:devflow (selfApproved with N tokens)'`
 
-For the `testing` step, hardcoded required skills are `devflow-verification-gate` + `devflow-adr-compliance`. Token TTL is 1 hour.
+For the `testing` step, hardcoded required skills (see `services/pipelineOrchestrator.js` HARDCODED_REQUIRED_SKILLS — source of truth) are: `devflow-verification-gate` + `devflow-adr-compliance` + `devflow-plan-reconciliation` + `devflow-knowledge-completer`. Token TTL is 1 hour.
 
 ## On Reject
 
