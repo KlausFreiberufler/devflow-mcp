@@ -6,7 +6,7 @@ hooks: [1, 7]
 discipline_token: devflow-knowledge-completer
 ported_from: NEW (DF-310)
 iron_laws:
-  - Never `dismiss` a knowledge gap. Always `extend` an existing wiki entry, create a new one, or `intent_defer`.
+  - Never `dismiss` a knowledge gap. Always `extend` an existing wiki entry, create a new one, or `intent_defer`. The priority is strict — extend > dismiss, and `dismiss` is the last resort reserved for truly off-topic mentions (backend hard-blocks dismiss when an extend-target exists).
   - Prefer `extend` over `create` whenever a related entry already exists — the wiki is a compounding artifact.
   - Tag every new wiki entry with the topic + the broader area (e.g. `auth/passkeys`) — multi-stage tags only.
 ---

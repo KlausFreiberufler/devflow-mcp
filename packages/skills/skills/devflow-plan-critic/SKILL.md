@@ -9,6 +9,7 @@ iron_laws:
   - All 7 dimensions must be checked before emitting a verdict.
   - High-severity findings must include a concrete suggestion, not just a problem.
   - The critic must not invent acceptance criteria — only assess what's already in the plan.
+  - Wiki-Coverage (dimension 4) must be backed by a real `wiki_get_briefing({flowId})` call — no bauchgefühl. extend > dismiss applies to every gap found.
   - Loop max 3 iterations. If 2 consecutive iterations have 0 high-findings → exit. If same finding appears twice unchanged → escalate.
   - Trivial flows (tasks ≤ 2 AND no schema-change AND no migration) MAY skip with verdict='approved-trivial'.
 ---
@@ -142,13 +143,16 @@ The skill produces a structured verdict as a JSON-shaped Markdown comment:
 
 ## Process
 
-1. Read the current plan (`flow.implementationPlan` + tasks + acceptance criteria)
-2. For **each** of the 7 dimensions, ask the focused question and look for failure-modes
-3. Record findings with severity + dimension + issue + suggestion
-4. Compute verdict from findings (rule above)
-5. Emit structured comment to the flow-discussion (or as agent-message)
-6. If verdict ≠ `approved`, revise the plan and re-invoke this skill
-7. If verdict = `approved`, proceed with `flow_update({currentState: 'approval'})`
+1. **Step 0 — pull the wiki briefing.** Before any dimension is judged, call `wiki_get_briefing({flowId})` once. The returned `relatedAdrs`, `relatedDocs`, `parallelFlows` and `gaps` are the empirical ground for **Dimension 4 — Wiki-Coverage**. Without this call you cannot detect ADR-drift, you can only guess.
+2. Read the current plan (`flow.implementationPlan` + tasks + acceptance criteria)
+3. For **each** of the 7 dimensions, ask the focused question and look for failure-modes. For Dimension 4 specifically, cross-reference the briefing from Step 0 — every related ADR/pattern that is not cited in the plan is a finding.
+4. Record findings with severity + dimension + issue + suggestion
+5. Compute verdict from findings (rule above)
+6. Emit structured comment to the flow-discussion (or as agent-message)
+7. If verdict ≠ `approved`, revise the plan and re-invoke this skill
+8. If verdict = `approved`, proceed with `flow_update({currentState: 'approval'})`
+
+> **Iron Law of the LLM-Wiki — extend > dismiss.** Any gap surfaced by Dimension 4 closes via `extend` of an existing ADR/pattern/runbook, or a new entry, or `intent_defer`. Never `dismiss`. See [[devflow-knowledge-completer]].
 
 ## Loop Semantics (Phase 2)
 
