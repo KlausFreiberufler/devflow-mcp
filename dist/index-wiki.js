@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.32.1";
+var MCP_VERSION = "4.33.0";
 
 // src/api/client.ts
 init_working_dir();
