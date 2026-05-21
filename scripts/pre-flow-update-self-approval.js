@@ -65,9 +65,13 @@ process.stdin.on('end', async () => {
     if (skills.length === 0) return;
 
     // 3) Surface stdout summary so the user sees what the agent SHOULD do.
+    // DF-422 — auch die Skill-File-Pfade ausgeben, damit der Agent die Iron
+    // Laws direkt nachlesen kann statt nur die Namen zu kennen.
+    const skillPaths = skills.map(s => `packages/skills/skills/${s}/SKILL.md`).join(', ');
     process.stdout.write(
       `🛈 Self-Approval ON · transition needs ${skills.length} discipline-token(s): ${skills.join(', ')}.\n` +
-      `   Pass selfApproved=true + disciplineTokens=[...] to flow_update or use POST /api/flows/${flowId}/discipline-tokens/auto-emit.\n`
+      `   Pass selfApproved=true + disciplineTokens=[...] to flow_update or use POST /api/flows/${flowId}/discipline-tokens/auto-emit.\n` +
+      `   💡 Read Iron Laws: ${skillPaths}\n`
     );
   } catch {
     // Never block flow_update on hook errors
