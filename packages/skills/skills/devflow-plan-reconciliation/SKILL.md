@@ -9,6 +9,7 @@ iron_laws:
   - Every AC and every plan section gets an explicit status — never "we'll see at testing time".
   - Scope-creep (work done not in the plan) is documented, not hidden.
   - Missing items must be fixed, deferred via intent_defer, or have a recorded rationale before review→done.
+  - Wiki-aware reconciliation: pull `planning_context({flowId})` + `wiki_get_briefing({flowId})` before judging — `moved` rows almost always become `extend` writes. extend > dismiss applies; never `dismiss` a gap surfaced during reconciliation.
 ---
 
 # Skill: devflow-plan-reconciliation
@@ -21,19 +22,17 @@ In `review` state, **before** `devflow-verification-gate`. After self-review (`d
 
 ## Process
 
-### 1 · Pull the approved plan + the change-set
+### 1 · Pull the approved plan + the change-set + the wiki snapshot
 
 ```ts
-flow_get({ id })           // returns implementation_plan + acceptance_criteria
-git diff main...HEAD --stat   // file-level summary
-git log main..HEAD --oneline  // commits since branch
+flow_get({ id })                  // returns implementation_plan + acceptance_criteria
+git diff main...HEAD --stat       // file-level summary
+git log main..HEAD --oneline      // commits since branch
+planning_context({ flowId: id })  // related ADRs + parallel flows + reference flows + arch modules
+wiki_get_briefing({ flowId: id }) // current relatedAdrs / relatedDocs / gaps / briefing
 ```
 
-Also:
-
-```ts
-GET /api/flows/:id/wiki-context  // for cited ADRs/patterns the plan promised
-```
+The `planning_context` + `wiki_get_briefing` calls let you compare the wiki state at planning-time (as cited in the plan) against the wiki state right now. `moved` rows in the reconciliation table almost always indicate an `extend`-write candidate. Iron Law — **extend > dismiss**: never close a gap surfaced here via `dismiss`; either `extend` an existing entry, create a new one, or `intent_defer` with substantive reason.
 
 ### 2 · Build the reconciliation table
 

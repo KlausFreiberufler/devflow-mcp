@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
  * DF-378 — Pre-tool-use hook for mcp__*__flow_create.
+ * DF-412 Paket C — also surfaces wiki-similarity hints before the create
+ * is sent, so the agent considers extending an existing ADR/pattern/flow
+ * instead of duplicating it. Iron Law of the LLM-Wiki: extend > create.
  *
  * Surfaces actionable 1-line hints to the agent BEFORE the tool-call is
  * sent to the backend, so the agent can self-correct (split a long
@@ -15,6 +18,9 @@
  *  - Stub-create (summary='Untitled' + no description + no AC) is silently
  *    accepted: the UI uses it for click-and-edit, and the agent shouldn't
  *    be encouraged to mimic that pattern.
+ *  - Wiki-similarity check (DF-412) NEVER blocks — network errors, missing
+ *    env-vars, missing projectId, or empty results all stay silent. The
+ *    hook only surfaces a hint when there is concrete evidence of overlap.
  */
 
 const LIMITS = {
@@ -89,9 +95,55 @@ function collectHints(input) {
   return hints;
 }
 
+/**
+ * DF-412 Paket C — non-blocking wiki-similarity hint.
+ * Calls /api/projects/:id/cmd-k-search (DF-368) and writes a 1-paragraph
+ * stdout hint when nearby ADRs / patterns / flows / drafts are found.
+ * Silent on every failure mode: missing env, missing projectId, network
+ * error, non-2xx, empty results. The agent is never blocked.
+ */
+async function maybeBuildWikiHint(args) {
+  const base = process.env.DEVFLOW_API_BASE;
+  const token = process.env.DEVFLOW_API_TOKEN;
+  if (!base || !token) return null;
+  if (!args || !args.projectId || typeof args.summary !== 'string') return null;
+  const q = args.summary.trim();
+  if (q.length < 3) return null;
+
+  const baseUrl = base.replace(/\/$/, '');
+  const url = `${baseUrl}/api/projects/${encodeURIComponent(args.projectId)}/cmd-k-search?q=${encodeURIComponent(q.slice(0, 120))}&limit=3`;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2000);
+    let res;
+    try {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res || !res.ok) return null;
+    const json = await res.json();
+    const payload = json && (json.data || json);
+    const results = Array.isArray(payload) ? payload : (payload && payload.results) || [];
+    if (!Array.isArray(results) || results.length === 0) return null;
+    const lines = results.slice(0, 3).map((r) => {
+      const type = r.type || r.documentType || 'wiki';
+      const title = r.title || r.summary || r.displayId || r.slug || '(untitled)';
+      const ref = r.displayId || r.slug || r.id;
+      return ref ? `${type}: ${title} (${ref})` : `${type}: ${title}`;
+    });
+    return `🛈 Wiki has nearby entries — Iron Law: extend > create. Review before duplicating:\n  - ${lines.join('\n  - ')}\n`;
+  } catch {
+    return null; // never block
+  }
+}
+
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
-process.stdin.on('end', () => {
+process.stdin.on('end', async () => {
   try {
     const payload = JSON.parse(input || '{}');
     if (!payload.tool || !payload.tool.endsWith('__flow_create')) {
@@ -102,7 +154,16 @@ process.stdin.on('end', () => {
     if (hints.length > 0) {
       process.stdout.write(`🛈 flow_create input issues:\n  - ${hints.join('\n  - ')}\n`);
     }
+
+    // DF-412 Paket C — wiki similarity hint, only when validation passed.
+    if (hints.length === 0 && !isFullStub(args)) {
+      const wikiHint = await maybeBuildWikiHint(args);
+      if (wikiHint) process.stdout.write(wikiHint);
+    }
   } catch {
     // Always exit 0: malformed input shouldn't block the agent.
   }
 });
+
+// Export for tests (no-op when run as script via stdin path).
+export { maybeBuildWikiHint, collectHints };
