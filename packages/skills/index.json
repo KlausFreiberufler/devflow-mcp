@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generated_at": "2026-05-06T16:36:32.365Z",
-  "count": 19,
+  "generated_at": "2026-05-21T18:49:19.674Z",
+  "count": 23,
   "skills": [
     {
       "name": "devflow-adr-compliance",
@@ -22,6 +22,17 @@
       "hooks": [],
       "discipline_token": "devflow-area-ideation",
       "iron_laws_count": 3
+    },
+    {
+      "name": "devflow-code-critic",
+      "slug": "devflow-code-critic",
+      "description": "Use during in_progress state, before submitting flow_update({currentState: 'review'}), to deeply review the implementation against 7 quality dimensions. The skill enforces a critic-persona — the agent steps out of \"implementer\" mode and into \"reviewer\" mode. Outputs a structured verdict (approved | minor_issues | needs_changes) with severity-tagged findings. Iron Law: a verdict is only valid if all 7 dimensions were explicitly checked, and the diff plan-vs-reality was actually examined.",
+      "flow_state": "in_progress",
+      "hooks": [
+        3
+      ],
+      "discipline_token": "devflow-code-critic",
+      "iron_laws_count": 5
     },
     {
       "name": "devflow-collision-acknowledged",
@@ -55,6 +66,15 @@
       "iron_laws_count": 3
     },
     {
+      "name": "devflow-draft-triage",
+      "slug": "devflow-draft-triage",
+      "description": "Use in the 'review' state to triage pending knowledge_drafts before review→done. Decides per draft: accept (new wiki entry) or reject (with substantive reason). Iron Law extend > dismiss applies — never wegklick a draft whose topic has an existing extend-target.",
+      "flow_state": "review",
+      "hooks": [],
+      "discipline_token": null,
+      "iron_laws_count": 4
+    },
+    {
       "name": "devflow-error-investigator",
       "slug": "devflow-error-investigator",
       "description": "Use FIRST when you encounter an unexpected error / exception / failing test that's not immediately obvious. Calls `error_context_get` to pull all wiki signals relevant to the error (runbooks, ADRs touching the file, recent flows, patterns, similar past errors). Iron Law of compounding wikis: every novel failure mode produces a new runbook on the way out.",
@@ -69,6 +89,15 @@
       "name": "devflow-executing",
       "slug": "devflow-executing",
       "description": "Use when the active DevFlow flow is in 'in_progress' state. Guides implementing the approved plan with tasks, commits, and TDD discipline.",
+      "flow_state": null,
+      "hooks": [],
+      "discipline_token": null,
+      "iron_laws_count": 0
+    },
+    {
+      "name": "devflow-flow-attachment",
+      "slug": "devflow-flow-attachment",
+      "description": "Use when the user asks you to attach a file to a flow (\"häng X an\", \"attach to DF-XXX\", \"save this to the flow\", \"upload this\"). Picks the right MCP tool (flow_upload for text, flow_upload_file for binaries) and the right kind. Iron law — never silently compress or truncate, prefer fail loud over corrupt-silently.",
       "flow_state": null,
       "hooks": [],
       "discipline_token": null,
@@ -120,13 +149,24 @@
       "iron_laws_count": 3
     },
     {
+      "name": "devflow-plan-critic",
+      "slug": "devflow-plan-critic",
+      "description": "Use during planning state, before submitting flow_update({currentState: 'approval'}), to deeply review the plan against 7 quality dimensions. The skill enforces a critic-persona — the agent steps out of \"author\" mode and into \"reviewer\" mode. Outputs a structured verdict (approved | minor_issues | needs_changes) with severity-tagged findings. Iron Law: a verdict is only valid if all 7 dimensions were explicitly checked.",
+      "flow_state": "planning",
+      "hooks": [
+        3
+      ],
+      "discipline_token": "devflow-plan-critic",
+      "iron_laws_count": 6
+    },
+    {
       "name": "devflow-plan-reconciliation",
       "slug": "devflow-plan-reconciliation",
       "description": "Use during the review state, before devflow-verification-gate, to reconcile the approved implementation_plan against what was actually implemented. Produces a per-AC and per-section table — done / partial / missing / extra — and forces the agent to address every gap (either fix it now, file an intent, or document why it's deferred). Without this skill the review only proves AC-by-AC, not that the plan as a whole was respected.",
       "flow_state": "review",
       "hooks": [],
       "discipline_token": "devflow-plan-reconciliation",
-      "iron_laws_count": 3
+      "iron_laws_count": 4
     },
     {
       "name": "devflow-planning",
