@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.33.0] - 2026-05-21
+
+### Added (DF-411)
+
+- **`/devflow-loop` slash-command** — single-command driver für „Agent läuft bis fertig". Orchestriert die State-Machine `idea → planning → approval → ready → in_progress → review → done` mit explizit emittierten Discipline-Tokens pro State, Gate-failure-Handling (409 reinject, fix named field, retry) und `--max-iterations` Cap. Args: `[flowId] [--max-iterations N] [--verify "<shell-cmd>"]`. Verify-Output wird verbatim in `testingInstructions` captured.
+- Foundation: DF-405 (Stop-Hook hard-blocks premature exit), DF-323 (Self-Approval auto-emit pre-hook), DF-408 (Knowledge-Resolution callable in approval/review), DF-410 (Skills clean + npm test 115 grün).
+
+### Notes
+
+- **Iron Law**: nutzt nur real existierende MCP tools — kein `wiki_create`, kein `visual-regression-passed` token, keine weighted-ADR voting (alles aus früheren Vision-Pitches, nicht implementiert). Out-of-scope explizit dokumentiert für künftige Flows.
+- **No BREAKING** — additive feature. Nutzer ohne den Command-Aufruf merken nichts.
+- Discipline-Tokens werden per Stage explizit emittet (`devflow_token_emit`) als Safety, parallel zur DF-323 pre-hook-Lösung. Wenn DF-323-Gap später via `modifiedToolInput` echt geschlossen wird (eigener Flow), wird der explizite Emit-Block im Command zur no-op-Sicherung.
+- Cross-Refs: DF-405 (Hook-Protokoll), DF-406 (devflow-planning Skill), DF-408 (KNOWLEDGE_RESOLUTION_TOOLS), DF-410 (Audit-Cleanup).
+
 > **Internal test-drift fix (DF-407, 2026-05-19)** — no user-facing change, no version bump.
 >
 > - `tests/strictness/{git,rules}.test.ts`: 6 tests pinned the pre-DF-377 hard-block assertions (`/⛔.*Block/`). Plugin emits informational warnings since v4.30.0 (intentional, post-DF-302 settings simplification). Tests now assert the actual `📋 / 📖 / 🌿 / 🔗 / 📦` soft-warn output and that the transition still succeeds.
