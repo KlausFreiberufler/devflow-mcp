@@ -63,7 +63,9 @@ The pre-tool-use hook on `flow_update` auto-resolves most warnings in bulk, but 
 
 ## Submitting for Approval
 
-When the plan is ready:
+When the plan is ready, **call `knowledge_check_flow({flowId})` first** as the explicit happy-path step (DF-420 GAP #3) — surface any open knowledge gaps before the submit, even if the reactive auto-resolve hook would catch them later. For every topic in the response without a resolution, call `knowledge_check_resolve` with `extend` (preferred), `adr` / `pattern` / `runbook`, or `intent_defer`. The Iron Law `extend > dismiss` applies.
+
+Then:
 
 ```
 flow_update({

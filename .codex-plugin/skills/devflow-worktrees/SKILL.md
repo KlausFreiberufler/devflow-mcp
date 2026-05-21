@@ -4,6 +4,7 @@ description: Use at the start of implementation (or when picking up an existing 
 flow_state: ready
 hooks: []
 discipline_token: devflow-worktrees
+optional: true
 ported_from: superpowers:using-git-worktrees
 iron_laws:
   - One worktree per flow — never share a directory across flows.

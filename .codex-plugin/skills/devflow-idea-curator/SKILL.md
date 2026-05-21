@@ -4,6 +4,7 @@ description: Use periodically (monthly cadence is plenty) to curate the project'
 flow_state: any
 hooks: []
 discipline_token: devflow-idea-curator
+optional: true
 ported_from: NEW (DF-315)
 iron_laws:
   - Every idea older than 90 days gets a verdict — pick&plan, defer with horizon, or reject. Idle backlog is dead backlog.

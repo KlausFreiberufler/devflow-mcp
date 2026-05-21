@@ -71,7 +71,15 @@ process.stdin.on('end', async () => {
     if (summary.intent_defer) counts.push(`${summary.intent_defer} defer`);
     if (counts.length === 0) return;
 
-    process.stdout.write(`✨ Wiki auto-resolved: ${counts.join(', ')}\n`);
+    // DF-420 DRIFT #1 — Topic-Vorschau anhängen damit der Agent sieht WAS
+    // genau extended/created/deferred wurde, nicht nur die Counts.
+    const topics = Array.isArray(resolved)
+      ? resolved.slice(0, 3).map(r => r?.topic).filter(Boolean)
+      : [];
+    const moreCount = Array.isArray(resolved) && resolved.length > 3 ? `, +${resolved.length - 3}` : '';
+    const topicSnippet = topics.length > 0 ? ` — topics: ${topics.join(', ')}${moreCount}` : '';
+
+    process.stdout.write(`✨ Wiki auto-resolved: ${counts.join(', ')}${topicSnippet}\n`);
   } catch {
     // Never block flow_update on hook errors
   }

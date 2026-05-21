@@ -19,6 +19,16 @@ Trigger this skill at review-time after the implementation is complete and a dif
 
 ## Process
 
+### 0. Snapshot accepted ADRs (before diff-matching)
+
+Before you compare paths, see which ADRs you are being measured against:
+
+```
+adr_list({ status: 'accepted' })
+```
+
+Read each result's `affects_paths` and `title` — these are the globs that the backend will run your diff against. Knowing them up front lets you (a) judge override-reasons honestly, (b) catch ADRs whose intent extends beyond their globs, and (c) spot accepted ADRs that obviously cover the area but have *empty* `affects_paths` (drift signal — flag as a finding instead of letting the compliance-check silently pass).
+
 ### 1. Collect the changed-files list
 
 Get the file diff between the feature branch and the integration target. Typical command:

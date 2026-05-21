@@ -4,6 +4,7 @@ description: Use periodically (or on demand from the Wiki page health-bar) to ke
 flow_state: any
 hooks: []
 discipline_token: devflow-wiki-lint
+optional: true
 ported_from: NEW (DF-312)
 iron_laws:
   - Every orphan must either gain a cross-link or be re-classified as `intent` (lifecycle_stage='idea'). Orphans never just sit.
