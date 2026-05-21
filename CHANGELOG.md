@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.35.0] - 2026-05-21
+
+### Added (DF-420 Welle 1 Paket D + DF-422 + DF-424 Skeleton)
+
+- **`devflow-draft-triage` Skill** (NEU) — flow_state: review, optional: false. Triagiert pending Drafts vor `review→done` mit Iron Law extend > dismiss. Worked Example aus DF-419 (17 Drafts → 0 pending). Verhindert dass das `no-pending-drafts` Gate beim review→done unerwartet feuert.
+- **`devflow-subagent-driven-dev` Skill** (NEU, Draft-Skeleton via DF-424) — status: draft, optional: true. Wartet auf RFC-Sign-off (siehe `docs/RFC_SUBAGENT_DF424.md` im backend-repo). Nicht aktiv.
+- **`devflow-planning` Skill** verschärft (DF-420 Paket C) — happy-path Step ergänzt: expliziter `knowledge_check_flow({flowId})`-Aufruf VOR `flow_update({currentState: 'approval'})`. Vorher nur reaktiv via Hook, jetzt sichtbar im Skill-Body.
+
+### Changed (DF-420 Paket E + DF-422)
+
+- **`pre-flow-update-knowledge-auto-resolve.js`** zeigt jetzt zusätzlich Topic-Vorschau: `✨ Wiki auto-resolved: 3 extend, 1 draft — topics: auth, payment, …`. Vorher nur counts. Damit sieht der Agent WAS resolved wurde, nicht nur wie viele.
+- **`pre-flow-update-self-approval.js`** (DF-323 Hook) gibt jetzt zusätzlich eine `💡 Read Iron Laws:`-Zeile mit den `packages/skills/skills/{name}/SKILL.md`-Pfaden aus. Damit kann der Agent die Iron Laws direkt nachlesen, nicht nur die Skill-Namen lesen.
+
+### Notes
+
+- Companion-Server-side: DF-420 Paket A/B (Backend `pendingWorkHints` + `wikiHint` bei `flow_create`) — backend-only PR, kein Plugin-impact. Sichtbar in `POST /api/flows` 201-Response.
+- DF-425 (RFC Option 2) ist Backend-only. Plugin unverändert davon.
+
+## [4.34.0] - 2026-05-21
+
+### Added (DF-415)
+
+- **Neuer Plugin-Hook `pre-flow-update-adr-compliance.js`** — surfaced `git diff --name-only base...branch` client-side bei `flow_update` zu `review`/`done`. Backend kann in Docker keinen Git-Repo-Zugriff, also läuft der diff lokal. Output: 1-line stdout-Hint mit Datei-Liste. Iron Law: niemals blocking, exit 0 garantiert.
+- Pattern: sister zu `pre-flow-update-knowledge-auto-resolve.js` (DF-320). Implementiert `[[mcp-pre-tool-use-hook-for-state-transition-gates]]`.
+
+### Notes
+
+- Backend-Side companion (DF-415 PR #520): `flowGate.js` blockt jetzt `review`-Transitions bei `git_settings.enabled=1` + `filesChanged` empty → 409 `files_changed_missing_with_git_enabled` mit Hint auf Plugin v4.34.0+. Defense-in-Depth.
+
 ## [4.33.0] - 2026-05-21
 
 ### Added (DF-411)
