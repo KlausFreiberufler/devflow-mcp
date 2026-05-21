@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generated_at": "2026-05-21T18:49:19.674Z",
-  "count": 23,
+  "generated_at": "2026-05-21T19:26:42.812Z",
+  "count": 24,
   "skills": [
     {
       "name": "devflow-adr-compliance",
@@ -194,6 +194,15 @@
       "hooks": [],
       "discipline_token": null,
       "iron_laws_count": 0
+    },
+    {
+      "name": "devflow-subagent-driven-dev",
+      "slug": "devflow-subagent-driven-dev",
+      "description": "DRAFT-SKELETON. Tier-2 Pilot. Future skill for delegating in_progress tasks to per-task sub-agents in isolated worktrees. NOT YET ACTIVE — see docs/RFC_SUBAGENT_DF424.md for the architecture-decision discussion that must complete before this skill is enabled.",
+      "flow_state": "in_progress",
+      "hooks": [],
+      "discipline_token": null,
+      "iron_laws_count": 5
     },
     {
       "name": "devflow-tdd",
