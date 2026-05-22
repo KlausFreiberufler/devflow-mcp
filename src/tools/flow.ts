@@ -23,6 +23,79 @@ const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 // Cap total inline text per flow_get to avoid huge responses
 const MAX_INLINE_TEXT_BYTES = 512 * 1024;
 
+/**
+ * DF-432 — Pure renderer for backend 409 gate.failures[] responses (DF-374 shape).
+ * Exported for unit-tests.
+ *
+ * Pre-DF-432 the plugin only handled the DF-292 / 403 self-approval shape and
+ * the modern unified-gate 409 fell through to a generic `Error: ${msg}` — the
+ * per-failure reason + hint were silently dropped. This renderer keeps them
+ * front-and-center.
+ *
+ * Input shape (DF-374):
+ *   {
+ *     transition?: 'in_progress→review',
+ *     failures: [{
+ *       conditionId: string,
+ *       label?: string,
+ *       reason: string,
+ *       hint?: string | null,
+ *       openTasks?: [{id, text}],
+ *       pendingDrafts?: any[],
+ *       validationErrors?: any[],
+ *     }],
+ *     autoFixed?: string[],
+ *   }
+ */
+export function renderGateFailures(
+  gate: {
+    transition?: string;
+    failures?: Array<{
+      conditionId: string;
+      label?: string;
+      reason: string;
+      hint?: string | null;
+      openTasks?: Array<{ id: string; text: string }>;
+      pendingDrafts?: unknown[];
+      validationErrors?: unknown[];
+    }>;
+    autoFixed?: string[];
+  },
+  topLevelError?: string
+): string {
+  const failures = gate?.failures || [];
+  const transitionLabel = gate?.transition ? `transition '${gate.transition}'` : 'this transition';
+  const lines: string[] = [
+    `⛔ Gate blocked: ${failures.length} condition${failures.length === 1 ? '' : 's'} failed for ${transitionLabel}.`,
+    '',
+  ];
+  for (const f of failures) {
+    lines.push(`• **${f.label || f.conditionId}**`);
+    lines.push(`  - reason: \`${f.reason}\``);
+    if (f.hint) lines.push(`  - hint: ${f.hint}`);
+    if (f.openTasks && f.openTasks.length > 0) {
+      const tasks = f.openTasks.map(t => t.text).join(', ');
+      lines.push(`  - open tasks: ${tasks}`);
+    }
+    if (f.validationErrors && f.validationErrors.length > 0) {
+      lines.push(`  - validation errors: ${JSON.stringify(f.validationErrors)}`);
+    }
+    if (f.pendingDrafts && f.pendingDrafts.length > 0) {
+      lines.push(`  - ${f.pendingDrafts.length} pending knowledge-draft(s) need a decision`);
+    }
+    lines.push('');
+  }
+  if (gate?.autoFixed && gate.autoFixed.length > 0) {
+    lines.push(`✓ Auto-fixed by backend: ${gate.autoFixed.join(', ')}`);
+    lines.push('');
+  }
+  if (topLevelError && topLevelError !== `Gate blocked: ${failures.length} condition${failures.length === 1 ? '' : 's'} failed`) {
+    // Single-failure hint that the backend surfaces as the top-level error (DF-374).
+    lines.push(`Backend message: ${topLevelError}`);
+  }
+  return lines.join('\n').trimEnd();
+}
+
 // ============ Tool Definitions ============
 
 const flowListDef = {
@@ -617,7 +690,7 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
   }
 
   if (!result.success || !result.data) {
-    // Handle 403 gate blocked response
+    // Handle 403 gate blocked response (DF-292 self-approval shape)
     if (result.statusCode === 403 && result.gate) {
       return [
         `⛔ Gate blocked: Step '${result.gate.pipelineStep}' requires human action.`,
@@ -628,6 +701,13 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
         'Wait for the user to proceed in DevFlow UI.',
         'Do NOT retry this transition.',
       ].filter(Boolean).join('\n');
+    }
+    // DF-432 — Handle 409 unified-gate response (DF-374 shape with gate.failures[])
+    // Pre-fix: this fell through to the generic Error string and the agent lost
+    // all per-failure reason/hint information. Render each failure as a bullet
+    // with its hint so the agent knows exactly what to fix.
+    if (result.statusCode === 409 && (result as any).gate?.failures) {
+      return renderGateFailures((result as any).gate, result.error);
     }
     return `Error: ${result.error || 'Failed to update flow'}`;
   }

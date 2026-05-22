@@ -47,7 +47,7 @@ test('hook bash scripts pass syntax-check', () => {
   }
 })
 
-test('skills/ populated (22 dirs)', () => {
+test('skills/ populated (24 dirs)', () => {
   const skillsDir = join(BUNDLE_DIR, 'skills')
   if (!existsSync(skillsDir)) {
     assert.fail('Run `node scripts/build-cursor-bundle.js` first')
@@ -55,7 +55,7 @@ test('skills/ populated (22 dirs)', () => {
   const dirs = readdirSync(skillsDir).filter(n => {
     try { return statSync(join(skillsDir, n)).isDirectory() } catch { return false }
   })
-  assert.equal(dirs.length, 22)
+  assert.equal(dirs.length, 24)
   assert.ok(dirs.includes('devflow-tdd'))
 })
 
