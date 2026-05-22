@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.37.0] - 2026-05-22
+
+### Added (DF-432)
+
+- **`flow_update` rendert 409 Gate-Failures jetzt strukturiert.** Bis 4.36.0 verschluckte `src/tools/flow.ts` die wertvollen Details aus `gate.failures[]` (DF-374 unified-gate-shape) und gab nur `Error: Gate blocked: N conditions failed` zurück. Der Agent sah keinen `reason`, kein `hint`, keine `openTasks` und keine `validationErrors`. Neu: jeder Failure wird als markdown-Bullet ausgegeben mit `label`, `reason`, `hint` und allen strukturierten Extras. Die alte DF-292 / 403-Self-Approval-Shape bleibt unverändert. Konkrete UX-Verbesserung am POE/WF-85 Bug-Report aus dem DF-430-Audit. Neue exportierte pure-function `renderGateFailures` in `src/tools/flow.ts` mit 10 unit-tests.
+
 ## [4.36.0] - 2026-05-22
 
 ### Fixed (DF-430)
