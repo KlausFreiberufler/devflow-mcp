@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.36.0] - 2026-05-22
+
+### Fixed (DF-430)
+
+- **`devflow-planning` Skill** — Plan-Template `## Acceptance Criteria` und `## Verification` auf das fett-markierte Format `- **AC-N:** <text>` umgestellt. Der Backend-Parser `parseAcceptanceCriteria` (`backend/src/services/flowGate.js:56`) erwartet genau dieses Format; das alte Checkbox-Format `- [ ] AC-1: …` wurde still ignoriert, wodurch die Auto-Generate-Tasks-aus-AC-Fallback in `tasksRequired` (DF-374) beim `planning → approval`-Submit nie griff. Symptom: 409 `no_tasks_no_ac_in_plan` mit kryptischem Hint trotz vorhandener ACs im Plan.
+
+### Added (DF-430)
+
+- **`devflow-executing` Skill** — neue Section `## Step 0 — Prepare Tasks (run before the Execution Loop)`. Beschreibt explizit, wie der Agent aus dem approved Plan via `task_create` Tasks anlegt, wenn die `task_list` leer ist (preferred: aus `## Tasks`-Plan-Sektion, fallback: per AC). Schließt die Lücke, durch die der Agent bei leerer Task-Liste in `in_progress` ratlos pausierte und der `tasksRequired` / `tasksAllCompleted`-Gate (DF-374 + DF-416) später schwer diagnostizierbar blockte.
+
 ## [4.35.0] - 2026-05-21
 
 ### Added (DF-420 Welle 1 Paket D + DF-422 + DF-424 Skeleton)

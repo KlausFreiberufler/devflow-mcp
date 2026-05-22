@@ -34,8 +34,8 @@ const skillDirs = readdirSync(SKILLS_DIR).filter(n => {
   try { return statSync(join(SKILLS_DIR, n)).isDirectory() } catch { return false }
 })
 
-test('packages/skills/skills exists and contains 22 skills', () => {
-  assert.equal(skillDirs.length, 22, `expected 22 skills, found ${skillDirs.length}`)
+test('packages/skills/skills exists and contains 24 skills', () => {
+  assert.equal(skillDirs.length, 24, `expected 24 skills, found ${skillDirs.length}`)
 })
 
 for (const slug of skillDirs) {
