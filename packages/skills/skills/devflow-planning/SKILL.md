@@ -38,8 +38,8 @@ The plan lives with the flow. Anyone can re-read it from `flow_get` or the UI's 
 <...>
 
 ## Acceptance Criteria
-- [ ] AC-1: <criterion + how to verify>
-- [ ] AC-2: <...>
+- **AC-1:** <criterion + how to verify>
+- **AC-2:** <...>
 
 ## Tasks (will be created in `in_progress`)
 1. <task title> — touches: `path/to/file`
@@ -49,8 +49,8 @@ The plan lives with the flow. Anyone can re-read it from `flow_get` or the UI's 
 - <each risk + mitigation>
 
 ## Verification
-- AC-1: `<exact command>` → expected output
-- AC-2: `<...>`
+- **AC-1:** `<exact command>` → expected output
+- **AC-2:** `<...>`
 ````
 
 Adjust sections to fit the flow. Keep ACs concrete and command-verifiable.
