@@ -2,7 +2,6 @@
 name: devflow-draft-triage
 description: Use in the 'review' state to triage pending knowledge_drafts before review→done. Decides per draft: accept (new wiki entry) or reject (with substantive reason). Iron Law extend > dismiss applies — never wegklick a draft whose topic has an existing extend-target.
 flow_state: review
-optional: false
 ported_from: NEW (DF-420 Welle 1 Paket D)
 iron_laws:
   - Every pending draft is decided — never left dangling. `no-pending-drafts` Gate blocks review→done otherwise.
