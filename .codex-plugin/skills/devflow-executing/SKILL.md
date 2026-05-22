@@ -14,6 +14,19 @@ You are in `in_progress`. The plan has been approved. Your job: implement it tas
 - **TDD per task.** Failing test first, then minimal code, then verify — captured in the `devflow-tdd` discipline-skill (token-emitted when each cycle has its evidence).
 - **One commit per task** when `gitEnabled: true` — keeps the diff auditable + lets the flow attach commits via `flow_update({commits})`.
 
+## Step 0 — Prepare Tasks (run before the Execution Loop)
+
+Tasks are the unit the `tasksAllCompleted`-gate (DF-416) checks at `in_progress → review`. If the flow has zero tasks, the gate may already block at the planning-side via `tasksRequired` (project-config `task_enforcement = 'gate'`). Don't enter the loop blind:
+
+1. Call `task_list({flowId})`.
+2. If the list is **empty**, derive tasks from the approved plan and create them now:
+   - **Preferred:** copy the entries from the plan's `## Tasks (will be created in 'in_progress')` section.
+   - **Fallback:** derive one task per Acceptance Criterion (the AC numbering matches the plan).
+3. For each derived item: `task_create({flowId, summary, description?, acceptanceCriteria?})`.
+4. Only then proceed to the Execution Loop below.
+
+**Iron Law:** No tasks → no observable implementation loop. The gate has nothing to clear at `review` time, and the next session has no resume-point. If the plan really has no work-units (rare — usually a docs-only flow), say so explicitly in `agentSummary` so the reviewer knows the zero-task state is intentional.
+
 ## Execution Loop
 
 1. Call `task_list` to get the current task state

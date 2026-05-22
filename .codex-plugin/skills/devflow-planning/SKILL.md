@@ -38,8 +38,8 @@ The plan lives with the flow. Anyone can re-read it from `flow_get` or the UI's 
 <...>
 
 ## Acceptance Criteria
-- [ ] AC-1: <criterion + how to verify>
-- [ ] AC-2: <...>
+- **AC-1:** <criterion + how to verify>
+- **AC-2:** <...>
 
 ## Tasks (will be created in `in_progress`)
 1. <task title> — touches: `path/to/file`
@@ -49,8 +49,8 @@ The plan lives with the flow. Anyone can re-read it from `flow_get` or the UI's 
 - <each risk + mitigation>
 
 ## Verification
-- AC-1: `<exact command>` → expected output
-- AC-2: `<...>`
+- **AC-1:** `<exact command>` → expected output
+- **AC-2:** `<...>`
 ````
 
 Adjust sections to fit the flow. Keep ACs concrete and command-verifiable.
@@ -63,7 +63,9 @@ The pre-tool-use hook on `flow_update` auto-resolves most warnings in bulk, but 
 
 ## Submitting for Approval
 
-When the plan is ready:
+When the plan is ready, **call `knowledge_check_flow({flowId})` first** as the explicit happy-path step (DF-420 GAP #3) — surface any open knowledge gaps before the submit, even if the reactive auto-resolve hook would catch them later. For every topic in the response without a resolution, call `knowledge_check_resolve` with `extend` (preferred), `adr` / `pattern` / `runbook`, or `intent_defer`. The Iron Law `extend > dismiss` applies.
+
+Then:
 
 ```
 flow_update({
