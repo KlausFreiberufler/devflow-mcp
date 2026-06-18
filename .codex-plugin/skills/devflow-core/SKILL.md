@@ -53,14 +53,16 @@ Default to **OFF** when in doubt — Beta-phase projects often have git off.
 
 ## Self-Approval Mode (DF-302)
 
-Every `devflow_init` response also includes `allowSelfApproval` (from `project_configs.allow_agent_self_approval`).
+The `devflow_init` / `next-step` response surfaces **`transitionPolicy`** for the current step (DF-434). That — not a separate `allowSelfApproval` field — tells you whether you may self-approve:
 
-- **`allowSelfApproval: false`** (default) — `planning → approval/ready` and `review → done` are **human-only**. When you hit a 403 with `gate.policy === 'human_only'`, the response carries `gate.userMessage`. **Show that message verbatim to the user** and stop. Don't retry.
-- **`allowSelfApproval: true`** — You may transition both gates yourself by emitting discipline-tokens via `devflow_token_emit` for every skill listed in `gate.requiredSkills`, then calling `flow_update({ currentState, selfApproved: true, disciplineTokens: [...] })`.
+- **`transitionPolicy: 'human_only'`** — `planning → approval/ready` and `review → done` need a human Approve in the DevFlow UI. On a 403 with `gate.reason === 'human_required'`, show `gate.userMessage` verbatim and stop. Don't retry.
+- **`transitionPolicy: 'agent_with_discipline'`** — Self-Approval is ON. You transition both gates yourself: emit a discipline-token via `devflow_token_emit` for every skill in `gate.requiredSkills`, then `flow_update({ currentState, selfApproved: true, disciplineTokens: [...] })`.
 
-Hardcoded required skills (DF-302):
-- `approval` step: `devflow-collision-acknowledged`, `devflow-pattern-reuse`, `devflow-tdd`
-- `testing` step: `devflow-verification-gate`, `devflow-adr-compliance`
+**When in doubt, attempt the transition — don't default to waiting.** The gate response is actionable (DF-434): a `discipline_incomplete` 403 lists exactly which tokens to emit — that's YOUR action, not a reason to wait. Only `human_required` means stop-and-wait.
+
+Hardcoded required skills (DF-302 — source of truth: `services/pipelineOrchestrator.js` `HARDCODED_REQUIRED_SKILLS`):
+- `approval` step: `devflow-collision-acknowledged`, `devflow-pattern-reuse`, `devflow-tdd`, `devflow-knowledge-completer`
+- `testing` step: `devflow-verification-gate`, `devflow-adr-compliance`, `devflow-plan-reconciliation`, `devflow-knowledge-completer`
 
 ## Knowledge-Check Gate (DF-264 / DF-302)
 

@@ -122,6 +122,13 @@ class SessionContext {
         flowId: this.context.flow.id,
         displayId: this.context.flow.displayId,
         state: this.context.flow.currentState,
+        // DF-434 — the pre-tool-use hooks (knowledge-auto-resolve, adr-compliance,
+        // self-approval) need projectId + apiBase to reach the backend; without them
+        // they silently no-op. The auth token is deliberately NOT written here —
+        // never persist a secret to a repo-local file — the hooks read it from
+        // ~/.devflow/credentials.json instead.
+        projectId: this.context.flow.projectId,
+        apiBase: devFlowClient.getBaseUrl(),
         since: new Date().toISOString(),
       };
       writeFileSync(getActiveFilePath(), JSON.stringify(data, null, 2));

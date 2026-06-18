@@ -19,7 +19,6 @@ import { registry } from './tools/registry.js'
 // Wiki-domain tool modules
 import { tools as docsTools } from './tools/docs.js'
 import { tools as searchTools } from './tools/search.js'
-import { tools as guidelinesTools } from './tools/guidelines.js'
 import { tools as wikiTools } from './tools/wiki.js'
 import { tools as adrsTools } from './tools/adrs.js'
 import { tools as knowledgeDraftsTools } from './tools/knowledgeDrafts.js'
@@ -38,7 +37,6 @@ if (process.argv[2] === 'setup' || process.argv[2] === 'uninstall') {
 
 registry.register(docsTools)
 registry.register(searchTools)
-registry.register(guidelinesTools)
 registry.register(wikiTools)
 registry.register(adrsTools)
 registry.register(knowledgeDraftsTools)

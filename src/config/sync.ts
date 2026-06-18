@@ -94,8 +94,7 @@ function parseRemoteConfig(raw: Record<string, unknown>): RemoteConfig {
  * Precedence: Backend > Cache > Defaults
  *
  * DF-326: No longer touches CLAUDE.md — the Claude Code plugin (skills + hooks +
- * MCP tool responses) covers all rules. Project guidelines are reachable via
- * the project_guidelines_get MCP tool.
+ * MCP tool responses) covers all rules.
  */
 export async function syncConfig(): Promise<void> {
   // Try backend first

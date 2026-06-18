@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.35.0";
+var MCP_VERSION = "4.38.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -8014,6 +8014,13 @@ var SessionContext = class {
         flowId: this.context.flow.id,
         displayId: this.context.flow.displayId,
         state: this.context.flow.currentState,
+        // DF-434 — the pre-tool-use hooks (knowledge-auto-resolve, adr-compliance,
+        // self-approval) need projectId + apiBase to reach the backend; without them
+        // they silently no-op. The auth token is deliberately NOT written here —
+        // never persist a secret to a repo-local file — the hooks read it from
+        // ~/.devflow/credentials.json instead.
+        projectId: this.context.flow.projectId,
+        apiBase: devFlowClient.getBaseUrl(),
         since: (/* @__PURE__ */ new Date()).toISOString()
       };
       writeFileSync(getActiveFilePath(), JSON.stringify(data, null, 2));
@@ -8198,8 +8205,7 @@ var DISCOVERY_TOOLS = /* @__PURE__ */ new Set([
   "devflow_init",
   "devflow_status",
   "devflow_connect",
-  "devflow_disconnect",
-  "project_guidelines_get"
+  "devflow_disconnect"
 ]);
 var NEXT_STEP_GUIDANCE = new Proxy(
   {},
@@ -9039,6 +9045,11 @@ function formatInitResponse(ctx, warning, updateAvailable) {
     if (ctx.skill) {
       lines.push(`**Skill:** ${ctx.skill.name}${ctx.skill.description ? ` \u2014 ${ctx.skill.description}` : ""}`);
     }
+    if (ctx.transitionPolicy === "agent_with_discipline") {
+      lines.push("", "\u{1F7E2} **Self-Approval: ON** \u2014 at the `approval`/`done` gate you transition yourself: emit a discipline-token (`devflow_token_emit`) for every skill the gate lists in `requiredSkills`, then `flow_update({ currentState, selfApproved: true, disciplineTokens: [...] })`. Do NOT wait for the user \u2014 a `discipline_incomplete` 403 tells you exactly what is missing.");
+    } else if (ctx.transitionPolicy === "human_only") {
+      lines.push("", "\u{1F512} **Self-Approval: OFF** \u2014 the `approval`/`done` gate needs a human Approve in the DevFlow UI. On a 403 here, show `gate.userMessage` verbatim and stop.");
+    }
     if (ctx.gateBlocked) {
       lines.push("", `\u26A0\uFE0F **Gate blocked:** Step '${ctx.pipelineStep}' requires human action. Wait for user in DevFlow UI.`);
     }
@@ -9079,6 +9090,38 @@ var INLINE_TEXT_MIME = /* @__PURE__ */ new Set([
 var IMAGE_MIME_PREFIX = "image/";
 var MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 var MAX_INLINE_TEXT_BYTES = 512 * 1024;
+function renderGateFailures(gate, topLevelError) {
+  const failures = gate?.failures || [];
+  const transitionLabel = gate?.transition ? `transition '${gate.transition}'` : "this transition";
+  const lines = [
+    `\u26D4 Gate blocked: ${failures.length} condition${failures.length === 1 ? "" : "s"} failed for ${transitionLabel}.`,
+    ""
+  ];
+  for (const f of failures) {
+    lines.push(`\u2022 **${f.label || f.conditionId}**`);
+    lines.push(`  - reason: \`${f.reason}\``);
+    if (f.hint) lines.push(`  - hint: ${f.hint}`);
+    if (f.openTasks && f.openTasks.length > 0) {
+      const tasks = f.openTasks.map((t) => t.text).join(", ");
+      lines.push(`  - open tasks: ${tasks}`);
+    }
+    if (f.validationErrors && f.validationErrors.length > 0) {
+      lines.push(`  - validation errors: ${JSON.stringify(f.validationErrors)}`);
+    }
+    if (f.pendingDrafts && f.pendingDrafts.length > 0) {
+      lines.push(`  - ${f.pendingDrafts.length} pending knowledge-draft(s) need a decision`);
+    }
+    lines.push("");
+  }
+  if (gate?.autoFixed && gate.autoFixed.length > 0) {
+    lines.push(`\u2713 Auto-fixed by backend: ${gate.autoFixed.join(", ")}`);
+    lines.push("");
+  }
+  if (topLevelError && topLevelError !== `Gate blocked: ${failures.length} condition${failures.length === 1 ? "" : "s"} failed`) {
+    lines.push(`Backend message: ${topLevelError}`);
+  }
+  return lines.join("\n").trimEnd();
+}
 var flowListDef = {
   name: "flow_list",
   description: `List flows as a Markdown table (ID | State | Assignee | Titel).
@@ -9580,15 +9623,46 @@ ${required2.message}`;
   }
   if (!result.success || !result.data) {
     if (result.statusCode === 403 && result.gate) {
+      const gate = result.gate;
+      const reason = gate.reason || "";
+      const step = gate.pipelineStep || "transition";
+      if (reason === "discipline_incomplete" || reason === "discipline_token_evidence_invalid") {
+        const required2 = Array.isArray(gate.requiredSkills) ? gate.requiredSkills : [];
+        const missing = Array.isArray(gate.missing) && gate.missing.length ? gate.missing : required2;
+        return [
+          `\u{1F510} Self-approval gate for step '${step}': discipline-tokens incomplete \u2014 this is YOUR action, do not wait for the user.`,
+          "",
+          missing.length ? `Missing token(s): ${missing.join(", ")}` : "",
+          required2.length ? `Required skills: ${required2.join(", ")}` : "",
+          "",
+          gate.hint || "Emit a token for each missing skill via devflow_token_emit({ flowId, skillName, evidence }), then retry flow_update with selfApproved=true and disciplineTokens=[\u2026]."
+        ].filter(Boolean).join("\n");
+      }
+      if (reason === "selfApproved flag required to claim agent self-approval") {
+        return [
+          `\u{1F510} Self-approval gate for step '${step}': you must claim self-approval explicitly.`,
+          "",
+          "Emit the required discipline-tokens, then call flow_update({ currentState, selfApproved: true, disciplineTokens: [...] }). Do not wait for the user."
+        ].join("\n");
+      }
+      if (reason === "human_required" || /allow_agent_self_approval=0/.test(reason)) {
+        return [
+          `\u26D4 Gate blocked at step '${step}': human approval required.`,
+          "",
+          gate.userMessage || reason || "",
+          "",
+          "Show this to the user and stop \u2014 Self-Approval is OFF for this project (Settings \u2192 General). Do NOT retry."
+        ].filter(Boolean).join("\n");
+      }
       return [
-        `\u26D4 Gate blocked: Step '${result.gate.pipelineStep}' requires human action.`,
+        `\u26D4 Gate blocked at step '${step}'.`,
         "",
-        `Executor: ${result.gate.executor}`,
-        result.gate.reason || "",
-        "",
-        "Wait for the user to proceed in DevFlow UI.",
-        "Do NOT retry this transition."
+        reason || "This transition requires action before it can proceed.",
+        gate.hint || ""
       ].filter(Boolean).join("\n");
+    }
+    if (result.statusCode === 409 && result.gate?.failures) {
+      return renderGateFailures(result.gate, result.error);
     }
     return `Error: ${result.error || "Failed to update flow"}`;
   }

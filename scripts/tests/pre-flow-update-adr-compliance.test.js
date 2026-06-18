@@ -25,24 +25,24 @@ function run(payload, env = {}) {
 }
 
 test('silent on non-flow_update tools', () => {
-  const out = run({ tool: 'mcp__plugin_devflow_devflow__flow_create', tool_input: { currentState: 'review' } });
+  const out = run({ tool_name: 'mcp__plugin_devflow_devflow__flow_create', tool_input: { currentState: 'review' } });
   assert.strictEqual(out, '');
 });
 
 test('silent on flow_update transitioning to planning (not review/done)', () => {
-  const out = run({ tool: 'mcp__plugin_devflow_devflow__flow_update', tool_input: { currentState: 'planning' } });
+  const out = run({ tool_name: 'mcp__plugin_devflow_devflow__flow_update', tool_input: { currentState: 'planning' } });
   assert.strictEqual(out, '');
 });
 
 test('silent on flow_update transitioning to approval', () => {
-  const out = run({ tool: 'mcp__plugin_devflow_devflow__flow_update', tool_input: { currentState: 'approval' } });
+  const out = run({ tool_name: 'mcp__plugin_devflow_devflow__flow_update', tool_input: { currentState: 'approval' } });
   assert.strictEqual(out, '');
 });
 
 test('silent when agent already supplied filesChanged on review transition', () => {
   // The hook respects an explicit list — no auto-derive needed.
   const out = run({
-    tool: 'mcp__plugin_devflow_devflow__flow_update',
+    tool_name: 'mcp__plugin_devflow_devflow__flow_update',
     tool_input: { currentState: 'review', filesChanged: ['backend/x.js'] },
   });
   assert.strictEqual(out, '');
@@ -50,7 +50,7 @@ test('silent when agent already supplied filesChanged on review transition', () 
 
 test('silent when agent supplied filesChanged on done transition', () => {
   const out = run({
-    tool: 'mcp__plugin_devflow_devflow__flow_update',
+    tool_name: 'mcp__plugin_devflow_devflow__flow_update',
     tool_input: { currentState: 'done', filesChanged: ['frontend/x.tsx', 'backend/y.js'] },
   });
   assert.strictEqual(out, '');
@@ -59,7 +59,7 @@ test('silent when agent supplied filesChanged on done transition', () => {
 test('silent on review/done transition without session (no .devflow-active, no env token)', () => {
   // No session → no API calls → safe silent fall-through.
   const out = run({
-    tool: 'mcp__plugin_devflow_devflow__flow_update',
+    tool_name: 'mcp__plugin_devflow_devflow__flow_update',
     tool_input: { currentState: 'review' },
   });
   assert.strictEqual(out, '');
@@ -86,7 +86,7 @@ test('legacy tool namespace mcp__devflow__flow_update is recognized', () => {
   // Without a session it's still silent, but we verify the suffix-check
   // doesn't reject the namespace.
   const out = run({
-    tool: 'mcp__devflow__flow_update',
+    tool_name: 'mcp__devflow__flow_update',
     tool_input: { currentState: 'review' },
   });
   assert.strictEqual(out, '');

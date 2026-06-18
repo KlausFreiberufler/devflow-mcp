@@ -7304,7 +7304,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.35.0";
+var MCP_VERSION = "4.38.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -8323,6 +8323,13 @@ var SessionContext = class {
         flowId: this.context.flow.id,
         displayId: this.context.flow.displayId,
         state: this.context.flow.currentState,
+        // DF-434 — the pre-tool-use hooks (knowledge-auto-resolve, adr-compliance,
+        // self-approval) need projectId + apiBase to reach the backend; without them
+        // they silently no-op. The auth token is deliberately NOT written here —
+        // never persist a secret to a repo-local file — the hooks read it from
+        // ~/.devflow/credentials.json instead.
+        projectId: this.context.flow.projectId,
+        apiBase: devFlowClient.getBaseUrl(),
         since: (/* @__PURE__ */ new Date()).toISOString()
       };
       writeFileSync(getActiveFilePath(), JSON.stringify(data, null, 2));
@@ -8452,8 +8459,7 @@ var DISCOVERY_TOOLS = /* @__PURE__ */ new Set([
   "devflow_init",
   "devflow_status",
   "devflow_connect",
-  "devflow_disconnect",
-  "project_guidelines_get"
+  "devflow_disconnect"
 ]);
 var NEXT_STEP_GUIDANCE = new Proxy(
   {},
@@ -9296,6 +9302,11 @@ function formatInitResponse(ctx, warning, updateAvailable) {
     if (ctx.skill) {
       lines.push(`**Skill:** ${ctx.skill.name}${ctx.skill.description ? ` \u2014 ${ctx.skill.description}` : ""}`);
     }
+    if (ctx.transitionPolicy === "agent_with_discipline") {
+      lines.push("", "\u{1F7E2} **Self-Approval: ON** \u2014 at the `approval`/`done` gate you transition yourself: emit a discipline-token (`devflow_token_emit`) for every skill the gate lists in `requiredSkills`, then `flow_update({ currentState, selfApproved: true, disciplineTokens: [...] })`. Do NOT wait for the user \u2014 a `discipline_incomplete` 403 tells you exactly what is missing.");
+    } else if (ctx.transitionPolicy === "human_only") {
+      lines.push("", "\u{1F512} **Self-Approval: OFF** \u2014 the `approval`/`done` gate needs a human Approve in the DevFlow UI. On a 403 here, show `gate.userMessage` verbatim and stop.");
+    }
     if (ctx.gateBlocked) {
       lines.push("", `\u26A0\uFE0F **Gate blocked:** Step '${ctx.pipelineStep}' requires human action. Wait for user in DevFlow UI.`);
     }
@@ -9337,6 +9348,38 @@ var INLINE_TEXT_MIME = /* @__PURE__ */ new Set([
 var IMAGE_MIME_PREFIX = "image/";
 var MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 var MAX_INLINE_TEXT_BYTES = 512 * 1024;
+function renderGateFailures(gate, topLevelError) {
+  const failures = gate?.failures || [];
+  const transitionLabel = gate?.transition ? `transition '${gate.transition}'` : "this transition";
+  const lines = [
+    `\u26D4 Gate blocked: ${failures.length} condition${failures.length === 1 ? "" : "s"} failed for ${transitionLabel}.`,
+    ""
+  ];
+  for (const f of failures) {
+    lines.push(`\u2022 **${f.label || f.conditionId}**`);
+    lines.push(`  - reason: \`${f.reason}\``);
+    if (f.hint) lines.push(`  - hint: ${f.hint}`);
+    if (f.openTasks && f.openTasks.length > 0) {
+      const tasks = f.openTasks.map((t) => t.text).join(", ");
+      lines.push(`  - open tasks: ${tasks}`);
+    }
+    if (f.validationErrors && f.validationErrors.length > 0) {
+      lines.push(`  - validation errors: ${JSON.stringify(f.validationErrors)}`);
+    }
+    if (f.pendingDrafts && f.pendingDrafts.length > 0) {
+      lines.push(`  - ${f.pendingDrafts.length} pending knowledge-draft(s) need a decision`);
+    }
+    lines.push("");
+  }
+  if (gate?.autoFixed && gate.autoFixed.length > 0) {
+    lines.push(`\u2713 Auto-fixed by backend: ${gate.autoFixed.join(", ")}`);
+    lines.push("");
+  }
+  if (topLevelError && topLevelError !== `Gate blocked: ${failures.length} condition${failures.length === 1 ? "" : "s"} failed`) {
+    lines.push(`Backend message: ${topLevelError}`);
+  }
+  return lines.join("\n").trimEnd();
+}
 var flowListDef = {
   name: "flow_list",
   description: `List flows as a Markdown table (ID | State | Assignee | Titel).
@@ -9838,15 +9881,46 @@ ${required2.message}`;
   }
   if (!result.success || !result.data) {
     if (result.statusCode === 403 && result.gate) {
+      const gate = result.gate;
+      const reason = gate.reason || "";
+      const step = gate.pipelineStep || "transition";
+      if (reason === "discipline_incomplete" || reason === "discipline_token_evidence_invalid") {
+        const required2 = Array.isArray(gate.requiredSkills) ? gate.requiredSkills : [];
+        const missing = Array.isArray(gate.missing) && gate.missing.length ? gate.missing : required2;
+        return [
+          `\u{1F510} Self-approval gate for step '${step}': discipline-tokens incomplete \u2014 this is YOUR action, do not wait for the user.`,
+          "",
+          missing.length ? `Missing token(s): ${missing.join(", ")}` : "",
+          required2.length ? `Required skills: ${required2.join(", ")}` : "",
+          "",
+          gate.hint || "Emit a token for each missing skill via devflow_token_emit({ flowId, skillName, evidence }), then retry flow_update with selfApproved=true and disciplineTokens=[\u2026]."
+        ].filter(Boolean).join("\n");
+      }
+      if (reason === "selfApproved flag required to claim agent self-approval") {
+        return [
+          `\u{1F510} Self-approval gate for step '${step}': you must claim self-approval explicitly.`,
+          "",
+          "Emit the required discipline-tokens, then call flow_update({ currentState, selfApproved: true, disciplineTokens: [...] }). Do not wait for the user."
+        ].join("\n");
+      }
+      if (reason === "human_required" || /allow_agent_self_approval=0/.test(reason)) {
+        return [
+          `\u26D4 Gate blocked at step '${step}': human approval required.`,
+          "",
+          gate.userMessage || reason || "",
+          "",
+          "Show this to the user and stop \u2014 Self-Approval is OFF for this project (Settings \u2192 General). Do NOT retry."
+        ].filter(Boolean).join("\n");
+      }
       return [
-        `\u26D4 Gate blocked: Step '${result.gate.pipelineStep}' requires human action.`,
+        `\u26D4 Gate blocked at step '${step}'.`,
         "",
-        `Executor: ${result.gate.executor}`,
-        result.gate.reason || "",
-        "",
-        "Wait for the user to proceed in DevFlow UI.",
-        "Do NOT retry this transition."
+        reason || "This transition requires action before it can proceed.",
+        gate.hint || ""
       ].filter(Boolean).join("\n");
+    }
+    if (result.statusCode === 409 && result.gate?.failures) {
+      return renderGateFailures(result.gate, result.error);
     }
     return `Error: ${result.error || "Failed to update flow"}`;
   }
@@ -11119,108 +11193,11 @@ var tools7 = {
   }
 };
 
-// src/tools/guidelines.ts
-var projectGuidelinesGetDef = {
-  name: "project_guidelines_get",
-  description: `Get project-specific guidelines (markdown).
-Guidelines are managed by the user via the DevFlow UI and stored in the backend.
-
-Automatically uses the linked project if no projectId is provided.`,
-  inputSchema: {
-    type: "object",
-    properties: {
-      projectId: {
-        type: "string",
-        description: "The project ID. If omitted, uses the linked project."
-      }
-    }
-  }
-};
-var projectGuidelinesUpdateDef = {
-  name: "project_guidelines_update",
-  description: `Update project-specific guidelines (markdown).
-Guidelines are stored in the backend and visible in the DevFlow UI.
-
-Automatically uses the linked project if no projectId is provided.`,
-  inputSchema: {
-    type: "object",
-    properties: {
-      projectId: {
-        type: "string",
-        description: "The project ID. If omitted, uses the linked project."
-      },
-      guidelines: {
-        type: "string",
-        description: "The guidelines content (markdown supported)"
-      }
-    },
-    required: ["guidelines"]
-  }
-};
-async function handleProjectGuidelinesGet(args) {
-  const projectId = args.projectId || devFlowClient.getLinkedProjectId();
-  if (!projectId) {
-    return "Error: projectId is required. No linked project found. Use project_list to find the project ID, or link a project first.";
-  }
-  const result = await devFlowClient.getProjectGuidelines(projectId);
-  if (!result.success || !result.data) {
-    if (result.error?.includes("404")) {
-      return formatGuidelines({ guidelines: "" }, projectId);
-    }
-    return `Error: ${result.error || "Failed to get project guidelines"}`;
-  }
-  return formatGuidelines(result.data, projectId);
-}
-async function handleProjectGuidelinesUpdate(args) {
-  const projectId = args.projectId || devFlowClient.getLinkedProjectId();
-  const guidelines = args.guidelines;
-  if (!projectId) {
-    return "Error: projectId is required. No linked project found. Use project_list to find the project ID, or link a project first.";
-  }
-  const result = await devFlowClient.updateProjectGuidelines(guidelines, projectId);
-  if (!result.success || !result.data) {
-    return `Error: ${result.error || "Failed to update project guidelines"}`;
-  }
-  return `Project guidelines updated successfully.
-
-${formatGuidelines(result.data, projectId)}`;
-}
-function formatGuidelines(data, projectId) {
-  const lines = [
-    "# Project Guidelines",
-    ""
-  ];
-  if (projectId) {
-    lines.push(`**Project:** ${projectId}`);
-  }
-  if (data.updatedAt) {
-    lines.push(`**Last updated:** ${new Date(data.updatedAt).toLocaleString()}`);
-  }
-  lines.push("");
-  if (data.guidelines && data.guidelines.trim()) {
-    lines.push("## Content\n");
-    lines.push(data.guidelines);
-  } else {
-    lines.push("*No guidelines stored yet. Use project_guidelines_update to add project-specific guidelines, or edit them in the DevFlow UI.*");
-  }
-  return lines.join("\n");
-}
-var tools8 = {
-  project_guidelines_get: {
-    definition: projectGuidelinesGetDef,
-    handler: withErrorHandling("project_guidelines_get", handleProjectGuidelinesGet)
-  },
-  project_guidelines_update: {
-    definition: projectGuidelinesUpdateDef,
-    handler: withErrorHandling("project_guidelines_update", handleProjectGuidelinesUpdate)
-  }
-};
-
 // src/tools/status.ts
 import { writeFileSync as writeFileSync3, unlinkSync as unlinkSync2, existsSync as existsSync2 } from "fs";
 import { join as join6 } from "path";
 init_working_dir();
-var tools9 = {
+var tools8 = {
   devflow_status: {
     definition: {
       name: "devflow_status",
@@ -11439,7 +11416,7 @@ async function handleListProjects() {
 import { writeFileSync as writeFileSync4 } from "fs";
 import { join as join7 } from "path";
 init_working_dir();
-var tools10 = {
+var tools9 = {
   devflow_connect: {
     definition: {
       name: "devflow_connect",
@@ -11593,7 +11570,7 @@ var tools10 = {
 import { existsSync as existsSync3, rmSync } from "fs";
 import { join as join8 } from "path";
 init_working_dir();
-var tools11 = {
+var tools10 = {
   devflow_disconnect: {
     definition: {
       name: "devflow_disconnect",
@@ -11756,7 +11733,7 @@ async function handleFlowUploadFile(args) {
 Kind: ${kind}` : ""}
 URL: ${url2}${planHint}`;
 }
-var tools12 = {
+var tools11 = {
   flow_upload: {
     definition: flowUploadDef,
     handler: withErrorHandling("flow_upload", handleFlowUpload)
@@ -12114,7 +12091,7 @@ async function handleIdeasGet(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return JSON.stringify(r.data, null, 2);
 }
-var tools13 = {
+var tools12 = {
   wiki_search: { definition: wikiSearchDef, handler: withErrorHandling("wiki_search", handleWikiSearch) },
   wiki_get_page: { definition: wikiGetPageDef, handler: withErrorHandling("wiki_get_page", handleWikiGetPage) },
   wiki_list_by_type: { definition: wikiListByTypeDef, handler: withErrorHandling("wiki_list_by_type", handleWikiListByType) },
@@ -12267,7 +12244,7 @@ async function handleAdrUpdateStatus(args) {
   const a = r.data;
   return `\u2713 ${a.displayId} \u2192 status: ${a.status}`;
 }
-var tools14 = {
+var tools13 = {
   adr_list: { definition: adrListDef, handler: withErrorHandling("adr_list", handleAdrList) },
   adr_get: { definition: adrGetDef, handler: withErrorHandling("adr_get", handleAdrGet) },
   adr_accept: { definition: adrAcceptDef, handler: withErrorHandling("adr_accept", handleAdrAccept) },
@@ -12497,7 +12474,7 @@ async function handleCheckFlow(args) {
   if (!r.success || !r.data) return `Error: ${r.error}`;
   return JSON.stringify(r.data, null, 2);
 }
-var tools15 = {
+var tools14 = {
   knowledge_backfill_request: { definition: backfillRequestDef, handler: withErrorHandling("knowledge_backfill_request", handleBackfillRequest) },
   knowledge_draft_create: { definition: draftCreateDef, handler: withErrorHandling("knowledge_draft_create", handleDraftCreate) },
   knowledge_draft_list: { definition: draftListDef, handler: withErrorHandling("knowledge_draft_list", handleDraftList) },
@@ -12538,7 +12515,7 @@ async function handlePlanningContext(args) {
 
 ${d.markdown || "_No context._"}`;
 }
-var tools16 = {
+var tools15 = {
   planning_context: {
     definition: planningContextDef,
     handler: withErrorHandling("planning_context", handlePlanningContext)
@@ -12577,7 +12554,7 @@ async function handle(args) {
   if (!r?.success || !r?.data) return `Error: ${r?.error || "prepare failed"}`;
   return r.data.instructions || "No instructions returned.";
 }
-var tools17 = {
+var tools16 = {
   project_bootstrap_audit: { definition: def, handler: withErrorHandling("project_bootstrap_audit", handle) }
 };
 
@@ -12726,7 +12703,7 @@ async function handleKnowledgeCheckResolve(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return `Resolution created: ${resolutionType} for topic "${topic}" on flow ${flowId}.`;
 }
-var tools18 = {
+var tools17 = {
   pending_work: {
     definition: pendingWorkDef,
     handler: withErrorHandling("pending_work", handlePendingWork)
@@ -12812,7 +12789,7 @@ async function handleTokensList(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return JSON.stringify(r.data, null, 2);
 }
-var tools19 = {
+var tools18 = {
   devflow_token_emit: {
     definition: tokenEmitDef,
     handler: withErrorHandling("devflow_token_emit", handleTokenEmit)
@@ -27012,7 +26989,6 @@ registry.register(tools15);
 registry.register(tools16);
 registry.register(tools17);
 registry.register(tools18);
-registry.register(tools19);
 startMcpServer({ name: "devflow", banner: "MCP Server (combined)" }).catch((error2) => {
   console.error("Fatal error:", error2);
   process.exit(1);

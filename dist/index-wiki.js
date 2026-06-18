@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.35.0";
+var MCP_VERSION = "4.38.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -8014,6 +8014,13 @@ var SessionContext = class {
         flowId: this.context.flow.id,
         displayId: this.context.flow.displayId,
         state: this.context.flow.currentState,
+        // DF-434 — the pre-tool-use hooks (knowledge-auto-resolve, adr-compliance,
+        // self-approval) need projectId + apiBase to reach the backend; without them
+        // they silently no-op. The auth token is deliberately NOT written here —
+        // never persist a secret to a repo-local file — the hooks read it from
+        // ~/.devflow/credentials.json instead.
+        projectId: this.context.flow.projectId,
+        apiBase: devFlowClient.getBaseUrl(),
         since: (/* @__PURE__ */ new Date()).toISOString()
       };
       writeFileSync(getActiveFilePath(), JSON.stringify(data, null, 2));
@@ -8198,8 +8205,7 @@ var DISCOVERY_TOOLS = /* @__PURE__ */ new Set([
   "devflow_init",
   "devflow_status",
   "devflow_connect",
-  "devflow_disconnect",
-  "project_guidelines_get"
+  "devflow_disconnect"
 ]);
 var NEXT_STEP_GUIDANCE = new Proxy(
   {},
@@ -8777,103 +8783,6 @@ var tools2 = {
   }
 };
 
-// src/tools/guidelines.ts
-var projectGuidelinesGetDef = {
-  name: "project_guidelines_get",
-  description: `Get project-specific guidelines (markdown).
-Guidelines are managed by the user via the DevFlow UI and stored in the backend.
-
-Automatically uses the linked project if no projectId is provided.`,
-  inputSchema: {
-    type: "object",
-    properties: {
-      projectId: {
-        type: "string",
-        description: "The project ID. If omitted, uses the linked project."
-      }
-    }
-  }
-};
-var projectGuidelinesUpdateDef = {
-  name: "project_guidelines_update",
-  description: `Update project-specific guidelines (markdown).
-Guidelines are stored in the backend and visible in the DevFlow UI.
-
-Automatically uses the linked project if no projectId is provided.`,
-  inputSchema: {
-    type: "object",
-    properties: {
-      projectId: {
-        type: "string",
-        description: "The project ID. If omitted, uses the linked project."
-      },
-      guidelines: {
-        type: "string",
-        description: "The guidelines content (markdown supported)"
-      }
-    },
-    required: ["guidelines"]
-  }
-};
-async function handleProjectGuidelinesGet(args) {
-  const projectId = args.projectId || devFlowClient.getLinkedProjectId();
-  if (!projectId) {
-    return "Error: projectId is required. No linked project found. Use project_list to find the project ID, or link a project first.";
-  }
-  const result = await devFlowClient.getProjectGuidelines(projectId);
-  if (!result.success || !result.data) {
-    if (result.error?.includes("404")) {
-      return formatGuidelines({ guidelines: "" }, projectId);
-    }
-    return `Error: ${result.error || "Failed to get project guidelines"}`;
-  }
-  return formatGuidelines(result.data, projectId);
-}
-async function handleProjectGuidelinesUpdate(args) {
-  const projectId = args.projectId || devFlowClient.getLinkedProjectId();
-  const guidelines = args.guidelines;
-  if (!projectId) {
-    return "Error: projectId is required. No linked project found. Use project_list to find the project ID, or link a project first.";
-  }
-  const result = await devFlowClient.updateProjectGuidelines(guidelines, projectId);
-  if (!result.success || !result.data) {
-    return `Error: ${result.error || "Failed to update project guidelines"}`;
-  }
-  return `Project guidelines updated successfully.
-
-${formatGuidelines(result.data, projectId)}`;
-}
-function formatGuidelines(data, projectId) {
-  const lines = [
-    "# Project Guidelines",
-    ""
-  ];
-  if (projectId) {
-    lines.push(`**Project:** ${projectId}`);
-  }
-  if (data.updatedAt) {
-    lines.push(`**Last updated:** ${new Date(data.updatedAt).toLocaleString()}`);
-  }
-  lines.push("");
-  if (data.guidelines && data.guidelines.trim()) {
-    lines.push("## Content\n");
-    lines.push(data.guidelines);
-  } else {
-    lines.push("*No guidelines stored yet. Use project_guidelines_update to add project-specific guidelines, or edit them in the DevFlow UI.*");
-  }
-  return lines.join("\n");
-}
-var tools3 = {
-  project_guidelines_get: {
-    definition: projectGuidelinesGetDef,
-    handler: withErrorHandling("project_guidelines_get", handleProjectGuidelinesGet)
-  },
-  project_guidelines_update: {
-    definition: projectGuidelinesUpdateDef,
-    handler: withErrorHandling("project_guidelines_update", handleProjectGuidelinesUpdate)
-  }
-};
-
 // src/tools/wiki.ts
 function resolveProjectId2(args) {
   return args.projectId || devFlowClient.getLinkedProjectId();
@@ -9221,7 +9130,7 @@ async function handleIdeasGet(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return JSON.stringify(r.data, null, 2);
 }
-var tools4 = {
+var tools3 = {
   wiki_search: { definition: wikiSearchDef, handler: withErrorHandling("wiki_search", handleWikiSearch) },
   wiki_get_page: { definition: wikiGetPageDef, handler: withErrorHandling("wiki_get_page", handleWikiGetPage) },
   wiki_list_by_type: { definition: wikiListByTypeDef, handler: withErrorHandling("wiki_list_by_type", handleWikiListByType) },
@@ -9374,7 +9283,7 @@ async function handleAdrUpdateStatus(args) {
   const a = r.data;
   return `\u2713 ${a.displayId} \u2192 status: ${a.status}`;
 }
-var tools5 = {
+var tools4 = {
   adr_list: { definition: adrListDef, handler: withErrorHandling("adr_list", handleAdrList) },
   adr_get: { definition: adrGetDef, handler: withErrorHandling("adr_get", handleAdrGet) },
   adr_accept: { definition: adrAcceptDef, handler: withErrorHandling("adr_accept", handleAdrAccept) },
@@ -9604,7 +9513,7 @@ async function handleCheckFlow(args) {
   if (!r.success || !r.data) return `Error: ${r.error}`;
   return JSON.stringify(r.data, null, 2);
 }
-var tools6 = {
+var tools5 = {
   knowledge_backfill_request: { definition: backfillRequestDef, handler: withErrorHandling("knowledge_backfill_request", handleBackfillRequest) },
   knowledge_draft_create: { definition: draftCreateDef, handler: withErrorHandling("knowledge_draft_create", handleDraftCreate) },
   knowledge_draft_list: { definition: draftListDef, handler: withErrorHandling("knowledge_draft_list", handleDraftList) },
@@ -9645,7 +9554,7 @@ async function handlePlanningContext(args) {
 
 ${d.markdown || "_No context._"}`;
 }
-var tools7 = {
+var tools6 = {
   planning_context: {
     definition: planningContextDef,
     handler: withErrorHandling("planning_context", handlePlanningContext)
@@ -9684,7 +9593,7 @@ async function handle(args) {
   if (!r?.success || !r?.data) return `Error: ${r?.error || "prepare failed"}`;
   return r.data.instructions || "No instructions returned.";
 }
-var tools8 = {
+var tools7 = {
   project_bootstrap_audit: { definition: def, handler: withErrorHandling("project_bootstrap_audit", handle) }
 };
 
@@ -23861,7 +23770,6 @@ registry.register(tools4);
 registry.register(tools5);
 registry.register(tools6);
 registry.register(tools7);
-registry.register(tools8);
 startMcpServer({ name: "devflow-wiki", banner: "Wiki MCP Server" }).catch((error2) => {
   console.error("Fatal error:", error2);
   process.exit(1);

@@ -29,13 +29,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { readDevflowToken } from './lib/hook-auth.js';
 
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
 process.stdin.on('end', async () => {
   try {
     const payload = JSON.parse(input || '{}');
-    if (!payload.tool || !payload.tool.endsWith('__flow_update')) return;
+    // DF-434 — Claude Code's PreToolUse payload uses `tool_name`, not `tool`.
+    const toolName = payload.tool_name || payload.tool;
+    if (!toolName || !toolName.endsWith('__flow_update')) return;
     const args = payload.tool_input || payload.input || {};
     const targetState = args.currentState;
     if (targetState !== 'review' && targetState !== 'done') return;
@@ -47,7 +50,7 @@ process.stdin.on('end', async () => {
     const flowId = args.flowId || session?.flowId;
     const projectId = session?.projectId;
     const apiBase = session?.apiBase || process.env.DEVFLOW_API_BASE || 'https://api.app.dev-flow.tech';
-    const token = session?.token || process.env.DEVFLOW_API_TOKEN;
+    const token = session?.token || readDevflowToken();
     if (!flowId || !projectId || !token) return;
 
     const flow = await apiGet(`${apiBase}/api/flows/${encodeURIComponent(flowId)}`, token);

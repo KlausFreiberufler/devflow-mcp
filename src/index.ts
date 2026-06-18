@@ -25,7 +25,6 @@ import { tools as agentSessionTools } from './tools/agent-session.js'
 import { tools as docsTools } from './tools/docs.js'
 import { tools as releaseTools } from './tools/release.js'
 import { tools as searchTools } from './tools/search.js'
-import { tools as guidelinesTools } from './tools/guidelines.js'
 import { tools as statusTools } from './tools/status.js'
 import { tools as connectTools } from './tools/connect.js'
 import { tools as disconnectTools } from './tools/disconnect.js'
@@ -63,7 +62,6 @@ registry.register(agentSessionTools)
 registry.register(docsTools)
 registry.register(releaseTools)
 registry.register(searchTools)
-registry.register(guidelinesTools)
 registry.register(statusTools)
 registry.register(connectTools)
 registry.register(disconnectTools)

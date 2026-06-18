@@ -52,14 +52,14 @@ const VALID_TRIPLE = {
 };
 
 test('valid triple → exit 0, no hint on stdout', async () => {
-  const res = await runHook({ tool: 'mcp__plugin_devflow_devflow__flow_create', tool_input: VALID_TRIPLE });
+  const res = await runHook({ tool_name: 'mcp__plugin_devflow_devflow__flow_create', tool_input: VALID_TRIPLE });
   assert.strictEqual(res.code, 0);
   assert.strictEqual(res.stdout.trim(), '');
 });
 
 test('missing description → hint mentions "description"', async () => {
   const res = await runHook({
-    tool: 'mcp__plugin_devflow_devflow__flow_create',
+    tool_name: 'mcp__plugin_devflow_devflow__flow_create',
     tool_input: { summary: VALID_TRIPLE.summary, acceptanceCriteria: VALID_TRIPLE.acceptanceCriteria },
   });
   assert.strictEqual(res.code, 0);
@@ -68,7 +68,7 @@ test('missing description → hint mentions "description"', async () => {
 
 test('missing acceptanceCriteria → hint mentions "acceptance"', async () => {
   const res = await runHook({
-    tool: 'mcp__plugin_devflow_devflow__flow_create',
+    tool_name: 'mcp__plugin_devflow_devflow__flow_create',
     tool_input: { summary: VALID_TRIPLE.summary, description: VALID_TRIPLE.description },
   });
   assert.strictEqual(res.code, 0);
@@ -77,7 +77,7 @@ test('missing acceptanceCriteria → hint mentions "acceptance"', async () => {
 
 test('summary 81 chars → hint mentions split / shorten / description', async () => {
   const res = await runHook({
-    tool: 'mcp__plugin_devflow_devflow__flow_create',
+    tool_name: 'mcp__plugin_devflow_devflow__flow_create',
     tool_input: { ...VALID_TRIPLE, summary: 'a'.repeat(81) },
   });
   assert.strictEqual(res.code, 0);
@@ -86,7 +86,7 @@ test('summary 81 chars → hint mentions split / shorten / description', async (
 
 test('all three fields invalid → hint aggregates all problems', async () => {
   const res = await runHook({
-    tool: 'mcp__plugin_devflow_devflow__flow_create',
+    tool_name: 'mcp__plugin_devflow_devflow__flow_create',
     tool_input: { summary: 'a'.repeat(81), description: null, acceptanceCriteria: [] },
   });
   assert.strictEqual(res.code, 0);
@@ -102,7 +102,7 @@ test('malformed JSON stdin → exit 0 (graceful, never blocks)', async () => {
 
 test('non-flow_create tool → exit 0, no hint (skip)', async () => {
   const res = await runHook({
-    tool: 'mcp__plugin_devflow_devflow__flow_update',
+    tool_name: 'mcp__plugin_devflow_devflow__flow_update',
     tool_input: { flowId: 'abc', currentState: 'approval' },
   });
   assert.strictEqual(res.code, 0);
@@ -126,7 +126,7 @@ test('Paket C: wiki match → stdout contains "extend > create" / nearby entry',
   try {
     const res = await runHook(
       {
-        tool: 'mcp__plugin_devflow_devflow__flow_create',
+        tool_name: 'mcp__plugin_devflow_devflow__flow_create',
         tool_input: { ...VALID_TRIPLE, projectId: 'proj-1', summary: 'Wiki Coverage Gate enforcement' },
       },
       { DEVFLOW_API_BASE: mock.url, DEVFLOW_API_TOKEN: 'test' }
@@ -148,7 +148,7 @@ test('Paket C: empty wiki results → silent (no hint added)', async () => {
   try {
     const res = await runHook(
       {
-        tool: 'mcp__plugin_devflow_devflow__flow_create',
+        tool_name: 'mcp__plugin_devflow_devflow__flow_create',
         tool_input: { ...VALID_TRIPLE, projectId: 'proj-1' },
       },
       { DEVFLOW_API_BASE: mock.url, DEVFLOW_API_TOKEN: 'test' }
@@ -168,7 +168,7 @@ test('Paket C: API error (500) → silent, never blocks', async () => {
   try {
     const res = await runHook(
       {
-        tool: 'mcp__plugin_devflow_devflow__flow_create',
+        tool_name: 'mcp__plugin_devflow_devflow__flow_create',
         tool_input: { ...VALID_TRIPLE, projectId: 'proj-1' },
       },
       { DEVFLOW_API_BASE: mock.url, DEVFLOW_API_TOKEN: 'test' }
@@ -184,7 +184,7 @@ test('Paket C: missing env vars → silent', async () => {
   // Mock server intentionally never set up — env unset means hook can't reach it.
   const res = await runHook(
     {
-      tool: 'mcp__plugin_devflow_devflow__flow_create',
+      tool_name: 'mcp__plugin_devflow_devflow__flow_create',
       tool_input: { ...VALID_TRIPLE, projectId: 'proj-1' },
     },
     { DEVFLOW_API_BASE: '', DEVFLOW_API_TOKEN: '' }
@@ -201,7 +201,7 @@ test('Paket C: missing projectId → no wiki lookup (silent)', async () => {
   try {
     const res = await runHook(
       {
-        tool: 'mcp__plugin_devflow_devflow__flow_create',
+        tool_name: 'mcp__plugin_devflow_devflow__flow_create',
         tool_input: { ...VALID_TRIPLE }, // no projectId
       },
       { DEVFLOW_API_BASE: mock.url, DEVFLOW_API_TOKEN: 'test' }
@@ -222,7 +222,7 @@ test('Paket C: validation hint takes precedence — no wiki call when input inva
   try {
     const res = await runHook(
       {
-        tool: 'mcp__plugin_devflow_devflow__flow_create',
+        tool_name: 'mcp__plugin_devflow_devflow__flow_create',
         tool_input: { summary: 'a'.repeat(81), projectId: 'proj-1' }, // too long
       },
       { DEVFLOW_API_BASE: mock.url, DEVFLOW_API_TOKEN: 'test' }
