@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.38.0] - 2026-06-18
+
+### Fixed (DF-434)
+
+- **Self-approval / auto-approve repariert — die Plugin-Hooks waren in echten Sessions tot.** Alle 7 `flow_update`/`flow_create`-Hooks (`scripts/pre-flow-update-*.js`, `post-flow-update.js`, `pre-flow-create-validate.js`) lasen `payload.tool`, aber Claude Code sendet im PreToolUse-Payload `tool_name`. Folge: jeder Hook no-oppte still — Self-Approval-Hinweis, knowledge-auto-resolve, adr-compliance, plan/code-critic und flow-create-validate feuerten nie. Fix: `payload.tool_name ?? payload.tool` (Fallback für synthetische Caller). Die Hook-Tests prüfen jetzt das echte `tool_name`-Protokoll (vorher `{tool}`, weshalb der Bug unentdeckt blieb).
+- **`flow_update` 403-Gate-Handler verzweigt jetzt nach `gate.reason`.** Vorher sagte er bei JEDEM 403 „requires human action / wait / Do NOT retry" — auch wenn nur Discipline-Tokens fehlten. Neu: `discipline_incomplete` / `discipline_token_evidence_invalid` zeigen `requiredSkills` + `hint` und „emit tokens, then retry"; nur `human_required` heißt stop-and-wait.
+- **`devflow_init` rendert den Self-Approval-Modus explizit** (`🟢 Self-Approval: ON/OFF`), abgeleitet aus `transitionPolicy`. Der `devflow-core`-Skill verwies auf ein `allowSelfApproval`-Feld, das die Antwort nie enthielt → der Agent fiel auf den Default „human-only" zurück.
+- **Skill-Drift behoben: korrekte HARDCODED_REQUIRED_SKILLS** (`devflow-core`, `devflow-planning`, `devflow-verification-gate`) — approval = 4 (collision-acknowledged/pattern-reuse/tdd/knowledge-completer), testing = 4 (verification-gate/adr-compliance/plan-reconciliation/knowledge-completer). Vorher 3+2 → zu wenige Tokens emittiert.
+- **`.devflow-active` trägt jetzt `projectId` + `apiBase`** (`src/context/session.ts`), und die API-Hooks lesen den Token aus `~/.devflow/credentials.json` (neue `scripts/lib/hook-auth.js`) — ohne diese Felder erreichten knowledge-auto-resolve / adr-compliance / self-approval ihren Backend-Call nie. Der Token wird bewusst NICHT in die Repo-lokale Datei geschrieben.
+
+### Removed (DF-434)
+
+- **`project_guidelines_get` / `project_guidelines_update` entfernt** — beide riefen `GET/PATCH /api/projects/:id/guidelines` auf, einen Endpoint, den das Backend nie hatte (404). Vestigial seit der `/knowledge`-Deprecation.
+
+### Notes
+
+- Vereinheitlicht die Versions-Achsen: package.json / MCP_VERSION (zuletzt 4.35.0) und plugin.json (zuletzt 4.37.0) stehen jetzt beide auf 4.38.0.
+
 ## [4.37.0] - 2026-05-22
 
 ### Added (DF-432)

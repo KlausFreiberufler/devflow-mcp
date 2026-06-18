@@ -531,6 +531,15 @@ function formatInitResponse(
     if (ctx.skill) {
       lines.push(`**Skill:** ${ctx.skill.name}${ctx.skill.description ? ` — ${ctx.skill.description}` : ''}`);
     }
+    // DF-434 — surface the self-approval mode explicitly. `transitionPolicy` is the
+    // real signal (there is no `allowSelfApproval` field in this response); without
+    // this line the agent defaults to "human-only" and refuses to self-approve even
+    // when the project allows it.
+    if (ctx.transitionPolicy === 'agent_with_discipline') {
+      lines.push('', '🟢 **Self-Approval: ON** — at the `approval`/`done` gate you transition yourself: emit a discipline-token (`devflow_token_emit`) for every skill the gate lists in `requiredSkills`, then `flow_update({ currentState, selfApproved: true, disciplineTokens: [...] })`. Do NOT wait for the user — a `discipline_incomplete` 403 tells you exactly what is missing.');
+    } else if (ctx.transitionPolicy === 'human_only') {
+      lines.push('', '🔒 **Self-Approval: OFF** — the `approval`/`done` gate needs a human Approve in the DevFlow UI. On a 403 here, show `gate.userMessage` verbatim and stop.');
+    }
     if (ctx.gateBlocked) {
       lines.push('', `⚠️ **Gate blocked:** Step '${ctx.pipelineStep}' requires human action. Wait for user in DevFlow UI.`);
     }

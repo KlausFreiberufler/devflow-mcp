@@ -15,13 +15,13 @@ function run(payload) {
 }
 
 test('silent when tool is not flow_update', () => {
-  const out = run({ tool: 'mcp__devflow__flow_get', response: {} });
+  const out = run({ tool_name: 'mcp__devflow__flow_get', response: {} });
   assert.strictEqual(out, '');
 });
 
 test('reminds on state transition in response', () => {
   const out = run({
-    tool: 'mcp__devflow__flow_update',
+    tool_name: 'mcp__devflow__flow_update',
     response: { currentState: 'ready', previousState: 'approval' }
   });
   assert.match(out, /State changed/);
@@ -31,7 +31,7 @@ test('reminds on state transition in response', () => {
 
 test('silent when state unchanged', () => {
   const out = run({
-    tool: 'mcp__devflow__flow_update',
+    tool_name: 'mcp__devflow__flow_update',
     response: { currentState: 'planning', previousState: 'planning' }
   });
   assert.strictEqual(out, '');

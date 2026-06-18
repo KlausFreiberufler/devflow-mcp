@@ -30,7 +30,9 @@ process.stdin.on('end', () => {
   try {
     const payload = JSON.parse(input || '{}')
     // DF-357 — accept any host's flow_update tool (devflow, plugin_devflow_devflow, etc.)
-    if (!payload.tool || !payload.tool.endsWith('__flow_update')) return
+    // DF-434 — Claude Code's PreToolUse payload uses `tool_name`, not `tool`.
+    const toolName = payload.tool_name || payload.tool
+    if (!toolName || !toolName.endsWith('__flow_update')) return
 
     const args = payload.tool_input || payload.input || {}
     const targetState = args.currentState

@@ -84,8 +84,8 @@ What happens at the backend (since DF-212):
 
 What happens next depends on the project's **Self-Approval mode** (DF-302, see `devflow-core`):
 
-- **`allowSelfApproval: false`** (default for old projects) — `approval → ready` is human-only. The 403 you get back carries `gate.userMessage`. Show that message to the user verbatim, then stop. Do not retry.
-- **`allowSelfApproval: true`** (default for new projects since DF-313) — emit discipline-tokens for `gate.requiredSkills` (`devflow-collision-acknowledged`, `devflow-pattern-reuse`, `devflow-tdd`, `devflow-adr-compliance`) via `devflow_token_emit`, then `flow_update({ currentState: 'ready', selfApproved: true, disciplineTokens: [...] })` to advance.
+- **`transitionPolicy: 'human_only'`** (Self-Approval OFF) — `approval → ready` is human-only. The 403 you get back carries `gate.userMessage`. Show that message to the user verbatim, then stop. Do not retry.
+- **`transitionPolicy: 'agent_with_discipline'`** (Self-Approval ON, default for new projects since DF-313) — emit discipline-tokens for `gate.requiredSkills` (`devflow-collision-acknowledged`, `devflow-pattern-reuse`, `devflow-tdd`, `devflow-knowledge-completer`) via `devflow_token_emit`, then `flow_update({ currentState: 'ready', selfApproved: true, disciplineTokens: [...] })` to advance. When in doubt, attempt it — a `discipline_incomplete` 403 tells you exactly which tokens are missing.
 
 In either mode, the flow does not silently stay in `approval` — either the user clicks Approve, or you self-approve with tokens.
 

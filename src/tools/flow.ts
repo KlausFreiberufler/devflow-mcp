@@ -690,16 +690,57 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
   }
 
   if (!result.success || !result.data) {
-    // Handle 403 gate blocked response (DF-292 self-approval shape)
+    // Handle 403 gate blocked response (DF-292 self-approval shape).
+    // DF-434 — branch on gate.reason. The old code told the agent "requires human
+    // action / wait / do NOT retry" for EVERY 403, even when the gate was actionable
+    // (missing discipline-tokens). That is exactly why self-approval silently fell
+    // back to manual UI approval: the agent was told to give up instead of emitting
+    // the tokens it was missing. Only human_required (Self-Approval OFF) is a real wait.
     if (result.statusCode === 403 && result.gate) {
+      const gate = result.gate as any;
+      const reason: string = gate.reason || '';
+      const step: string = gate.pipelineStep || 'transition';
+
+      // Actionable — discipline-tokens missing or their evidence is invalid.
+      if (reason === 'discipline_incomplete' || reason === 'discipline_token_evidence_invalid') {
+        const required: string[] = Array.isArray(gate.requiredSkills) ? gate.requiredSkills : [];
+        const missing: string[] = Array.isArray(gate.missing) && gate.missing.length ? gate.missing : required;
+        return [
+          `🔐 Self-approval gate for step '${step}': discipline-tokens incomplete — this is YOUR action, do not wait for the user.`,
+          '',
+          missing.length ? `Missing token(s): ${missing.join(', ')}` : '',
+          required.length ? `Required skills: ${required.join(', ')}` : '',
+          '',
+          gate.hint || 'Emit a token for each missing skill via devflow_token_emit({ flowId, skillName, evidence }), then retry flow_update with selfApproved=true and disciplineTokens=[…].',
+        ].filter(Boolean).join('\n');
+      }
+
+      // Actionable — the agent must explicitly claim self-approval.
+      if (reason === 'selfApproved flag required to claim agent self-approval') {
+        return [
+          `🔐 Self-approval gate for step '${step}': you must claim self-approval explicitly.`,
+          '',
+          'Emit the required discipline-tokens, then call flow_update({ currentState, selfApproved: true, disciplineTokens: [...] }). Do not wait for the user.',
+        ].join('\n');
+      }
+
+      // Not actionable by the agent — Self-Approval is OFF, or a genuine human-only gate.
+      if (reason === 'human_required' || /allow_agent_self_approval=0/.test(reason)) {
+        return [
+          `⛔ Gate blocked at step '${step}': human approval required.`,
+          '',
+          gate.userMessage || reason || '',
+          '',
+          'Show this to the user and stop — Self-Approval is OFF for this project (Settings → General). Do NOT retry.',
+        ].filter(Boolean).join('\n');
+      }
+
+      // Fallback for any other 403 gate shape.
       return [
-        `⛔ Gate blocked: Step '${result.gate.pipelineStep}' requires human action.`,
+        `⛔ Gate blocked at step '${step}'.`,
         '',
-        `Executor: ${result.gate.executor}`,
-        result.gate.reason || '',
-        '',
-        'Wait for the user to proceed in DevFlow UI.',
-        'Do NOT retry this transition.',
+        reason || 'This transition requires action before it can proceed.',
+        gate.hint || '',
       ].filter(Boolean).join('\n');
     }
     // DF-432 — Handle 409 unified-gate response (DF-374 shape with gate.failures[])

@@ -146,7 +146,9 @@ process.stdin.on('data', (chunk) => { input += chunk; });
 process.stdin.on('end', async () => {
   try {
     const payload = JSON.parse(input || '{}');
-    if (!payload.tool || !payload.tool.endsWith('__flow_create')) {
+    // DF-434 — Claude Code's PreToolUse payload uses `tool_name`, not `tool`.
+    const toolName = payload.tool_name || payload.tool;
+    if (!toolName || !toolName.endsWith('__flow_create')) {
       return;
     }
     const args = payload.tool_input || payload.input || {};

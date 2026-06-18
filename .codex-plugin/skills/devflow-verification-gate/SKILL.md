@@ -90,7 +90,7 @@ PATCH /api/flows/:id
 {
   "currentState": "done",
   "selfApproved": true,
-  "disciplineTokens": ["<verification-gate-token>", "<adr-compliance-token>", "<test-suite-green-token>", "<knowledge-harvest-token>"]
+  "disciplineTokens": ["<verification-gate-token>", "<adr-compliance-token>", "<plan-reconciliation-token>", "<knowledge-completer-token>"]
 }
 ```
 
