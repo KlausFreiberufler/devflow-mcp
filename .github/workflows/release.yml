@@ -1,11 +1,14 @@
 name: Release
 
-# Validates a tag-push: version-sync, tag-matches-pkg, build is reproducible,
-# tests pass, dist/ is committed. Then creates a GitHub release.
+# On a tag-push (v*): version-sync, tag-matches-pkg, build reproducible, tests pass,
+# dist/ committed → then publishes to npm and creates the GitHub release.
 #
-# npm publish runs LOCALLY from the maintainer's machine (`npm publish --access public`),
-# not from CI. See CONTRIBUTING.md → Releasing. This avoids storing an npm token
-# as a GitHub Action secret and keeps publish under direct human control.
+# DF-434: npm publish now runs autonomously in CI via an npm *automation* token
+# (secrets.NPM_TOKEN), which is exempt from 2FA/OTP — so there is no manual `--otp`
+# step anymore. Set the token once:
+#   npmjs.com → Access Tokens → Generate New Token → Automation
+#   gh secret set NPM_TOKEN --repo KlausFreiberufler/devflow-mcp
+# The publish step is idempotent — it skips if the version is already on npm.
 
 on:
   push:
@@ -23,6 +26,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
 
@@ -49,6 +53,18 @@ jobs:
           fi
 
       - run: npm test
+
+      - name: Publish to npm (idempotent — skips if version already published)
+        run: |
+          pkg="$(node -p "require('./package.json').name")"
+          ver="$(node -p "require('./package.json').version")"
+          if npm view "$pkg@$ver" version >/dev/null 2>&1; then
+            echo "$pkg@$ver is already on npm — skipping publish."
+          else
+            npm publish --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
