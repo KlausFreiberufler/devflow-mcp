@@ -7,7 +7,7 @@ import { devFlowClient, type Flow, type FlowAttachment, type FlowDiscussionComme
 import type { ToolContentBlock, ToolHandlerResult, ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 import { sessionContext } from '../context/session.js';
-import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
+import { getGuidanceFor } from '../context/permissions.js';
 import { extractImagesFromTipTap } from '../utils/tiptap.js';
 import { formatAttachmentList } from '../utils/attachments.js';
 import { resolveFlowId } from '../utils/resolve-flow-id.js';
@@ -488,7 +488,7 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
 
   // Auto-init: set session context for the newly created flow
   const newFlow = result.data;
-  const nextStep = NEXT_STEP_GUIDANCE[newFlow.currentState] || 'Beginne mit der Planung.';
+  const nextStep = getGuidanceFor(newFlow.currentState) || 'Beginne mit der Planung.';
 
   // Lock the flow
   await devFlowClient.updateFlow(newFlow.id, {
@@ -789,7 +789,9 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
         }).catch(() => {});
       }
 
-      const guidance = NEXT_STEP_GUIDANCE[newState] || '';
+      // DF-437 — policy-aware: no 'Warte auf User' when the step runs under
+      // agent_with_discipline; the agent is told to self-approve instead.
+      const guidance = getGuidanceFor(newState, sessionContext.get()?.transitionPolicy) || '';
       const reinitHint = newState === 'approval'
         ? `\n\n**Nach Genehmigung:** Rufe \`devflow_init({ flowId: "${resolvedId}" })\` auf — der Auto-Advance von ready → in_progress passiert dort automatisch.`
         : '';

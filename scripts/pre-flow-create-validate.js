@@ -141,6 +141,8 @@ async function maybeBuildWikiHint(args) {
   }
 }
 
+import { emitContext, warn } from './lib/hook-output.js';
+
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
 process.stdin.on('end', async () => {
@@ -154,16 +156,17 @@ process.stdin.on('end', async () => {
     const args = payload.tool_input || payload.input || {};
     const hints = collectHints(args);
     if (hints.length > 0) {
-      process.stdout.write(`🛈 flow_create input issues:\n  - ${hints.join('\n  - ')}\n`);
+      emitContext(`flow_create input issues:\n  - ${hints.join('\n  - ')}`);
     }
 
     // DF-412 Paket C — wiki similarity hint, only when validation passed.
     if (hints.length === 0 && !isFullStub(args)) {
       const wikiHint = await maybeBuildWikiHint(args);
-      if (wikiHint) process.stdout.write(wikiHint);
+      if (wikiHint) emitContext(wikiHint.trim());
     }
-  } catch {
-    // Always exit 0: malformed input shouldn't block the agent.
+  } catch (e) {
+    // Always exit 0: malformed input shouldn't block the agent — but leave a trace (DF-437 AC-3).
+    warn(`flow-create-validate hook error: ${e?.message || e}`);
   }
 });
 

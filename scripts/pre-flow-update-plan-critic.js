@@ -24,6 +24,8 @@
  * Pattern: [[auto-self-approval-via-pre-tool-use-hook]]
  */
 
+import { emitContext, warn } from './lib/hook-output.js'
+
 let input = ''
 process.stdin.on('data', (chunk) => { input += chunk })
 process.stdin.on('end', () => {
@@ -63,9 +65,10 @@ process.stdin.on('end', () => {
       'Phase 1 (this hook): informational. Phase 2 will block until verdict=approved.',
     ]
 
-    // Print to stderr so it shows as informational hint (per Claude Code convention).
-    console.error(lines.join('\n'))
-  } catch {
-    // Best-effort — never block the actual tool call from this hook
+    // DF-437 — inject into the AGENT's context; stderr never reached the model.
+    emitContext(lines.join('\n'))
+  } catch (e) {
+    // Best-effort — never block the tool call, but leave a trace (DF-437 AC-3).
+    warn(`plan-critic hook error: ${e?.message || e}`)
   }
 })

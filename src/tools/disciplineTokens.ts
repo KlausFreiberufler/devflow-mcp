@@ -57,6 +57,31 @@ const tokensListDef = {
   }
 };
 
+const tokensAutoEmitDef = {
+  name: 'discipline_tokens_auto_emit',
+  description: `DF-437 — Bulk auto-emit all discipline-tokens required for a target transition (POST /api/flows/:id/discipline-tokens/auto-emit).
+
+PREFER the DF-435 body fields on flow_update itself — they carry real evidence and the backend derives the tokens from them:
+  - testStrategy: "<Red→Green-Strategie ≥30 Zeichen>"          (approval/ready → devflow-tdd)
+  - acVerification: [{acId, command, output}]                  (done → devflow-verification-gate)
+  - planReconciliation: { perAcStatus: [{acId, status}] }      (done → devflow-plan-reconciliation)
+  - filesChanged: [<paths>]                                    (done → devflow-adr-compliance)
+
+Use this tool as a FALLBACK when the body-field path is not available (e.g. older backend) or a token is missing after a 403 discipline_incomplete. Tokens land in the DB — the next flow_update passes via implicit self-approval (DF-371), no token-strings needed.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      flowId: { type: 'string', description: 'Flow id' },
+      targetState: {
+        type: 'string',
+        enum: ['approval', 'ready', 'done'],
+        description: 'The transition the tokens are needed for'
+      }
+    },
+    required: ['flowId', 'targetState']
+  }
+};
+
 // ============ Handlers ============
 
 async function handleTokenEmit(args: Record<string, unknown>): Promise<string> {
@@ -90,6 +115,22 @@ async function handleTokensList(args: Record<string, unknown>): Promise<string> 
   return JSON.stringify(r.data, null, 2);
 }
 
+async function handleTokensAutoEmit(args: Record<string, unknown>): Promise<string> {
+  const flowId = args.flowId as string;
+  const targetState = args.targetState as string;
+  if (!flowId || !targetState) return 'Error: flowId and targetState are required';
+  const r = await devFlowClient.autoEmitDisciplineTokens(flowId, targetState);
+  if (!r.success || !r.data) return `Error: ${r.error || 'auto-emit failed'}`;
+  return JSON.stringify(
+    {
+      ...r.data,
+      _hint: 'Tokens are in the DB — retry the flow_update now; implicit self-approval (DF-371) picks them up automatically.'
+    },
+    null,
+    2
+  );
+}
+
 // ============ Registry ============
 
 export const tools: ToolModule = {
@@ -100,5 +141,9 @@ export const tools: ToolModule = {
   devflow_tokens_list: {
     definition: tokensListDef,
     handler: withErrorHandling('devflow_tokens_list', handleTokensList)
+  },
+  discipline_tokens_auto_emit: {
+    definition: tokensAutoEmitDef,
+    handler: withErrorHandling('discipline_tokens_auto_emit', handleTokensAutoEmit)
   }
 };

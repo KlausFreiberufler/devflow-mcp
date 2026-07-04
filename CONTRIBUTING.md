@@ -141,9 +141,15 @@ npm pack --dry-run
 | `npm run setup` | Start setup wizard |
 | `npm pack --dry-run` | Check package contents |
 
-## Releasing (Manual / Local)
+## Releasing
 
-`npm publish` runs **locally on the maintainer's machine**, not from CI. Reason: avoids storing an npm token as a GitHub Action secret and keeps the publish under direct human control. The CI workflow (`.github/workflows/release.yml`) still runs on each tag push to validate version-sync + dist/ + tests + create the GitHub release.
+Since DF-434 (PR #72), `npm publish` runs **autonomously in CI** on every `v*` tag push, using an npm *automation* token stored as the `NPM_TOKEN` GitHub Action secret (automation tokens are exempt from 2FA/OTP). The publish step is idempotent — it skips when the version is already on npm. The same workflow validates version-sync + dist/ + tests and creates the GitHub release.
+
+One-time setup (if `NPM_TOKEN` is missing, the publish step fails while the rest of the release job still runs):
+```bash
+# npmjs.com → Access Tokens → Generate New Token → Automation
+gh secret set NPM_TOKEN --repo KlausFreiberufler/devflow-mcp
+```
 
 ### Steps
 
@@ -161,13 +167,13 @@ npm pack --dry-run
    git push origin main
    ```
 
-3. **Tag + push (this triggers the validation workflow)**:
+3. **Tag + push (this triggers validation + npm publish + GitHub release)**:
    ```bash
    git tag v4.17.0
    git push origin v4.17.0
    ```
 
-4. **Publish to npm (locally)**:
+4. **Fallback — publish locally** (only if CI publish is unavailable):
    ```bash
    npm publish --access public
    ```

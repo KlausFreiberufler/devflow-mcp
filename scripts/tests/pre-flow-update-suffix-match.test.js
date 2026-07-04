@@ -72,12 +72,17 @@ test('all scripts ignore tools without __flow_update suffix (real tool_name shap
 });
 
 test('post-flow-update fires on plugin-namespaced tool_name (real shape)', () => {
+  // DF-437 — real PostToolUse shape: tool_input carries the transition,
+  // tool_response is the tool's text output; agent-visible output is the
+  // additionalContext envelope.
   const out = run('post-flow-update.js', {
     tool_name: 'mcp__plugin_devflow_devflow__flow_update',
-    response: { currentState: 'ready', previousState: 'approval' },
+    tool_input: { flowId: 'f-1', currentState: 'ready' },
+    tool_response: 'Flow updated successfully.',
   });
-  assert.match(out, /State changed/);
-  assert.match(out, /devflow_init/);
+  const parsed = JSON.parse(out);
+  assert.match(parsed.hookSpecificOutput.additionalContext, /ready/);
+  assert.match(parsed.hookSpecificOutput.additionalContext, /devflow_init/);
 });
 
 test('plan-critic fires on transition to approval (real tool_name shape)', () => {
@@ -168,7 +173,9 @@ test('plan-critic still fires on legacy `tool` field (fallback)', () => {
 test('post-flow-update still fires on legacy `tool` field (fallback)', () => {
   const out = run('post-flow-update.js', {
     tool: 'mcp__devflow__flow_update',
-    response: { currentState: 'ready', previousState: 'approval' },
+    tool_input: { flowId: 'f-1', currentState: 'ready' },
+    tool_response: 'Flow updated successfully.',
   });
-  assert.match(out, /State changed/);
+  const parsed = JSON.parse(out);
+  assert.match(parsed.hookSpecificOutput.additionalContext, /ready/);
 });

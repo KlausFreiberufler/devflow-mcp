@@ -65,8 +65,14 @@ declare class SessionContext {
     /**
      * Refresh flow state from backend when context might be stale.
      * Called when a tool is about to be blocked - checks if the user
-     * changed the state in the UI since the last check.
-     * Returns true if the state changed (permissions were updated).
+     * changed the state OR the permissions in the UI since the last check.
+     *
+     * DF-437 — the allowedActions refetch runs UNCONDITIONALLY, not only on a
+     * state change: a mid-session Self-Approval-toggle flips allowedActions /
+     * transitionPolicy without moving the flow state, and the old guard kept
+     * blocking flow_update client-side before the backend was ever asked.
+     *
+     * Returns true if the state or the allowedActions changed.
      */
     refreshFromBackend(): Promise<boolean>;
 }

@@ -14,5 +14,11 @@ export declare const DISCOVERY_TOOLS: ReadonlySet<string>;
  * but the values come from the remote config when available.
  */
 export declare const NEXT_STEP_GUIDANCE: Record<string, string>;
+/**
+ * Resolve the next-step guidance for a state, taking the step's
+ * transitionPolicy into account (DF-437). Falls back to the configured
+ * per-state guidance for every non-self-approval case.
+ */
+export declare function getGuidanceFor(state: string, transitionPolicy?: string | null): string;
 export declare function buildNoContextMessage(toolName: string): string;
 export declare function buildStateBlockMessage(toolName: string, flowSummary: string, flowId: string, currentState: string, allowedActions?: string[]): string;

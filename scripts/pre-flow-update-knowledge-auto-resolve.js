@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { readDevflowToken } from './lib/hook-auth.js';
+import { emitContext, warn } from './lib/hook-output.js';
 
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
@@ -47,7 +48,10 @@ process.stdin.on('end', async () => {
     const projectId = session?.projectId;
     const apiBase = session?.apiBase || process.env.DEVFLOW_API_BASE || 'https://api.app.dev-flow.tech';
     const token = session?.token || readDevflowToken();
-    if (!flowId || !projectId || !token) return;
+    if (!flowId || !projectId || !token) {
+      warn('knowledge-auto-resolve hook skipped — missing flowId/projectId/token (.devflow-active oder ~/.devflow/credentials.json pruefen)');
+      return;
+    }
 
     const url = `${apiBase}/api/projects/${encodeURIComponent(projectId)}/knowledge/auto-resolve`;
     const res = await fetch(url, {
@@ -60,8 +64,7 @@ process.stdin.on('end', async () => {
     });
     if (!res.ok) {
       // 404 → backend doesn't have the endpoint yet (older version) → no-op
-      // anything else → silent fall-through, agent's flow_update will still
-      // fire and surface the gate as before.
+      if (res.status !== 404) warn(`knowledge-auto-resolve hook: HTTP ${res.status} from auto-resolve endpoint`);
       return;
     }
     const json = await res.json().catch(() => null);
@@ -82,9 +85,10 @@ process.stdin.on('end', async () => {
     const moreCount = Array.isArray(resolved) && resolved.length > 3 ? `, +${resolved.length - 3}` : '';
     const topicSnippet = topics.length > 0 ? ` — topics: ${topics.join(', ')}${moreCount}` : '';
 
-    process.stdout.write(`✨ Wiki auto-resolved: ${counts.join(', ')}${topicSnippet}\n`);
-  } catch {
-    // Never block flow_update on hook errors
+    emitContext(`Wiki auto-resolved: ${counts.join(', ')}${topicSnippet}`);
+  } catch (e) {
+    // Never block flow_update on hook errors — but leave a trace (DF-437 AC-3).
+    warn(`knowledge-auto-resolve hook error: ${e?.message || e}`);
   }
 });
 
