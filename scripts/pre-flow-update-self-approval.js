@@ -1,21 +1,25 @@
 #!/usr/bin/env node
 /**
- * DF-323 — Pre-tool-use hook for mcp__devflow__flow_update.
+ * DF-323 / DF-437 — Pre-tool-use hook for mcp__devflow__flow_update.
  *
- * When the agent submits a state-transition to `approval` or `done` AND
- * the project has self-approval enabled, this hook:
+ * When the agent submits a state-transition to `approval`, `ready` or `done`
+ * AND the project has self-approval enabled, this hook:
  *   1. Looks up the required discipline-skills via GET /api/flows/:id/required-skills
- *   2. Bulk-emits all tokens via POST /api/flows/:id/discipline-tokens/auto-emit
- *   3. Surfaces a 1-line stdout summary so the user sees what happened
+ *   2. Injects the requirements into the AGENT's context via
+ *      hookSpecificOutput.additionalContext (DF-437 — plain stdout never
+ *      reaches the model on PreToolUse; it only lands in the debug log).
  *
- * The agent never reasons about tokens — they're served by the platform.
- * But: this hook only operates in informational mode (prints status). The
- * actual `selfApproved: true + disciplineTokens: [...]` injection into the
- * tool call is not possible from a hook (Claude Code's hook protocol does
- * not allow modifying the tool input). What this hook achieves is making
- * the audit trail visible to the user; the agent should still pass the
- * tokens explicitly. This is a UX/visibility improvement; the structural
- * Self-Approval automation needs a server-side proxy (deferred).
+ * The message teaches the two token paths, preferred first:
+ *   a) DF-435 body fields on flow_update itself (testStrategy /
+ *      acVerification / planReconciliation / filesChanged) — the backend
+ *      auto-emits the tokens from that evidence, AND
+ *   b) the `discipline_tokens_auto_emit` MCP tool as a bulk fallback.
+ *
+ * This hook cannot modify the tool input (Claude Code's hook protocol has no
+ * input-rewrite for PreToolUse) — it informs, the backend enforces.
+ *
+ * Fail-loud (DF-437 AC-3): every silent-return now leaves a `[devflow-hook]`
+ * line on stderr. exit code stays 0 — hooks never block the tool call.
  *
  * Pattern: [[auto-self-approval-via-pre-tool-use-hook]]
  */
@@ -24,6 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { readDevflowToken } from './lib/hook-auth.js';
+import { emitContext, warn } from './lib/hook-output.js';
 
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
@@ -48,13 +53,24 @@ process.stdin.on('end', async () => {
     const projectId = session?.projectId;
     const apiBase = session?.apiBase || process.env.DEVFLOW_API_BASE || 'https://api.app.dev-flow.tech';
     const token = session?.token || readDevflowToken();
-    if (!flowId || !projectId || !token) return;
+    if (!flowId || !projectId || !token) {
+      const missing = [
+        !flowId ? 'flowId' : null,
+        !projectId ? 'projectId (.devflow-active fehlt/unvollständig?)' : null,
+        !token ? 'auth token (~/.devflow/credentials.json abgelaufen/fehlt?)' : null,
+      ].filter(Boolean).join(', ');
+      warn(`self-approval hook skipped — missing: ${missing}`);
+      return;
+    }
 
     // 1) Check project self-approval flag
     const cfgRes = await fetch(`${apiBase}/api/projects/${encodeURIComponent(projectId)}/config`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!cfgRes.ok) return;
+    if (!cfgRes.ok) {
+      warn(`self-approval hook: project-config lookup failed with HTTP ${cfgRes.status}`);
+      return;
+    }
     const cfgJson = await cfgRes.json().catch(() => null);
     const allowSelf = cfgJson?.data?.allowAgentSelfApproval ?? cfgJson?.data?.allow_agent_self_approval;
     if (!allowSelf) return;
@@ -64,22 +80,29 @@ process.stdin.on('end', async () => {
       `${apiBase}/api/flows/${encodeURIComponent(flowId)}/required-skills?targetState=${encodeURIComponent(targetState)}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    if (!reqRes.ok) return;
+    if (!reqRes.ok) {
+      warn(`self-approval hook: required-skills lookup failed with HTTP ${reqRes.status}`);
+      return;
+    }
     const reqJson = await reqRes.json().catch(() => null);
     const skills = reqJson?.data?.skills || [];
     if (skills.length === 0) return;
 
-    // 3) Surface stdout summary so the user sees what the agent SHOULD do.
-    // DF-422 — auch die Skill-File-Pfade ausgeben, damit der Agent die Iron
-    // Laws direkt nachlesen kann statt nur die Namen zu kennen.
+    // 3) Inject into the agent's context (DF-437). DF-422 — include the
+    // skill-file paths so the agent can read the Iron Laws directly.
     const skillPaths = skills.map(s => `packages/skills/skills/${s}/SKILL.md`).join(', ');
-    process.stdout.write(
-      `🛈 Self-Approval ON · transition needs ${skills.length} discipline-token(s): ${skills.join(', ')}.\n` +
-      `   Pass selfApproved=true + disciplineTokens=[...] to flow_update or use POST /api/flows/${flowId}/discipline-tokens/auto-emit.\n` +
-      `   💡 Read Iron Laws: ${skillPaths}\n`
+    const evidenceHint = targetState === 'done'
+      ? 'acVerification: [{acId, command, output}], planReconciliation: { perAcStatus: [{acId, status}] }, filesChanged: [<paths>]'
+      : 'testStrategy: "<Red→Green-Strategie ≥30 Zeichen>"';
+    emitContext(
+      `Self-Approval ON — transition '${targetState}' needs ${skills.length} discipline-token(s): ${skills.join(', ')}.\n` +
+      `Preferred: include the evidence in THIS flow_update call — ${evidenceHint} — the backend auto-emits the tokens from it (DF-435).\n` +
+      `Fallback: discipline_tokens_auto_emit({ flowId: "${flowId}", targetState: "${targetState}" }) bulk-emits via the platform.\n` +
+      `Iron Laws: ${skillPaths}`
     );
-  } catch {
-    // Never block flow_update on hook errors
+  } catch (e) {
+    // Never block flow_update on hook errors — but never fail silently either.
+    warn(`self-approval hook error: ${e?.message || e}`);
   }
 });
 

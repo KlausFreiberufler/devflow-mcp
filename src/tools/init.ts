@@ -7,7 +7,7 @@
 
 import { devFlowClient } from '../api/client.js';
 import { sessionContext, type SessionFeedback, type ActiveContext, type GitContext } from '../context/session.js';
-import { NEXT_STEP_GUIDANCE } from '../context/permissions.js';
+import { getGuidanceFor } from '../context/permissions.js';
 import { getConfig } from '../config/sync.js';
 import { formatStrictnessLevel } from '../config/types.js';
 import { checkForUpdate } from '../config/version-check.js';
@@ -60,7 +60,7 @@ function determineFeedback(flow: {
   return null;
 }
 
-function determineNextStep(state: string, feedback: SessionFeedback | null, git?: GitContext): string {
+function determineNextStep(state: string, feedback: SessionFeedback | null, git?: GitContext, transitionPolicy?: string | null): string {
   if (feedback) {
     if (feedback.type === 'plan_rejected') {
       return 'Lies das Feedback und ueberarbeite den Plan. Nutze flow_update({ implementationPlan: "...", currentState: "approval" }) wenn fertig.';
@@ -97,7 +97,9 @@ function determineNextStep(state: string, feedback: SessionFeedback | null, git?
     return guidance;
   }
 
-  return NEXT_STEP_GUIDANCE[state] || 'Pruefe den Flow-Status.';
+  // DF-437 — policy-aware: under agent_with_discipline the wait-states
+  // (approval/review) instruct the agent to self-approve instead of waiting.
+  return getGuidanceFor(state, transitionPolicy);
 }
 
 function generateGitGuidelines(git: GitContext, projectName: string): string {
@@ -388,7 +390,7 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     previousFeedback = (initData.previousFeedback as string) || null;
   }
 
-  const nextStep = determineNextStep(state, feedback, gitContext);
+  const nextStep = determineNextStep(state, feedback, gitContext, transitionPolicy);
 
   const activeContext: ActiveContext = {
     flow,

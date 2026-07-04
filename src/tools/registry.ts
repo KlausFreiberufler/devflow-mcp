@@ -76,7 +76,7 @@ class ToolRegistry {
         return buildNoContextMessage(name);
       }
 
-      if (!ctx.allowedActions.includes(name)) {
+      if (!sessionContext.isToolAllowed(name)) {
         // Context might be stale if user changed state in UI — refresh before blocking
         const stateChanged = await sessionContext.refreshFromBackend();
         if (stateChanged && sessionContext.isToolAllowed(name)) {

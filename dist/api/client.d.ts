@@ -228,6 +228,10 @@ export declare class DevFlowClient {
         expiresAt: string;
     }>>;
     listActiveDisciplineTokens(flowId: string): Promise<ApiResponse<unknown[]>>;
+    autoEmitDisciplineTokens(flowId: string, targetState: string): Promise<ApiResponse<{
+        tokens: unknown[];
+        summary: unknown;
+    }>>;
     getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>>;
     updateProjectGuidelines(guidelines: string, projectId?: string): Promise<ApiResponse<ProjectGuidelines>>;
     listReleases(projectId?: string): Promise<ApiResponse<Release[]>>;

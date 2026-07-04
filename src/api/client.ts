@@ -913,6 +913,16 @@ Or set: export DEVFLOW_TOKEN="your-token"
     return this.request('GET', `/api/flows/${flowId}/discipline-tokens`);
   }
 
+  // DF-437 — bulk auto-emit for all required skills of a target transition
+  // (DF-323 backend endpoint; was documented in the self-approval hook but
+  // never actually callable from the plugin).
+  async autoEmitDisciplineTokens(
+    flowId: string,
+    targetState: string
+  ): Promise<ApiResponse<{ tokens: unknown[]; summary: unknown }>> {
+    return this.request('POST', `/api/flows/${flowId}/discipline-tokens/auto-emit`, { targetState });
+  }
+
   // ============ Guidelines Methods ============
 
   async getProjectGuidelines(projectId?: string): Promise<ApiResponse<ProjectGuidelines>> {

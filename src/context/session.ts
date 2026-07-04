@@ -53,6 +53,15 @@ export interface ActiveContext {
 
 const ACTIVE_FILE = '.devflow-active';
 
+/**
+ * DF-437 — client-side permission aliases for tools the backend allowlist
+ * doesn't know (yet). Key: new tool, value: the allowlisted tool whose
+ * permission it shares.
+ */
+const TOOL_PERMISSION_ALIASES: Record<string, string> = {
+  discipline_tokens_auto_emit: 'devflow_token_emit',
+};
+
 function getActiveFilePath(): string {
   return join(process.cwd(), ACTIVE_FILE);
 }
@@ -88,7 +97,12 @@ class SessionContext {
 
   isToolAllowed(toolName: string): boolean {
     if (!this.context) return false;
-    return this.context.allowedActions.includes(toolName);
+    if (this.context.allowedActions.includes(toolName)) return true;
+    // DF-437 — permission alias: the backend allowlist predates
+    // discipline_tokens_auto_emit; it is semantically the bulk-variant of
+    // devflow_token_emit and shares its permission.
+    const alias = TOOL_PERMISSION_ALIASES[toolName];
+    return alias ? this.context.allowedActions.includes(alias) : false;
   }
 
   update(partial: Partial<ActiveContext>): void {
@@ -151,11 +165,19 @@ class SessionContext {
   /**
    * Refresh flow state from backend when context might be stale.
    * Called when a tool is about to be blocked - checks if the user
-   * changed the state in the UI since the last check.
-   * Returns true if the state changed (permissions were updated).
+   * changed the state OR the permissions in the UI since the last check.
+   *
+   * DF-437 — the allowedActions refetch runs UNCONDITIONALLY, not only on a
+   * state change: a mid-session Self-Approval-toggle flips allowedActions /
+   * transitionPolicy without moving the flow state, and the old guard kept
+   * blocking flow_update client-side before the backend was ever asked.
+   *
+   * Returns true if the state or the allowedActions changed.
    */
   async refreshFromBackend(): Promise<boolean> {
     if (!this.context) return false;
+
+    let changed = false;
 
     try {
       const result = await devFlowClient.getFlow(this.context.flow.id);
@@ -166,28 +188,34 @@ class SessionContext {
 
       if (freshState !== cachedState) {
         this.context.flow = result.data;
-        // Re-fetch allowedActions from backend (sole source of truth)
-        try {
-          const nextStepResult = await devFlowClient.getNextStep(this.context.flow.id);
-          if (nextStepResult.success && nextStepResult.data?.allowedActions) {
-            this.context.allowedActions = nextStepResult.data.allowedActions as string[];
-            if (nextStepResult.data.kind) {
-              this.context.stepKind = nextStepResult.data.kind as string;
-            }
-            if (nextStepResult.data.transitionPolicy) {
-              this.context.transitionPolicy = nextStepResult.data.transitionPolicy as string;
-            }
+        changed = true;
+      }
+
+      // Re-fetch allowedActions from backend (sole source of truth) — always.
+      try {
+        const nextStepResult = await devFlowClient.getNextStep(this.context.flow.id);
+        if (nextStepResult.success && nextStepResult.data?.allowedActions) {
+          const fresh = nextStepResult.data.allowedActions as string[];
+          const cached = this.context.allowedActions || [];
+          const actionsChanged =
+            fresh.length !== cached.length || fresh.some((a) => !cached.includes(a));
+          if (actionsChanged) changed = true;
+          this.context.allowedActions = fresh;
+          if (nextStepResult.data.kind) {
+            this.context.stepKind = nextStepResult.data.kind as string;
           }
-        } catch {
-          // Network error during refresh - keep stale allowedActions
+          if (nextStepResult.data.transitionPolicy) {
+            this.context.transitionPolicy = nextStepResult.data.transitionPolicy as string;
+          }
         }
-        return true;
+      } catch {
+        // Network error during refresh - keep stale allowedActions
       }
     } catch {
       // Network error - keep cached state
     }
 
-    return false;
+    return changed;
   }
 }
 

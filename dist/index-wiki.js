@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.38.0";
+var MCP_VERSION = "4.39.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -7672,6 +7672,12 @@ Or set: export DEVFLOW_TOKEN="your-token"
   async listActiveDisciplineTokens(flowId) {
     return this.request("GET", `/api/flows/${flowId}/discipline-tokens`);
   }
+  // DF-437 — bulk auto-emit for all required skills of a target transition
+  // (DF-323 backend endpoint; was documented in the self-approval hook but
+  // never actually callable from the plugin).
+  async autoEmitDisciplineTokens(flowId, targetState) {
+    return this.request("POST", `/api/flows/${flowId}/discipline-tokens/auto-emit`, { targetState });
+  }
   // ============ Guidelines Methods ============
   async getProjectGuidelines(projectId) {
     const id = projectId || this.getLinkedProjectId();
@@ -7959,6 +7965,9 @@ var devFlowClient = new DevFlowClient();
 
 // src/context/session.ts
 var ACTIVE_FILE = ".devflow-active";
+var TOOL_PERMISSION_ALIASES = {
+  discipline_tokens_auto_emit: "devflow_token_emit"
+};
 function getActiveFilePath() {
   return join3(process.cwd(), ACTIVE_FILE);
 }
@@ -7986,7 +7995,9 @@ var SessionContext = class {
   }
   isToolAllowed(toolName) {
     if (!this.context) return false;
-    return this.context.allowedActions.includes(toolName);
+    if (this.context.allowedActions.includes(toolName)) return true;
+    const alias = TOOL_PERMISSION_ALIASES[toolName];
+    return alias ? this.context.allowedActions.includes(alias) : false;
   }
   update(partial2) {
     if (this.context) {
@@ -8039,11 +8050,18 @@ var SessionContext = class {
   /**
    * Refresh flow state from backend when context might be stale.
    * Called when a tool is about to be blocked - checks if the user
-   * changed the state in the UI since the last check.
-   * Returns true if the state changed (permissions were updated).
+   * changed the state OR the permissions in the UI since the last check.
+   *
+   * DF-437 — the allowedActions refetch runs UNCONDITIONALLY, not only on a
+   * state change: a mid-session Self-Approval-toggle flips allowedActions /
+   * transitionPolicy without moving the flow state, and the old guard kept
+   * blocking flow_update client-side before the backend was ever asked.
+   *
+   * Returns true if the state or the allowedActions changed.
    */
   async refreshFromBackend() {
     if (!this.context) return false;
+    let changed = false;
     try {
       const result = await devFlowClient.getFlow(this.context.flow.id);
       if (!result.success || !result.data) return false;
@@ -8051,24 +8069,28 @@ var SessionContext = class {
       const cachedState = this.context.flow.currentState;
       if (freshState !== cachedState) {
         this.context.flow = result.data;
-        try {
-          const nextStepResult = await devFlowClient.getNextStep(this.context.flow.id);
-          if (nextStepResult.success && nextStepResult.data?.allowedActions) {
-            this.context.allowedActions = nextStepResult.data.allowedActions;
-            if (nextStepResult.data.kind) {
-              this.context.stepKind = nextStepResult.data.kind;
-            }
-            if (nextStepResult.data.transitionPolicy) {
-              this.context.transitionPolicy = nextStepResult.data.transitionPolicy;
-            }
+        changed = true;
+      }
+      try {
+        const nextStepResult = await devFlowClient.getNextStep(this.context.flow.id);
+        if (nextStepResult.success && nextStepResult.data?.allowedActions) {
+          const fresh = nextStepResult.data.allowedActions;
+          const cached2 = this.context.allowedActions || [];
+          const actionsChanged = fresh.length !== cached2.length || fresh.some((a) => !cached2.includes(a));
+          if (actionsChanged) changed = true;
+          this.context.allowedActions = fresh;
+          if (nextStepResult.data.kind) {
+            this.context.stepKind = nextStepResult.data.kind;
           }
-        } catch {
+          if (nextStepResult.data.transitionPolicy) {
+            this.context.transitionPolicy = nextStepResult.data.transitionPolicy;
+          }
         }
-        return true;
+      } catch {
       }
     } catch {
     }
-    return false;
+    return changed;
   }
 };
 var sessionContext = new SessionContext();
@@ -8409,7 +8431,7 @@ var ToolRegistry = class {
         logToolCall({ toolName: name, args, blocked: true, blockReason: "No allowedActions \u2014 call devflow_init first" });
         return buildNoContextMessage(name);
       }
-      if (!ctx.allowedActions.includes(name)) {
+      if (!sessionContext.isToolAllowed(name)) {
         const stateChanged = await sessionContext.refreshFromBackend();
         if (stateChanged && sessionContext.isToolAllowed(name)) {
         } else {

@@ -7304,7 +7304,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.38.0";
+var MCP_VERSION = "4.39.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -7981,6 +7981,12 @@ Or set: export DEVFLOW_TOKEN="your-token"
   async listActiveDisciplineTokens(flowId) {
     return this.request("GET", `/api/flows/${flowId}/discipline-tokens`);
   }
+  // DF-437 — bulk auto-emit for all required skills of a target transition
+  // (DF-323 backend endpoint; was documented in the self-approval hook but
+  // never actually callable from the plugin).
+  async autoEmitDisciplineTokens(flowId, targetState) {
+    return this.request("POST", `/api/flows/${flowId}/discipline-tokens/auto-emit`, { targetState });
+  }
   // ============ Guidelines Methods ============
   async getProjectGuidelines(projectId) {
     const id = projectId || this.getLinkedProjectId();
@@ -8268,6 +8274,9 @@ var devFlowClient = new DevFlowClient();
 
 // src/context/session.ts
 var ACTIVE_FILE = ".devflow-active";
+var TOOL_PERMISSION_ALIASES = {
+  discipline_tokens_auto_emit: "devflow_token_emit"
+};
 function getActiveFilePath() {
   return join3(process.cwd(), ACTIVE_FILE);
 }
@@ -8295,7 +8304,9 @@ var SessionContext = class {
   }
   isToolAllowed(toolName) {
     if (!this.context) return false;
-    return this.context.allowedActions.includes(toolName);
+    if (this.context.allowedActions.includes(toolName)) return true;
+    const alias = TOOL_PERMISSION_ALIASES[toolName];
+    return alias ? this.context.allowedActions.includes(alias) : false;
   }
   update(partial2) {
     if (this.context) {
@@ -8348,11 +8359,18 @@ var SessionContext = class {
   /**
    * Refresh flow state from backend when context might be stale.
    * Called when a tool is about to be blocked - checks if the user
-   * changed the state in the UI since the last check.
-   * Returns true if the state changed (permissions were updated).
+   * changed the state OR the permissions in the UI since the last check.
+   *
+   * DF-437 — the allowedActions refetch runs UNCONDITIONALLY, not only on a
+   * state change: a mid-session Self-Approval-toggle flips allowedActions /
+   * transitionPolicy without moving the flow state, and the old guard kept
+   * blocking flow_update client-side before the backend was ever asked.
+   *
+   * Returns true if the state or the allowedActions changed.
    */
   async refreshFromBackend() {
     if (!this.context) return false;
+    let changed = false;
     try {
       const result = await devFlowClient.getFlow(this.context.flow.id);
       if (!result.success || !result.data) return false;
@@ -8360,24 +8378,28 @@ var SessionContext = class {
       const cachedState = this.context.flow.currentState;
       if (freshState !== cachedState) {
         this.context.flow = result.data;
-        try {
-          const nextStepResult = await devFlowClient.getNextStep(this.context.flow.id);
-          if (nextStepResult.success && nextStepResult.data?.allowedActions) {
-            this.context.allowedActions = nextStepResult.data.allowedActions;
-            if (nextStepResult.data.kind) {
-              this.context.stepKind = nextStepResult.data.kind;
-            }
-            if (nextStepResult.data.transitionPolicy) {
-              this.context.transitionPolicy = nextStepResult.data.transitionPolicy;
-            }
+        changed = true;
+      }
+      try {
+        const nextStepResult = await devFlowClient.getNextStep(this.context.flow.id);
+        if (nextStepResult.success && nextStepResult.data?.allowedActions) {
+          const fresh = nextStepResult.data.allowedActions;
+          const cached2 = this.context.allowedActions || [];
+          const actionsChanged = fresh.length !== cached2.length || fresh.some((a) => !cached2.includes(a));
+          if (actionsChanged) changed = true;
+          this.context.allowedActions = fresh;
+          if (nextStepResult.data.kind) {
+            this.context.stepKind = nextStepResult.data.kind;
           }
-        } catch {
+          if (nextStepResult.data.transitionPolicy) {
+            this.context.transitionPolicy = nextStepResult.data.transitionPolicy;
+          }
         }
-        return true;
+      } catch {
       }
     } catch {
     }
-    return false;
+    return changed;
   }
 };
 var sessionContext = new SessionContext();
@@ -8482,6 +8504,16 @@ var NEXT_STEP_GUIDANCE = new Proxy(
     }
   }
 );
+var SELF_APPROVAL_GUIDANCE = {
+  approval: 'Self-Approval ist AKTIV (agent_with_discipline) \u2014 warte NICHT auf den User. Pruefe flow_get_feedback() einmal auf blockierendes Feedback; wenn keins vorliegt, transitioniere selbst: flow_update({ currentState: "ready", testStrategy: "<Red\u2192Green-Strategie \u226530 Zeichen>" }). Das Backend emittiert die Required-Skill-Tokens automatisch (DF-435); fehlt eins, nennt der 403 die Luecke.',
+  review: 'Self-Approval ist AKTIV (agent_with_discipline) \u2014 warte NICHT auf den User. Fuehre das Self-Review durch und transitioniere selbst: flow_update({ currentState: "done", acVerification: [{acId, command, output}, ...], planReconciliation: { perAcStatus: [{acId, status}, ...] }, filesChanged: [<paths>] }). Das Backend emittiert verification-gate, plan-reconciliation, adr-compliance und knowledge-completer daraus automatisch (DF-435).'
+};
+function getGuidanceFor(state, transitionPolicy) {
+  if (transitionPolicy === "agent_with_discipline" && SELF_APPROVAL_GUIDANCE[state]) {
+    return SELF_APPROVAL_GUIDANCE[state];
+  }
+  return NEXT_STEP_GUIDANCE[state] || "Pruefe den Flow-Status.";
+}
 function buildNoContextMessage(toolName) {
   return [
     `\u26D4 Kein aktiver Flow-Context. Tool '${toolName}' ist blockiert.`,
@@ -8663,7 +8695,7 @@ var ToolRegistry = class {
         logToolCall({ toolName: name, args, blocked: true, blockReason: "No allowedActions \u2014 call devflow_init first" });
         return buildNoContextMessage(name);
       }
-      if (!ctx.allowedActions.includes(name)) {
+      if (!sessionContext.isToolAllowed(name)) {
         const stateChanged = await sessionContext.refreshFromBackend();
         if (stateChanged && sessionContext.isToolAllowed(name)) {
         } else {
@@ -8922,7 +8954,7 @@ function determineFeedback(flow) {
   }
   return null;
 }
-function determineNextStep(state, feedback, git) {
+function determineNextStep(state, feedback, git, transitionPolicy) {
   if (feedback) {
     if (feedback.type === "plan_rejected") {
       return 'Lies das Feedback und ueberarbeite den Plan. Nutze flow_update({ implementationPlan: "...", currentState: "approval" }) wenn fertig.';
@@ -8951,7 +8983,7 @@ function determineNextStep(state, feedback, git) {
     }
     return guidance;
   }
-  return NEXT_STEP_GUIDANCE[state] || "Pruefe den Flow-Status.";
+  return getGuidanceFor(state, transitionPolicy);
 }
 function generateGitGuidelines(git, projectName) {
   const lines = [`# Git-Richtlinien fuer Projekt "${projectName}"`, ""];
@@ -9191,7 +9223,7 @@ Nutze flow_list() um verfuegbare Flows zu sehen.`;
     retryCount = initData.retryCount || 0;
     previousFeedback = initData.previousFeedback || null;
   }
-  const nextStep = determineNextStep(state, feedback, gitContext);
+  const nextStep = determineNextStep(state, feedback, gitContext, transitionPolicy);
   const activeContext = {
     flow,
     previousState: advanceTo ? AUTO_ADVANCE[advanceTo] ? void 0 : flow.currentState : void 0,
@@ -9726,7 +9758,7 @@ async function handleFlowCreate(args) {
     return `Error: ${result.error || "Failed to create flow"}`;
   }
   const newFlow = result.data;
-  const nextStep = NEXT_STEP_GUIDANCE[newFlow.currentState] || "Beginne mit der Planung.";
+  const nextStep = getGuidanceFor(newFlow.currentState) || "Beginne mit der Planung.";
   await devFlowClient.updateFlow(newFlow.id, {
     agentStatus: "analyzing",
     agentMessage: "Neuer Flow erstellt"
@@ -9953,7 +9985,7 @@ ${required2.message}`;
         }).catch(() => {
         });
       }
-      const guidance = NEXT_STEP_GUIDANCE[newState] || "";
+      const guidance = getGuidanceFor(newState, sessionContext.get()?.transitionPolicy) || "";
       const reinitHint2 = newState === "approval" ? `
 
 **Nach Genehmigung:** Rufe \`devflow_init({ flowId: "${resolvedId}" })\` auf \u2014 der Auto-Advance von ready \u2192 in_progress passiert dort automatisch.` : "";
@@ -12760,6 +12792,30 @@ var tokensListDef = {
     required: ["flowId"]
   }
 };
+var tokensAutoEmitDef = {
+  name: "discipline_tokens_auto_emit",
+  description: `DF-437 \u2014 Bulk auto-emit all discipline-tokens required for a target transition (POST /api/flows/:id/discipline-tokens/auto-emit).
+
+PREFER the DF-435 body fields on flow_update itself \u2014 they carry real evidence and the backend derives the tokens from them:
+  - testStrategy: "<Red\u2192Green-Strategie \u226530 Zeichen>"          (approval/ready \u2192 devflow-tdd)
+  - acVerification: [{acId, command, output}]                  (done \u2192 devflow-verification-gate)
+  - planReconciliation: { perAcStatus: [{acId, status}] }      (done \u2192 devflow-plan-reconciliation)
+  - filesChanged: [<paths>]                                    (done \u2192 devflow-adr-compliance)
+
+Use this tool as a FALLBACK when the body-field path is not available (e.g. older backend) or a token is missing after a 403 discipline_incomplete. Tokens land in the DB \u2014 the next flow_update passes via implicit self-approval (DF-371), no token-strings needed.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      flowId: { type: "string", description: "Flow id" },
+      targetState: {
+        type: "string",
+        enum: ["approval", "ready", "done"],
+        description: "The transition the tokens are needed for"
+      }
+    },
+    required: ["flowId", "targetState"]
+  }
+};
 async function handleTokenEmit(args) {
   const flowId = args.flowId;
   const skillName = args.skillName;
@@ -12789,6 +12845,21 @@ async function handleTokensList(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return JSON.stringify(r.data, null, 2);
 }
+async function handleTokensAutoEmit(args) {
+  const flowId = args.flowId;
+  const targetState = args.targetState;
+  if (!flowId || !targetState) return "Error: flowId and targetState are required";
+  const r = await devFlowClient.autoEmitDisciplineTokens(flowId, targetState);
+  if (!r.success || !r.data) return `Error: ${r.error || "auto-emit failed"}`;
+  return JSON.stringify(
+    {
+      ...r.data,
+      _hint: "Tokens are in the DB \u2014 retry the flow_update now; implicit self-approval (DF-371) picks them up automatically."
+    },
+    null,
+    2
+  );
+}
 var tools18 = {
   devflow_token_emit: {
     definition: tokenEmitDef,
@@ -12797,6 +12868,10 @@ var tools18 = {
   devflow_tokens_list: {
     definition: tokensListDef,
     handler: withErrorHandling("devflow_tokens_list", handleTokensList)
+  },
+  discipline_tokens_auto_emit: {
+    definition: tokensAutoEmitDef,
+    handler: withErrorHandling("discipline_tokens_auto_emit", handleTokensAutoEmit)
   }
 };
 

@@ -30,6 +30,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { readDevflowToken } from './lib/hook-auth.js';
+import { emitContext, warn } from './lib/hook-output.js';
 
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
@@ -51,7 +52,10 @@ process.stdin.on('end', async () => {
     const projectId = session?.projectId;
     const apiBase = session?.apiBase || process.env.DEVFLOW_API_BASE || 'https://api.app.dev-flow.tech';
     const token = session?.token || readDevflowToken();
-    if (!flowId || !projectId || !token) return;
+    if (!flowId || !projectId || !token) {
+      warn('adr-compliance hook skipped — missing flowId/projectId/token (.devflow-active oder ~/.devflow/credentials.json pruefen)');
+      return;
+    }
 
     const flow = await apiGet(`${apiBase}/api/flows/${encodeURIComponent(flowId)}`, token);
     if (!flow?.data) return;
@@ -65,14 +69,17 @@ process.stdin.on('end', async () => {
 
     const files = runGitDiff(base, branch);
     if (!files || files.length === 0) {
-      process.stdout.write(`🛈 DF-415 ADR-Compliance: 0 files in diff ${base}...${branch} — pass filesChanged: [] if the gate trips.\n`);
+      emitContext(`ADR-Compliance (DF-415): 0 files in diff ${base}...${branch} — pass filesChanged: [] if the gate trips.`);
       return;
     }
 
-    process.stdout.write(`🛈 DF-415 ADR-Compliance: ${files.length} files in diff ${base}...${branch}. If the ADR-compliance gate fires, re-run flow_update with:\n`);
-    process.stdout.write(`   filesChanged: ${JSON.stringify(files)}\n`);
-  } catch {
-    // Never block flow_update on hook errors.
+    emitContext(
+      `ADR-Compliance (DF-415): ${files.length} files in diff ${base}...${branch}. ` +
+      `Include filesChanged: ${JSON.stringify(files)} in the flow_update body so the adr-compliance token can auto-emit (DF-435).`
+    );
+  } catch (e) {
+    // Never block flow_update on hook errors — but leave a trace (DF-437 AC-3).
+    warn(`adr-compliance hook error: ${e?.message || e}`);
   }
 });
 
