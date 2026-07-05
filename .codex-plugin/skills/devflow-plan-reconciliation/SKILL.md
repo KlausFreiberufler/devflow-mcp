@@ -81,11 +81,12 @@ devflow_token_emit({
   flowId,
   skillName: 'devflow-plan-reconciliation',
   evidence: {
-    rows: [{ item, status, evidence }],
-    counts: { done, partial, missing, extra, moved },
+    perAcStatus: [{ acId: 'AC-1', status: 'done' /* done|partial|missing|extra */ }],
     deferredVia: [{ topic, intentPageId }],
     completedAt: new Date().toISOString()
   }
+  // Alternativ ohne separaten Emit: planReconciliation: { perAcStatus: [...] }
+  // direkt im flow_update-Body — der Backend-Auto-Emit (DF-435) baut das Token daraus.
 })
 ```
 

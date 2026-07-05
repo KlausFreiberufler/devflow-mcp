@@ -7304,7 +7304,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.40.0";
+var MCP_VERSION = "4.41.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -12816,7 +12816,14 @@ The backend verifies all required tokens before allowing the transition. Without
       skillName: { type: "string", description: 'Discipline-skill name (e.g. "devflow-verification-gate")' },
       evidence: {
         type: "object",
-        description: "Optional structured evidence (cycles, hashes, criteria results \u2014 kept verbatim for audit)",
+        description: `Structured evidence, validated against the per-skill schema (DF-417/DF-438; warn-mode today, hard 400 under DEVFLOW_EVIDENCE_STRICT). Required shapes:
+  devflow-verification-gate:      { acVerification: [{acId, command, output}] }
+  devflow-plan-reconciliation:    { perAcStatus: [{acId, status: done|partial|missing|extra}] }
+  devflow-tdd:                    { testFirstPerPackage: [{package, redCommit, greenCommit}] } ODER plan-level { testStrategy, checkedAt }
+  devflow-collision-acknowledged: { totals, checkedAt }
+  devflow-knowledge-completer:    { gapsResolved: [], checkedAt }  (leeres Array ist g\xFCltig)
+  devflow-pattern-reuse:          { patternsReferenced: [\u22651] }
+  devflow-adr-compliance:         { filesChanged: [\u22651], compliant: true }`,
         additionalProperties: true
       }
     },
