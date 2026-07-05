@@ -10008,7 +10008,8 @@ ${required2.message}`;
     const newState = updatedFlow.currentState;
     if (["approval", "review", "done"].includes(newState)) {
       const sessionId = sessionContext.get()?.sessionId;
-      if (sessionId && sessionId !== "local-session") {
+      const currentPolicy = sessionContext.get()?.transitionPolicy;
+      if (sessionId && sessionId !== "local-session" && shouldAutoCompleteSession(newState, currentPolicy)) {
         const summaryMap = {
           approval: "Plan eingereicht, warte auf Freigabe",
           review: "Self-Review abgeschlossen, warte auf User-Review",
@@ -10016,6 +10017,8 @@ ${required2.message}`;
         };
         devFlowClient.completeAgentSession(sessionId, {
           summary: summaryMap[newState] || "Session beendet"
+        }).then(() => {
+          devFlowClient.setAgentSessionId(null);
         }).catch(() => {
         });
       }
@@ -10292,6 +10295,11 @@ var tools2 = {
     handler: withErrorHandling("flow_comments_get", handleFlowCommentsGet)
   }
 };
+function shouldAutoCompleteSession(newState, transitionPolicy) {
+  if (!["approval", "review", "done"].includes(newState)) return false;
+  if (newState === "done") return true;
+  return transitionPolicy !== "agent_with_discipline";
+}
 
 // src/tools/task.ts
 var taskListDef = {

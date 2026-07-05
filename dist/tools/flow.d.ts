@@ -45,3 +45,12 @@ export declare function renderGateFailures(gate: {
 }, topLevelError?: string): string;
 export declare function handleFlowUpdate(args: Record<string, unknown>): Promise<string>;
 export declare const tools: ToolModule;
+/**
+ * DF-436 — decide whether flow_update should auto-complete the agent-session
+ * after a transition. Under `agent_with_discipline` the agent self-approves
+ * and keeps working — the session must stay ACTIVE so the backend keeps
+ * treating the caller as an agent (gate + audit consistency). Only a real
+ * hand-off to a human (human_only / human_or_agent waits) or flow completion
+ * ends the session.
+ */
+export declare function shouldAutoCompleteSession(newState: string, transitionPolicy?: string | null): boolean;
