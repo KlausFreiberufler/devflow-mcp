@@ -436,7 +436,46 @@ async function handleDevflowInit(args: Record<string, unknown>): Promise<string>
     }
   } catch {}
 
-  return formatInitResponse(activeContext, warning, updateInfo) + attachmentSection;
+  // DF-439 (AC-5) — embed a compact wiki briefing so the agent starts every
+  // session with the relevant ADRs/patterns/gaps in context instead of
+  // having to remember to call wiki_get_briefing. Best-effort: a briefing
+  // failure must never break init.
+  let briefingSection = '';
+  try {
+    briefingSection = await buildInitWikiBriefing(activeContext.flow.id);
+  } catch {}
+
+  return formatInitResponse(activeContext, warning, updateInfo) + attachmentSection + briefingSection;
+}
+
+/**
+ * DF-439 — render the compact `## Wiki-Briefing` block for the init response
+ * from GET /api/flows/:id/wiki-context. Exported for tests.
+ */
+export async function buildInitWikiBriefing(flowId: string): Promise<string> {
+  const result = await devFlowClient.fetchWikiContext(flowId);
+  if (!result.success || !result.data) return '';
+  const ctx = result.data as {
+    relatedAdrs?: Array<{ number?: number; title?: string }>;
+    relatedDocs?: Array<{ title?: string; documentType?: string; document_type?: string }>;
+    gaps?: Array<{ topic?: string }>;
+  };
+  const adrs = (ctx.relatedAdrs || []).slice(0, 3);
+  const docs = (ctx.relatedDocs || []).slice(0, 3);
+  const gaps = ctx.gaps || [];
+  if (adrs.length === 0 && docs.length === 0 && gaps.length === 0) return '';
+
+  const lines = ['', '', '## Wiki-Briefing'];
+  if (adrs.length > 0) {
+    lines.push(`**Related ADRs:** ${adrs.map((a) => `ADR-${a.number ?? '?'} ${a.title ?? ''}`.trim()).join(' · ')}`);
+  }
+  if (docs.length > 0) {
+    lines.push(`**Patterns/Runbooks:** ${docs.map((d) => `${d.title ?? ''} (${d.documentType || d.document_type || 'doc'})`).join(' · ')}`);
+  }
+  if (gaps.length > 0) {
+    lines.push(`**Offene Knowledge-Gaps:** ${gaps.length} — ${gaps.slice(0, 3).map((g) => g.topic).filter(Boolean).join(', ')}${gaps.length > 3 ? ', …' : ''} (resolve via knowledge_check_resolve, Iron Law: extend > create > defer)`);
+  }
+  return lines.join('\n');
 }
 
 function formatInitResponse(

@@ -17,6 +17,15 @@ export const DISCOVERY_TOOLS: ReadonlySet<string> = new Set([
   'devflow_status',
   'devflow_connect',
   'devflow_disconnect',
+  // DF-439 — wiki health/curation reads: exactly the tools you need when
+  // DECIDING what to work on (no flow yet). All default to the linked
+  // project; reading the wiki is never a state mutation.
+  'wiki_get_lint',
+  'wiki_get_index',
+  'wiki_get_log',
+  'ideas_get',
+  'idea_prompts_get',
+  'error_context_get',
 ]);
 
 /**
