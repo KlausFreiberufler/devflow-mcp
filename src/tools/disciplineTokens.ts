@@ -37,7 +37,14 @@ The backend verifies all required tokens before allowing the transition. Without
       skillName: { type: 'string', description: 'Discipline-skill name (e.g. "devflow-verification-gate")' },
       evidence: {
         type: 'object',
-        description: 'Optional structured evidence (cycles, hashes, criteria results — kept verbatim for audit)',
+        description: `Structured evidence, validated against the per-skill schema (DF-417/DF-438; warn-mode today, hard 400 under DEVFLOW_EVIDENCE_STRICT). Required shapes:
+  devflow-verification-gate:      { acVerification: [{acId, command, output}] }
+  devflow-plan-reconciliation:    { perAcStatus: [{acId, status: done|partial|missing|extra}] }
+  devflow-tdd:                    { testFirstPerPackage: [{package, redCommit, greenCommit}] } ODER plan-level { testStrategy, checkedAt }
+  devflow-collision-acknowledged: { totals, checkedAt }
+  devflow-knowledge-completer:    { gapsResolved: [], checkedAt }  (leeres Array ist gültig)
+  devflow-pattern-reuse:          { patternsReferenced: [≥1] }
+  devflow-adr-compliance:         { filesChanged: [≥1], compliant: true }`,
         additionalProperties: true
       }
     },

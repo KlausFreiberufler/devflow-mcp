@@ -58,9 +58,9 @@ POST /api/flows/:id/discipline-tokens
 {
   "skillName": "devflow-collision-acknowledged",
   "evidence": {
-    "buckets": { "adrs": <n>, "intents": <n>, "flows": <n>, "drafts": <n> },
-    "decisions": { "kept": <n>, "dismissed": <n>, "deferred": <n> },
-    "completedAt": "<iso>"
+    "totals": { "inFlightFlows": <n>, "openIntents": <n>, "proposedAdrs": <n>, "pendingDrafts": <n> },
+    "decisions": [ { "item": "<DF-XXX / Intent-Titel>", "decision": "keep|irrelevant|later", "note": "<warum>" } ],
+    "checkedAt": "<iso>"
   }
 }
 ```

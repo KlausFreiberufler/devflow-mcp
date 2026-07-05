@@ -70,8 +70,8 @@ POST /api/flows/:id/discipline-tokens
 {
   "skillName": "devflow-pattern-reuse",
   "evidence": {
-    "tagScope": [...],
-    "patternsConsidered": [{ slug, decision: 'used'|'partial'|'rejected', reason? }],
+    "patternsReferenced": ["pattern:<slug>", ...],
+    "patternsConsidered": [{ "slug": "<slug>", "decision": "used|partial|rejected", "reason": "<optional>" }],
     "completedAt": "<iso>"
   }
 }

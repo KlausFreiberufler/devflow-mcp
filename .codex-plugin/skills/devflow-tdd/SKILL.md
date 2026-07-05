@@ -81,11 +81,23 @@ POST /api/flows/:id/discipline-tokens
 {
   "skillName": "devflow-tdd",
   "evidence": {
-    "cycles": [
-      { "task": "<acceptance-criterion>", "redOutput": "<truncated stderr>", "greenOutput": "<truncated stdout>", "refactored": true|false }
+    "testFirstPerPackage": [
+      { "package": "backend", "redCommit": "<sha des failing-test-commits>", "greenCommit": "<sha des green-commits>" }
     ],
     "patternsCited": ["pattern:<slug>", ...],
     "completedAt": "<iso>"
+  }
+}
+```
+
+**Plan-level Variante (DF-438):** Am approval-Zeitpunkt existieren noch keine Commits — dort ist die zweite Schema-Branch gültig (oder das `testStrategy`-Body-Feld von `flow_update`, das der Backend-Auto-Emit nutzt):
+
+```
+{
+  "skillName": "devflow-tdd",
+  "evidence": {
+    "testStrategy": "<Red→Green-Strategie, ≥30 Zeichen>",
+    "checkedAt": "<iso>"
   }
 }
 ```

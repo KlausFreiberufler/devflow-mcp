@@ -73,10 +73,9 @@ POST /api/flows/:id/discipline-tokens
 {
   "skillName": "devflow-verification-gate",
   "evidence": {
-    "criteria": [
-      { "id": "AC-1", "command": "...", "exitCode": 0, "outputSha256": "...", "durationMs": 141 }
+    "acVerification": [
+      { "acId": "AC-1", "command": "npx vitest run tests/api/x.test.ts", "output": "<truncated stdout, letzte ~30 Zeilen>" }
     ],
-    "totalCommands": <n>,
     "allPassed": true,
     "completedAt": "<iso>"
   }

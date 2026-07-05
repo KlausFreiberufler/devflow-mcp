@@ -53,11 +53,11 @@ devflow_token_emit({
   flowId,
   skillName: 'devflow-knowledge-completer',
   evidence: {
-    gapsClosed: number,
+    gapsResolved: ['<topic-1>', '<topic-2>'],  // leer [] ist gültig: sauberer Check ist selbst der Beweis (DF-435)
     extends: [{ entityType, entityId, topic }],
     creates: [{ resolutionType, topic, entityId }],
     defers: [{ topic, horizon }],
-    completedAt: new Date().toISOString()
+    checkedAt: new Date().toISOString()
   }
 })
 ```

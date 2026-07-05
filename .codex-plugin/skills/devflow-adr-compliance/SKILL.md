@@ -87,8 +87,8 @@ POST /api/flows/:id/discipline-tokens
 {
   "skillName": "devflow-adr-compliance",
   "evidence": {
-    "filesChanged": <count>,
-    "violationsTotal": <n>,
+    "filesChanged": ["<pfad-1>", "<pfad-2>", ...],
+    "compliant": true,
     "violationsOverridden": <n>,
     "completedAt": "<iso>"
   }
