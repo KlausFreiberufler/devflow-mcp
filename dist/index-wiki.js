@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.39.0";
+var MCP_VERSION = "4.40.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -8227,7 +8227,16 @@ var DISCOVERY_TOOLS = /* @__PURE__ */ new Set([
   "devflow_init",
   "devflow_status",
   "devflow_connect",
-  "devflow_disconnect"
+  "devflow_disconnect",
+  // DF-439 — wiki health/curation reads: exactly the tools you need when
+  // DECIDING what to work on (no flow yet). All default to the linked
+  // project; reading the wiki is never a state mutation.
+  "wiki_get_lint",
+  "wiki_get_index",
+  "wiki_get_log",
+  "ideas_get",
+  "idea_prompts_get",
+  "error_context_get"
 ]);
 var NEXT_STEP_GUIDANCE = new Proxy(
   {},

@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.39.0";
+var MCP_VERSION = "4.40.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -8227,7 +8227,16 @@ var DISCOVERY_TOOLS = /* @__PURE__ */ new Set([
   "devflow_init",
   "devflow_status",
   "devflow_connect",
-  "devflow_disconnect"
+  "devflow_disconnect",
+  // DF-439 — wiki health/curation reads: exactly the tools you need when
+  // DECIDING what to work on (no flow yet). All default to the linked
+  // project; reading the wiki is never a state mutation.
+  "wiki_get_lint",
+  "wiki_get_index",
+  "wiki_get_log",
+  "ideas_get",
+  "idea_prompts_get",
+  "error_context_get"
 ]);
 var NEXT_STEP_GUIDANCE = new Proxy(
   {},
@@ -9002,7 +9011,32 @@ Nutze flow_list() um verfuegbare Flows zu sehen.`;
     }
   } catch {
   }
-  return formatInitResponse(activeContext, warning, updateInfo) + attachmentSection;
+  let briefingSection = "";
+  try {
+    briefingSection = await buildInitWikiBriefing(activeContext.flow.id);
+  } catch {
+  }
+  return formatInitResponse(activeContext, warning, updateInfo) + attachmentSection + briefingSection;
+}
+async function buildInitWikiBriefing(flowId) {
+  const result = await devFlowClient.fetchWikiContext(flowId);
+  if (!result.success || !result.data) return "";
+  const ctx = result.data;
+  const adrs = (ctx.relatedAdrs || []).slice(0, 3);
+  const docs = (ctx.relatedDocs || []).slice(0, 3);
+  const gaps = ctx.gaps || [];
+  if (adrs.length === 0 && docs.length === 0 && gaps.length === 0) return "";
+  const lines = ["", "", "## Wiki-Briefing"];
+  if (adrs.length > 0) {
+    lines.push(`**Related ADRs:** ${adrs.map((a) => `ADR-${a.number ?? "?"} ${a.title ?? ""}`.trim()).join(" \xB7 ")}`);
+  }
+  if (docs.length > 0) {
+    lines.push(`**Patterns/Runbooks:** ${docs.map((d) => `${d.title ?? ""} (${d.documentType || d.document_type || "doc"})`).join(" \xB7 ")}`);
+  }
+  if (gaps.length > 0) {
+    lines.push(`**Offene Knowledge-Gaps:** ${gaps.length} \u2014 ${gaps.slice(0, 3).map((g) => g.topic).filter(Boolean).join(", ")}${gaps.length > 3 ? ", \u2026" : ""} (resolve via knowledge_check_resolve, Iron Law: extend > create > defer)`);
+  }
+  return lines.join("\n");
 }
 function formatInitResponse(ctx, warning, updateAvailable) {
   const w = ctx.flow;
