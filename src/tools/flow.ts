@@ -775,10 +775,18 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
 
     const newState = updatedFlow.currentState;
 
-    // Auto-complete session on review/wait/done states
+    // Auto-complete session on review/wait/done states.
+    // DF-436 — NOT under agent_with_discipline (except done): there the agent
+    // keeps working (self-approval); completing the session mid-flight made
+    // the backend treat follow-up calls as human (gate bypass + audit gap).
     if (['approval', 'review', 'done'].includes(newState)) {
       const sessionId = sessionContext.get()?.sessionId;
-      if (sessionId && sessionId !== 'local-session') {
+      const currentPolicy = sessionContext.get()?.transitionPolicy;
+      if (
+        sessionId &&
+        sessionId !== 'local-session' &&
+        shouldAutoCompleteSession(newState, currentPolicy)
+      ) {
         const summaryMap: Record<string, string> = {
           approval: 'Plan eingereicht, warte auf Freigabe',
           review: 'Self-Review abgeschlossen, warte auf User-Review',
@@ -786,7 +794,14 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
         };
         devFlowClient.completeAgentSession(sessionId, {
           summary: summaryMap[newState] || 'Session beendet',
-        }).catch(() => {});
+        })
+          .then(() => {
+            // DF-436 — stop sending the completed session's header; the
+            // backend treats any X-Agent-Session as agent (fail-closed), but
+            // a stale header is misleading in logs/audit.
+            devFlowClient.setAgentSessionId(null);
+          })
+          .catch(() => {});
       }
 
       // DF-437 — policy-aware: no 'Warte auf User' when the step runs under
@@ -1143,3 +1158,17 @@ export const tools: ToolModule = {
     handler: withErrorHandling('flow_comments_get', handleFlowCommentsGet),
   },
 };
+
+/**
+ * DF-436 — decide whether flow_update should auto-complete the agent-session
+ * after a transition. Under `agent_with_discipline` the agent self-approves
+ * and keeps working — the session must stay ACTIVE so the backend keeps
+ * treating the caller as an agent (gate + audit consistency). Only a real
+ * hand-off to a human (human_only / human_or_agent waits) or flow completion
+ * ends the session.
+ */
+export function shouldAutoCompleteSession(newState: string, transitionPolicy?: string | null): boolean {
+  if (!['approval', 'review', 'done'].includes(newState)) return false;
+  if (newState === 'done') return true;
+  return transitionPolicy !== 'agent_with_discipline';
+}
