@@ -6995,7 +6995,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.41.0";
+var MCP_VERSION = "4.42.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -9326,6 +9326,10 @@ var tools4 = {
 function resolveProjectId4(args) {
   return args.projectId || devFlowClient.getLinkedProjectId();
 }
+function resolveDraftId(args) {
+  const id = args.id ?? args.draftId;
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
 var backfillRequestDef = {
   name: "knowledge_backfill_request",
   description: `Prepare a knowledge backfill run for a project. Returns done-flows + existing ADRs + structured instructions that YOU (Claude) must follow to classify and propose knowledge drafts.
@@ -9396,7 +9400,7 @@ var draftAcceptDef = {
   inputSchema: {
     type: "object",
     properties: {
-      id: { type: "string", description: "Draft id" }
+      id: { type: "string", description: "Draft id (alias: draftId is also accepted)" }
     },
     required: ["id"]
   }
@@ -9407,7 +9411,7 @@ var draftRejectDef = {
   inputSchema: {
     type: "object",
     properties: {
-      id: { type: "string" },
+      id: { type: "string", description: "Draft id (alias: draftId is also accepted)" },
       notes: { type: "string", description: "Why this draft was rejected" }
     },
     required: ["id"]
@@ -9494,14 +9498,18 @@ async function handleDraftList(args) {
   return rows.map((d) => `- [${d.status}] ${d.draftType}: ${d.title} (${d.id}) \xB7 sources: ${d.sourceFlowIds.length}`).join("\n");
 }
 async function handleDraftAccept(args) {
-  const r = await devFlowClient.acceptKnowledgeDraft(args.id);
+  const id = resolveDraftId(args);
+  if (!id) return "Error: id (draft id) is required \u2014 got neither id nor draftId.";
+  const r = await devFlowClient.acceptKnowledgeDraft(id);
   if (!r.success) return `Error: ${r.error}`;
-  return `Draft ${args.id} accepted.`;
+  return `Draft ${id} accepted.`;
 }
 async function handleDraftReject(args) {
-  const r = await devFlowClient.rejectKnowledgeDraft(args.id, args.notes);
+  const id = resolveDraftId(args);
+  if (!id) return "Error: id (draft id) is required \u2014 got neither id nor draftId.";
+  const r = await devFlowClient.rejectKnowledgeDraft(id, args.notes);
   if (!r.success) return `Error: ${r.error}`;
-  return `Draft ${args.id} rejected.`;
+  return `Draft ${id} rejected.`;
 }
 async function handleHarvest(args) {
   const flowId = args.flowId;
