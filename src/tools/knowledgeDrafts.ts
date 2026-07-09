@@ -14,6 +14,17 @@ function resolveProjectId(args: Record<string, unknown>): string | null {
   return (args.projectId as string | undefined) || devFlowClient.getLinkedProjectId();
 }
 
+/**
+ * DF-477 — the schema says `id`, but the MCP layer does not enforce it and
+ * LLMs plausibly guess `draftId`. Accept both, and fail loud BEFORE any
+ * backend call — an undefined id used to travel into the URL and come back
+ * as a misleading "Draft not found".
+ */
+export function resolveDraftId(args: Record<string, unknown>): string | null {
+  const id = (args.id ?? args.draftId) as string | undefined;
+  return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
 // ============ Tool Definitions ============
 
 const backfillRequestDef = {
@@ -89,7 +100,7 @@ const draftAcceptDef = {
   inputSchema: {
     type: 'object' as const,
     properties: {
-      id: { type: 'string', description: 'Draft id' }
+      id: { type: 'string', description: 'Draft id (alias: draftId is also accepted)' }
     },
     required: ['id']
   }
@@ -101,7 +112,7 @@ const draftRejectDef = {
   inputSchema: {
     type: 'object' as const,
     properties: {
-      id: { type: 'string' },
+      id: { type: 'string', description: 'Draft id (alias: draftId is also accepted)' },
       notes: { type: 'string', description: 'Why this draft was rejected' }
     },
     required: ['id']
@@ -195,15 +206,19 @@ async function handleDraftList(args: Record<string, unknown>): Promise<string> {
 }
 
 async function handleDraftAccept(args: Record<string, unknown>): Promise<string> {
-  const r = await devFlowClient.acceptKnowledgeDraft(args.id as string);
+  const id = resolveDraftId(args);
+  if (!id) return 'Error: id (draft id) is required — got neither id nor draftId.';
+  const r = await devFlowClient.acceptKnowledgeDraft(id);
   if (!r.success) return `Error: ${r.error}`;
-  return `Draft ${args.id} accepted.`;
+  return `Draft ${id} accepted.`;
 }
 
 async function handleDraftReject(args: Record<string, unknown>): Promise<string> {
-  const r = await devFlowClient.rejectKnowledgeDraft(args.id as string, args.notes as string | undefined);
+  const id = resolveDraftId(args);
+  if (!id) return 'Error: id (draft id) is required — got neither id nor draftId.';
+  const r = await devFlowClient.rejectKnowledgeDraft(id, args.notes as string | undefined);
   if (!r.success) return `Error: ${r.error}`;
-  return `Draft ${args.id} rejected.`;
+  return `Draft ${id} rejected.`;
 }
 
 async function handleHarvest(args: Record<string, unknown>): Promise<string> {
