@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.42.0] - 2026-07-09
+
+### Fixed (DF-477)
+
+- **`knowledge_draft_accept` / `knowledge_draft_reject` scheitern jetzt laut statt irreführend.** Der MCP-Layer erzwingt das Tool-Schema nicht; ein Call mit dem naheliegenden falschen Parameternamen `draftId` schickte `id=undefined` in die Backend-URL und kam als "Draft not found" zurück (live getroffen in DF-476). Neu: `id ?? draftId` wird akzeptiert (Alias), und bei fehlender Id gibt es einen klaren "id is required"-Fehler **bevor** irgendein Backend-Call passiert.
+
 ## [4.38.0] - 2026-06-18
 
 ### Fixed (DF-434)
