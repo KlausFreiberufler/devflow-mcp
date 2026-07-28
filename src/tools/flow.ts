@@ -293,6 +293,28 @@ IMPORTANT: Some state transitions require mandatory fields:
         type: 'array',
         items: { type: 'string' },
         description: 'DF-292 — signed HMAC tokens (one per required skill) returned by devflow_token_emit. Backend verifies all required tokens before allowing the transition.'
+      },
+      // DF-435 evidence fields — the backend derives discipline-tokens from
+      // these automatically. Without the passthrough the adr-compliance gate
+      // rejects review→done with `files_changed_missing_with_git_enabled`
+      // (engine runs got stuck for 5 iterations on exactly this).
+      filesChanged: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Repo-relative paths changed by this flow (e.g. from `git diff --name-only origin/main...HEAD`). Required by the adr-compliance gate on review→done when git is enabled.'
+      },
+      testStrategy: {
+        type: 'string',
+        description: 'DF-435 — evidence for devflow-tdd/verification: how the change was tested (commands + results).'
+      },
+      acVerification: {
+        type: 'array',
+        items: { type: 'object' },
+        description: 'DF-435 — per-AC verification evidence: [{acId, status, evidence}].'
+      },
+      planReconciliation: {
+        type: 'object',
+        description: 'DF-435 — plan-vs-reality reconciliation: { perAcStatus: [{acId, status}, ...] }.'
       }
     },
     required: ['flowId']
@@ -563,6 +585,11 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
   // DF-292 — agent_with_discipline self-approval
   const selfApproved = args.selfApproved as boolean | undefined;
   const disciplineTokens = args.disciplineTokens as string[] | undefined;
+  // DF-435 evidence passthrough (fixes files_changed_missing_with_git_enabled on review→done)
+  const filesChanged = args.filesChanged as string[] | undefined;
+  const testStrategy = args.testStrategy as string | undefined;
+  const acVerification = args.acVerification as unknown[] | undefined;
+  const planReconciliation = args.planReconciliation as Record<string, unknown> | undefined;
 
   const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
@@ -671,6 +698,11 @@ export async function handleFlowUpdate(args: Record<string, unknown>): Promise<s
   // DF-292 — agent_with_discipline self-approval fields
   if (selfApproved !== undefined) cleanUpdate.selfApproved = selfApproved;
   if (disciplineTokens) cleanUpdate.disciplineTokens = disciplineTokens;
+  // DF-435 evidence passthrough — backend derives discipline-tokens from these
+  if (filesChanged) cleanUpdate.filesChanged = filesChanged;
+  if (testStrategy) cleanUpdate.testStrategy = testStrategy;
+  if (acVerification) cleanUpdate.acVerification = acVerification;
+  if (planReconciliation) cleanUpdate.planReconciliation = planReconciliation;
 
   const result = await devFlowClient.updateFlow(resolvedId, cleanUpdate);
 
