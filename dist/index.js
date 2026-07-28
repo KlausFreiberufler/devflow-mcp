@@ -7304,7 +7304,7 @@ function normalizeClientType(value) {
 }
 
 // src/config/version.ts
-var MCP_VERSION = "4.42.0";
+var MCP_VERSION = "4.43.0";
 
 // src/api/client.ts
 init_working_dir();
@@ -9638,6 +9638,28 @@ IMPORTANT: Some state transitions require mandatory fields:
         type: "array",
         items: { type: "string" },
         description: "DF-292 \u2014 signed HMAC tokens (one per required skill) returned by devflow_token_emit. Backend verifies all required tokens before allowing the transition."
+      },
+      // DF-435 evidence fields — the backend derives discipline-tokens from
+      // these automatically. Without the passthrough the adr-compliance gate
+      // rejects review→done with `files_changed_missing_with_git_enabled`
+      // (engine runs got stuck for 5 iterations on exactly this).
+      filesChanged: {
+        type: "array",
+        items: { type: "string" },
+        description: "Repo-relative paths changed by this flow (e.g. from `git diff --name-only origin/main...HEAD`). Required by the adr-compliance gate on review\u2192done when git is enabled."
+      },
+      testStrategy: {
+        type: "string",
+        description: "DF-435 \u2014 evidence for devflow-tdd/verification: how the change was tested (commands + results)."
+      },
+      acVerification: {
+        type: "array",
+        items: { type: "object" },
+        description: "DF-435 \u2014 per-AC verification evidence: [{acId, status, evidence}]."
+      },
+      planReconciliation: {
+        type: "object",
+        description: "DF-435 \u2014 plan-vs-reality reconciliation: { perAcStatus: [{acId, status}, ...] }."
       }
     },
     required: ["flowId"]
@@ -9854,6 +9876,10 @@ async function handleFlowUpdate(args) {
   const prState = args.prState;
   const selfApproved = args.selfApproved;
   const disciplineTokens = args.disciplineTokens;
+  const filesChanged = args.filesChanged;
+  const testStrategy = args.testStrategy;
+  const acVerification = args.acVerification;
+  const planReconciliation = args.planReconciliation;
   const resolvedId = await resolveFlowId(flowId);
   if (!resolvedId) {
     return `Error: Flow not found (tried exact and prefix match for "${flowId}")`;
@@ -9933,6 +9959,10 @@ ${required2.message}`;
   if (prState) cleanUpdate.prState = prState;
   if (selfApproved !== void 0) cleanUpdate.selfApproved = selfApproved;
   if (disciplineTokens) cleanUpdate.disciplineTokens = disciplineTokens;
+  if (filesChanged) cleanUpdate.filesChanged = filesChanged;
+  if (testStrategy) cleanUpdate.testStrategy = testStrategy;
+  if (acVerification) cleanUpdate.acVerification = acVerification;
+  if (planReconciliation) cleanUpdate.planReconciliation = planReconciliation;
   const result = await devFlowClient.updateFlow(resolvedId, cleanUpdate);
   if (implementationPlan && result.success) {
     try {
