@@ -10039,20 +10039,10 @@ async function handleFlowCreate(args) {
   const newFlow = result.data;
   const nextStep = getGuidanceFor(newFlow.currentState) || "Beginne mit der Planung.";
   await devFlowClient.updateFlow(newFlow.id, {
-    agentStatus: "analyzing",
+    agentStatus: "idle",
     agentMessage: "Neuer Flow erstellt"
   });
-  let sessionId = "local-session";
-  try {
-    const sessionResult = await devFlowClient.createAgentSession({
-      flowId: newFlow.id,
-      type: "enforcement-v3"
-    });
-    if (sessionResult.success && sessionResult.data) {
-      sessionId = sessionResult.data.id;
-    }
-  } catch {
-  }
+  const sessionId = "local-session";
   let allowedActions = [];
   try {
     const nextStepResult = await devFlowClient.getNextStep(newFlow.id);
@@ -10074,7 +10064,10 @@ async function handleFlowCreate(args) {
     nextStep
   });
   return [
-    "Flow erstellt und Session gestartet.",
+    // Sagt jetzt, was wirklich passiert ist (DF-532): angelegt, nicht
+    // begonnen. Der alte Satz behauptete eine Sitzung, die eine fremde
+    // verdrängt hatte — die Antwort log über ihre eigene Nebenwirkung.
+    "Flow erstellt. Zum Arbeiten: devflow_init({ flowId }) \u2014 eine laufende Sitzung an einem anderen Vorgang bleibt davon unber\xFChrt.",
     "",
     formatFlowDetail(newFlow),
     "",

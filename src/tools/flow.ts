@@ -512,25 +512,33 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
   const newFlow = result.data;
   const nextStep = getGuidanceFor(newFlow.currentState) || 'Beginne mit der Planung.';
 
-  // Lock the flow
+  // Anlegen heißt nicht arbeiten (DF-532).
+  //
+  // Hier stand vorher zweierlei, das beides so tat, als würde bereits an dem
+  // neuen Flow gearbeitet:
+  //
+  // 1. `agentStatus: 'analyzing'` — dadurch erschien ein frisch angelegter
+  //    Flow in `flow_list` als gesperrt (🔒), obwohl niemand ihn angefasst
+  //    hatte. Ein solcher Status hat andernorts schon einen Vorgang
+  //    zweieinhalb Wochen lang als belegt angezeigt.
+  //
+  // 2. `createAgentSession` — und das war das teurere: Das Backend verdrängt
+  //    beim Anlegen einer Sitzung die laufende Sitzung. Wer also während einer
+  //    fremden Prüfsitzung eine Auffälligkeit als Flow festhielt, zerstörte
+  //    damit deren Nachweis. Gemessen am 17.08.2026: Eine Abnehmer-Sitzung
+  //    stand danach auf `abandoned` mit null Protokolleinträgen — die
+  //    Prüfarbeit hatte stattgefunden, nur ihr Beleg war weg. Und die
+  //    Antwort meldete dazu nichts, sondern schrieb „Session gestartet".
+  //
+  // Ein Flow in `idea` braucht keine Sitzung. Wer an ihm arbeiten will, ruft
+  // `devflow_init` — das legt eine an und sagt auch, wenn es dabei eine
+  // andere verdrängt.
   await devFlowClient.updateFlow(newFlow.id, {
-    agentStatus: 'analyzing',
+    agentStatus: 'idle',
     agentMessage: 'Neuer Flow erstellt',
   });
 
-  // Create agent session
-  let sessionId = 'local-session';
-  try {
-    const sessionResult = await devFlowClient.createAgentSession({
-      flowId: newFlow.id,
-      type: 'enforcement-v3',
-    });
-    if (sessionResult.success && sessionResult.data) {
-      sessionId = sessionResult.data.id;
-    }
-  } catch {
-    // Continue with local tracking
-  }
+  const sessionId = 'local-session';
 
   // Fetch allowedActions from backend (sole source of truth)
   let allowedActions: string[] = [];
@@ -558,7 +566,10 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
   });
 
   return [
-    'Flow erstellt und Session gestartet.',
+    // Sagt jetzt, was wirklich passiert ist (DF-532): angelegt, nicht
+    // begonnen. Der alte Satz behauptete eine Sitzung, die eine fremde
+    // verdrängt hatte — die Antwort log über ihre eigene Nebenwirkung.
+    'Flow erstellt. Zum Arbeiten: devflow_init({ flowId }) — eine laufende Sitzung an einem anderen Vorgang bleibt davon unberührt.',
     '',
     formatFlowDetail(newFlow),
     '',
