@@ -8,6 +8,43 @@ import type { AgentSession } from '../api/client.js';
 import type { ToolModule } from '../tools/registry.js';
 import { withErrorHandling } from '../utils/errors.js';
 
+/**
+ * Die Protokoll-Ebenen, die der Speicher tatsächlich annimmt (DF-531).
+ *
+ * Quelle der Wahrheit ist die CHECK-Constraint im Backend:
+ *   backend/src/database/db.js:345 und schema.sql:303
+ *     level TEXT CHECK(level IN ('debug', 'info', 'warning', 'error'))
+ *
+ * Vorher standen hier drei andere Werte. `warn` war anwählbar, aber nie
+ * speicherbar; `debug` war speicherbar, aber nicht anwählbar. Der laut Schema
+ * korrekte Aufruf scheiterte — als gewöhnliche Werkzeugantwort, nicht als
+ * Abbruch. Wer den Rückgabewert nicht liest, schließt die Sitzung ohne den
+ * Eintrag ab, den er geschrieben zu haben glaubt.
+ *
+ * Deshalb eine benannte Konstante: Schema und Normalisierung werden aus
+ * derselben Quelle gespeist, damit sie nicht wieder auseinanderlaufen.
+ */
+export const PROTOKOLL_EBENEN = ['debug', 'info', 'warning', 'error'] as const;
+
+export type ProtokollEbene = (typeof PROTOKOLL_EBENEN)[number];
+
+/**
+ * Bringt einen Ebenen-Wert in eine Form, die der Speicher annimmt (DF-531).
+ *
+ * `warn` wird übersetzt statt zurückgewiesen: Wer es schickt, meint eine
+ * Warnung — die Ablehnung war ein Fehler, kein Vertrag. Alles Unbekannte
+ * fällt auf `info` zurück, denn ein durchgereichter Fantasiewert erzeugt
+ * genau den stillen Fehlschlag, um den es hier geht. Lieber die ungenauere
+ * Ebene als ein verlorener Eintrag.
+ */
+export function normalisiereEbene(wert: string | undefined): ProtokollEbene {
+  if (!wert) return 'info';
+  if (wert === 'warn') return 'warning';
+  return (PROTOKOLL_EBENEN as readonly string[]).includes(wert)
+    ? (wert as ProtokollEbene)
+    : 'info';
+}
+
 // ============ Tool Definitions ============
 
 const agentSessionCreateDef = {
@@ -55,8 +92,8 @@ Supports different log levels:
       },
       level: {
         type: 'string',
-        enum: ['info', 'warn', 'error'],
-        description: 'Log level (default: info)'
+        enum: [...PROTOKOLL_EBENEN],
+        description: 'Log level (default: info). "warn" is accepted and stored as "warning".'
       }
     },
     required: ['id', 'message']
@@ -119,7 +156,10 @@ async function handleAgentSessionCreate(args: Record<string, unknown>): Promise<
 async function handleAgentSessionLog(args: Record<string, unknown>): Promise<string> {
   const id = args.id as string;
   const message = args.message as string;
-  const level = (args.level as string) || 'info';
+  // Normalisiert statt roh durchgereicht (DF-531): Ein Wert, den der Speicher
+  // ablehnt, kostet den Eintrag — und der Fehler kommt als Antwort zurück,
+  // nicht als Abbruch.
+  const level = normalisiereEbene(args.level as string | undefined);
 
   const result = await devFlowClient.logAgentSession(id, { message, level });
 
