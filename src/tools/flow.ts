@@ -538,7 +538,28 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
     agentMessage: 'Neuer Flow erstellt',
   });
 
-  const sessionId = 'local-session';
+  // Eine Sitzung nur, wenn wir auch übernehmen (DF-532, Nachschlag).
+  //
+  // Der erste Anlauf ließ sie ganz weg — und verlor damit das Protokoll im
+  // Normalfall: `auto-logger` steigt bei `sessionId === 'local-session'` aus,
+  // also schrieb ein frischer Agent nach dem Anlegen protokolllos weiter.
+  // Genau die „0 Einträge", gegen die dieser Flow angetreten ist, nur an
+  // anderer Stelle. Vom Abnehmer gemessen.
+  //
+  // Verdrängt wird dabei nichts: Ist kein Kontext aktiv, gibt es keine fremde
+  // Sitzung, die das Backend beim Anlegen abräumen könnte. Der Schaden
+  // entstand ausschließlich aus dem umgekehrten Fall.
+  const uebernehmen = !sessionContext.isActive();
+
+  let sessionId = 'local-session';
+  if (uebernehmen) {
+    try {
+      const s = await devFlowClient.createAgentSession({ flowId: newFlow.id, type: 'enforcement-v3' });
+      if (s.success && s.data) sessionId = s.data.id;
+    } catch {
+      // Ohne Sitzung weiterarbeiten ist besser als gar nicht anlegen.
+    }
+  }
 
   // Fetch allowedActions from backend (sole source of truth)
   let allowedActions: string[] = [];
@@ -569,7 +590,6 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
   // weiterarbeiten können —, gilt nur für den sitzungslosen Fall. Läuft schon
   // etwas, gehört der Kontext dem, der ihn hat. Wer am neuen Flow arbeiten
   // will, ruft `devflow_init`.
-  const uebernehmen = !sessionContext.isActive();
   if (uebernehmen) {
     sessionContext.init({
       flow: newFlow,
