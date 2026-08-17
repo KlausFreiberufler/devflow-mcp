@@ -38,6 +38,19 @@ describe('Protokoll-Ebenen', () => {
     }
   });
 
+  // Vom Prüfer benannt: 'ERROR' fiel still auf 'info' zurück — aus einem
+  // Fehler-Eintrag wurde lautlos eine Notiz.
+  it('nimmt Groß-/Kleinschreibung und Leerraum hin, statt still herabzustufen', () => {
+    expect(normalisiereEbene('ERROR')).toBe('error');
+    expect(normalisiereEbene('Warning')).toBe('warning');
+    expect(normalisiereEbene('WARN')).toBe('warning');
+    expect(normalisiereEbene(' info ')).toBe('info');
+  });
+
+  it('lässt sich zur Laufzeit nicht verbiegen', () => {
+    expect(Object.isFrozen(PROTOKOLL_EBENEN)).toBe(true);
+  });
+
   it('fängt Unbekanntes bei info ab, statt es an die Constraint durchzureichen', () => {
     // Ein durchgereichter Fantasiewert erzeugt genau den stillen Fehlschlag,
     // um den es hier geht. Lieber die falsche Ebene als ein verlorener Eintrag.

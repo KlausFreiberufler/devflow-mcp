@@ -24,7 +24,7 @@ import { withErrorHandling } from '../utils/errors.js';
  * Deshalb eine benannte Konstante: Schema und Normalisierung werden aus
  * derselben Quelle gespeist, damit sie nicht wieder auseinanderlaufen.
  */
-export const PROTOKOLL_EBENEN = ['debug', 'info', 'warning', 'error'] as const;
+export const PROTOKOLL_EBENEN = Object.freeze(['debug', 'info', 'warning', 'error'] as const);
 
 export type ProtokollEbene = (typeof PROTOKOLL_EBENEN)[number];
 
@@ -38,10 +38,15 @@ export type ProtokollEbene = (typeof PROTOKOLL_EBENEN)[number];
  * Ebene als ein verlorener Eintrag.
  */
 export function normalisiereEbene(wert: string | undefined): ProtokollEbene {
-  if (!wert) return 'info';
-  if (wert === 'warn') return 'warning';
-  return (PROTOKOLL_EBENEN as readonly string[]).includes(wert)
-    ? (wert as ProtokollEbene)
+  if (typeof wert !== 'string') return 'info';
+  // Getrimmt und kleingeschrieben, bevor verglichen wird: Sonst fällt 'ERROR'
+  // oder ' warn ' still auf 'info' zurück, und aus einem Fehler-Eintrag wird
+  // lautlos eine Notiz. Vom Prüfer benannt.
+  const sauber = wert.trim().toLowerCase();
+  if (!sauber) return 'info';
+  if (sauber === 'warn') return 'warning';
+  return (PROTOKOLL_EBENEN as readonly string[]).includes(sauber)
+    ? (sauber as ProtokollEbene)
     : 'info';
 }
 
@@ -76,9 +81,14 @@ const agentSessionLogDef = {
 Use this to record progress, decisions, or issues during a work session.
 
 Supports different log levels:
+- debug: Detailed tracing, rarely needed
 - info: General progress updates (default)
-- warn: Potential issues or concerns
-- error: Errors encountered during work`,
+- warning: Potential issues or concerns — a review verdict belongs here
+- error: Errors encountered during work
+
+"warn" is accepted as an alias and stored as "warning". Anything else falls
+back to "info" — a rejected level would cost the entry, and a logged entry at
+the wrong level beats no entry at all.`,
   inputSchema: {
     type: 'object' as const,
     properties: {
