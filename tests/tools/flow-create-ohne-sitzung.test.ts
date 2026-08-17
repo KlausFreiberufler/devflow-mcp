@@ -1,64 +1,111 @@
-// DF-532: `flow_create` darf keine Agent-Sitzung starten.
+// DF-532: `flow_create` darf einen laufenden Vorgang nicht verdrängen.
 //
-// Am 17.08.2026 gemessen: Während ein Abnehmer-Subagent an einem Vorgang
-// arbeitete, wurden zwei Auffälligkeiten als Flows angelegt. Beide Antworten
-// meldeten „Flow erstellt und Session gestartet" — und die laufende
-// Abnehmer-Sitzung des ANDEREN Flows stand danach auf `abandoned` mit null
-// Protokolleinträgen. Das Backend verdrängt beim Anlegen einer Sitzung die
-// laufende. Die Prüfarbeit hatte stattgefunden, nur ihr Nachweis war weg.
+// Am 17.08.2026 gemessen: Während ein Abnehmer-Subagent arbeitete, wurden zwei
+// Auffälligkeiten als Flows angelegt. Beide Antworten meldeten „Session
+// gestartet" — und die laufende Abnehmer-Sitzung des ANDEREN Flows stand
+// danach auf `abandoned` mit null Protokolleinträgen. Die Prüfarbeit hatte
+// stattgefunden, nur ihr Nachweis war weg.
 //
-// Dieser Test liest die Quelle, statt den Handler auszuführen: Der Handler
-// spricht mit dem Backend, und ein Verhaltenstest bräuchte einen gemockten
-// Client samt Session-Lebenszyklus. Was hier zählt, ist eine Regression, die
-// niemandem auffällt — dass jemand den Aufruf beim Aufräumen zurückbringt.
-// Ein Strukturtest fängt genau das, und er ist ehrlich darin, was er kann:
-// Er beweist die Abwesenheit des Aufrufs, nicht das Laufzeitverhalten.
+// Der erste Anlauf dieses Tests las den Quelltext und prüfte, ob bestimmte
+// Wörter fehlen. Der Prüfer hat ihn mit fünf Mutationen vorgeführt: Vier
+// gingen grün durch, darunter die entscheidende — der Aufruf zurück im Code,
+// mit einem `// temp` am Zeilenende, das die Kommentar-Strippung die ganze
+// Codezeile verschlucken ließ. Ein Test, der Text statt Verhalten misst, misst
+// am Ende sich selbst.
+//
+// Deshalb jetzt gegen das Verhalten: echter Handler, gestubbter Client.
 
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const hier = dirname(fileURLToPath(import.meta.url));
-const quelle = readFileSync(resolve(hier, '../../src/tools/flow.ts'), 'utf8');
+const aufrufe: Array<[string, unknown]> = [];
 
-/**
- * Der Rumpf von handleFlowCreate — ohne die übrigen Handler und **ohne
- * Kommentare**.
- *
- * Das Strippen ist nicht kosmetisch: Beim ersten Anlauf war dieser Test rot,
- * weil die Erklärung im Code die Wörter enthielt, deren Abwesenheit er prüfen
- * sollte. Ein Test, der Text statt Verhalten misst, muss wenigstens den Text
- * messen, auf den es ankommt.
- */
-function rumpfVonFlowCreate(): string {
-  const start = quelle.indexOf('async function handleFlowCreate');
-  expect(start).toBeGreaterThan(-1);
-  const naechster = quelle.indexOf('\nasync function ', start + 1);
-  const roh = quelle.slice(start, naechster === -1 ? undefined : naechster);
-  return roh
-    .replace(/\/\*[\s\S]*?\*\//g, '') // Blockkommentare
-    .replace(/^[^\n]*?\/\/.*$/gm, ''); // Zeilenkommentare (auch am Zeilenende)
+// Ein Proxy statt einer Methodenliste: Der Handler ruft mehr am Client auf,
+// als dieser Test kennen will, und eine unvollständige Attrappe würde mit
+// „is not a function" scheitern statt mit einer Aussage über das Verhalten.
+// Jeder Aufruf wird aufgezeichnet; bekannte Namen liefern brauchbare Daten,
+// alle anderen ein unauffälliges Erfolgsergebnis.
+const antworten: Record<string, unknown> = {
+  createFlow: { id: 'flow-NEU', displayId: 'DF-999', currentState: 'idea', ticketSummary: 'Probe' },
+  createAgentSession: { id: 'sess-NEU' },
+  getNextStep: { allowedActions: ['flow_update', 'flow_get'], nextStep: 'planen' },
+};
+
+vi.mock('../../src/api/client.js', () => ({
+  devFlowClient: new Proxy({} as Record<string, unknown>, {
+    get(_ziel, name: string) {
+      if (name === 'then') return undefined; // nicht als Promise missverstehen
+      return async (...args: unknown[]) => {
+        aufrufe.push([name, args.length === 1 ? args[0] : args]);
+        if (name === 'getLinkedProjectId') return 'projekt-1';
+        return { success: true, data: antworten[name] ?? {} };
+      };
+    },
+  }),
+}));
+
+const { tools: flowTools } = await import('../../src/tools/flow.js');
+const { sessionContext } = await import('../../src/context/session.js');
+
+function laufenderVorgang() {
+  sessionContext.init({
+    flow: { id: 'flow-ALT', displayId: 'DF-100', currentState: 'review' } as never,
+    sessionId: 'sess-ECHT',
+    startedAt: new Date().toISOString(),
+    feedback: null,
+    tasks: [],
+    allowedActions: ['task_update', 'flow_update'],
+    nextStep: 'pruefen',
+  });
+}
+
+async function flowCreate() {
+  return flowTools.flow_create.handler({ summary: 'Probe', description: 'x'.repeat(40), acceptanceCriteria: ['irgendein pruefbares Kriterium'] });
 }
 
 describe('flow_create legt an, ohne zu beanspruchen', () => {
-  it('startet keine Agent-Sitzung', () => {
-    // Sonst verdrängt das Backend eine laufende Sitzung an einem anderen
-    // Vorgang — samt ihres Protokolls, das den Nachweis einer Prüfung bildet.
-    expect(rumpfVonFlowCreate()).not.toContain('createAgentSession');
+  beforeEach(() => {
+    aufrufe.length = 0;
+    sessionContext.release();
   });
 
-  it('lässt den neuen Flow als unbeansprucht stehen', () => {
-    const rumpf = rumpfVonFlowCreate();
-    expect(rumpf).toContain("agentStatus: 'idle'");
-    // 'analyzing' ließ einen frisch angelegten Flow in flow_list als gesperrt
-    // erscheinen, obwohl niemand an ihm arbeitete.
-    expect(rumpf).not.toContain("agentStatus: 'analyzing'");
+  it('startet keine Agent-Sitzung', async () => {
+    await flowCreate();
+    // Das Backend verdrängt beim Anlegen einer Sitzung die laufende — samt
+    // ihres Protokolls, das den Nachweis einer Prüfung bildet.
+    expect(aufrufe.map(([name]) => name)).not.toContain('createAgentSession');
   });
 
-  it('behauptet in der Antwort keine Sitzung, die es nicht gibt', () => {
-    const rumpf = rumpfVonFlowCreate();
-    expect(rumpf).not.toContain('Session gestartet');
-    expect(rumpf).toContain('devflow_init');
+  it('lässt den neuen Flow als unbeansprucht stehen', async () => {
+    await flowCreate();
+    const update = aufrufe.find(([name]) => name === 'updateFlow');
+    // 'analyzing' ließ einen frisch angelegten Flow als gesperrt erscheinen,
+    // obwohl niemand an ihm arbeitete (flow.ts hängt das Schloss daran).
+    expect(update?.[1]).toEqual(['flow-NEU', expect.objectContaining({ agentStatus: 'idle' })]);
+  });
+
+  it('lässt einen laufenden Vorgang in Ruhe — der Kern des Befunds', async () => {
+    laufenderVorgang();
+    await flowCreate();
+    const ctx = sessionContext.get();
+    expect(ctx?.flow?.id).toBe('flow-ALT');
+    expect(ctx?.sessionId).toBe('sess-ECHT');
+    // Sonst wird der Prüfer nach dem Festhalten einer Auffälligkeit an seinem
+    // EIGENEN Vorgang ausgesperrt: allowedActions wären die des neuen Flows.
+    expect(ctx?.allowedActions).toContain('task_update');
+  });
+
+  it('übernimmt, wenn niemand arbeitet — die Bequemlichkeit bleibt', async () => {
+    await flowCreate();
+    expect(sessionContext.get()?.flow?.id).toBe('flow-NEU');
+  });
+
+  it('sagt in der Antwort, was tatsächlich passiert ist', async () => {
+    const mitLaufendem = (laufenderVorgang(), await flowCreate());
+    expect(mitLaufendem).toContain('bleibt aktiv');
+    expect(mitLaufendem).not.toContain('Session gestartet');
+
+    sessionContext.release();
+    aufrufe.length = 0;
+    expect(await flowCreate()).toContain('übernommen');
   });
 });

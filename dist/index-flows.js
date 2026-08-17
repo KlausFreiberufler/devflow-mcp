@@ -8721,7 +8721,7 @@ var ToolRegistry = class {
     }
     if (name !== "devflow_init" && sessionContext.isActive()) {
       const ctx = sessionContext.get();
-      if (ctx?.sessionId) {
+      if (ctx?.sessionId && ctx.sessionId !== "local-session") {
         devFlowClient.touchSessionActivity(ctx.sessionId).catch(() => {
         });
       }
@@ -9796,20 +9796,23 @@ async function handleFlowCreate(args) {
   if (allowedActions.length === 0) {
     allowedActions = ["flow_update", "flow_get"];
   }
-  sessionContext.init({
-    flow: newFlow,
-    sessionId,
-    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    feedback: null,
-    tasks: [],
-    allowedActions,
-    nextStep
-  });
+  const uebernehmen = !sessionContext.isActive();
+  if (uebernehmen) {
+    sessionContext.init({
+      flow: newFlow,
+      sessionId,
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      feedback: null,
+      tasks: [],
+      allowedActions,
+      nextStep
+    });
+  }
   return [
     // Sagt jetzt, was wirklich passiert ist (DF-532): angelegt, nicht
     // begonnen. Der alte Satz behauptete eine Sitzung, die eine fremde
     // verdrängt hatte — die Antwort log über ihre eigene Nebenwirkung.
-    "Flow erstellt. Zum Arbeiten: devflow_init({ flowId }) \u2014 eine laufende Sitzung an einem anderen Vorgang bleibt davon unber\xFChrt.",
+    uebernehmen ? "Flow erstellt und als aktiver Vorgang \xFCbernommen." : "Flow erstellt. Der laufende Vorgang bleibt aktiv \u2014 zum Wechseln: devflow_init({ flowId }).",
     "",
     formatFlowDetail(newFlow),
     "",

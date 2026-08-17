@@ -555,21 +555,40 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
     allowedActions = ['flow_update', 'flow_get'];
   }
 
-  sessionContext.init({
-    flow: newFlow,
-    sessionId,
-    startedAt: new Date().toISOString(),
-    feedback: null,
-    tasks: [],
-    allowedActions,
-    nextStep,
-  });
+  // Nur übernehmen, wenn gerade niemand arbeitet (DF-532).
+  //
+  // Der Wegfall der Backend-Sitzung allein hat den Schaden NICHT behoben —
+  // vom Prüfer im A/B gegen `main` gemessen: `sessionContext.init` überschrieb
+  // den aktiven Kontext weiterhin bedingungslos, und danach zeigte alles auf
+  // den neuen Ideen-Flow. Ein anschließendes `task_update` am eigenen Vorgang
+  // wurde abgewiesen („nicht erlaubt im State idea"), `auto-status` schrieb
+  // den Status dorthin, und Anlagen ohne ausdrückliche `flowId` landeten am
+  // falschen Flow.
+  //
+  // Die Bequemlichkeit, die das mal war — nach `flow_create` gleich
+  // weiterarbeiten können —, gilt nur für den sitzungslosen Fall. Läuft schon
+  // etwas, gehört der Kontext dem, der ihn hat. Wer am neuen Flow arbeiten
+  // will, ruft `devflow_init`.
+  const uebernehmen = !sessionContext.isActive();
+  if (uebernehmen) {
+    sessionContext.init({
+      flow: newFlow,
+      sessionId,
+      startedAt: new Date().toISOString(),
+      feedback: null,
+      tasks: [],
+      allowedActions,
+      nextStep,
+    });
+  }
 
   return [
     // Sagt jetzt, was wirklich passiert ist (DF-532): angelegt, nicht
     // begonnen. Der alte Satz behauptete eine Sitzung, die eine fremde
     // verdrängt hatte — die Antwort log über ihre eigene Nebenwirkung.
-    'Flow erstellt. Zum Arbeiten: devflow_init({ flowId }) — eine laufende Sitzung an einem anderen Vorgang bleibt davon unberührt.',
+    uebernehmen
+      ? 'Flow erstellt und als aktiver Vorgang übernommen.'
+      : 'Flow erstellt. Der laufende Vorgang bleibt aktiv — zum Wechseln: devflow_init({ flowId }).',
     '',
     formatFlowDetail(newFlow),
     '',
