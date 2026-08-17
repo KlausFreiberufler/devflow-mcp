@@ -68,11 +68,22 @@ describe('flow_create legt an, ohne zu beanspruchen', () => {
     sessionContext.release();
   });
 
-  it('startet keine Agent-Sitzung', async () => {
+  it('verdrängt keine fremde Sitzung — der Kern', async () => {
+    laufenderVorgang();
     await flowCreate();
     // Das Backend verdrängt beim Anlegen einer Sitzung die laufende — samt
-    // ihres Protokolls, das den Nachweis einer Prüfung bildet.
+    // ihres Protokolls, das den Nachweis einer Prüfung bildet. Solange
+    // jemand arbeitet, wird deshalb keine angelegt.
     expect(aufrufe.map(([name]) => name)).not.toContain('createAgentSession');
+  });
+
+  it('legt eine Sitzung an, wenn niemand arbeitet — sonst fehlt das Protokoll', async () => {
+    await flowCreate();
+    // Ohne Sitzung bliebe sessionId 'local-session', und auto-logger steigt
+    // bei genau diesem Wert aus: Der Agent arbeitete protokolllos weiter.
+    // Verdrängt wird hier nichts — es gibt nichts zu verdrängen.
+    expect(aufrufe.map(([name]) => name)).toContain('createAgentSession');
+    expect(sessionContext.get()?.sessionId).toBe('sess-NEU');
   });
 
   it('lässt den neuen Flow als unbeansprucht stehen', async () => {

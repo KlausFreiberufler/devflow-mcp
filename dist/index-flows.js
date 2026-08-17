@@ -9784,7 +9784,15 @@ async function handleFlowCreate(args) {
     agentStatus: "idle",
     agentMessage: "Neuer Flow erstellt"
   });
-  const sessionId = "local-session";
+  const uebernehmen = !sessionContext.isActive();
+  let sessionId = "local-session";
+  if (uebernehmen) {
+    try {
+      const s = await devFlowClient.createAgentSession({ flowId: newFlow.id, type: "enforcement-v3" });
+      if (s.success && s.data) sessionId = s.data.id;
+    } catch {
+    }
+  }
   let allowedActions = [];
   try {
     const nextStepResult = await devFlowClient.getNextStep(newFlow.id);
@@ -9796,7 +9804,6 @@ async function handleFlowCreate(args) {
   if (allowedActions.length === 0) {
     allowedActions = ["flow_update", "flow_get"];
   }
-  const uebernehmen = !sessionContext.isActive();
   if (uebernehmen) {
     sessionContext.init({
       flow: newFlow,
