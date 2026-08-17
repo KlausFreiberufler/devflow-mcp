@@ -512,25 +512,33 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
   const newFlow = result.data;
   const nextStep = getGuidanceFor(newFlow.currentState) || 'Beginne mit der Planung.';
 
-  // Lock the flow
+  // Anlegen heißt nicht arbeiten (DF-532).
+  //
+  // Hier stand vorher zweierlei, das beides so tat, als würde bereits an dem
+  // neuen Flow gearbeitet:
+  //
+  // 1. `agentStatus: 'analyzing'` — dadurch erschien ein frisch angelegter
+  //    Flow in `flow_list` als gesperrt (🔒), obwohl niemand ihn angefasst
+  //    hatte. Ein solcher Status hat andernorts schon einen Vorgang
+  //    zweieinhalb Wochen lang als belegt angezeigt.
+  //
+  // 2. `createAgentSession` — und das war das teurere: Das Backend verdrängt
+  //    beim Anlegen einer Sitzung die laufende Sitzung. Wer also während einer
+  //    fremden Prüfsitzung eine Auffälligkeit als Flow festhielt, zerstörte
+  //    damit deren Nachweis. Gemessen am 17.08.2026: Eine Abnehmer-Sitzung
+  //    stand danach auf `abandoned` mit null Protokolleinträgen — die
+  //    Prüfarbeit hatte stattgefunden, nur ihr Beleg war weg. Und die
+  //    Antwort meldete dazu nichts, sondern schrieb „Session gestartet".
+  //
+  // Ein Flow in `idea` braucht keine Sitzung. Wer an ihm arbeiten will, ruft
+  // `devflow_init` — das legt eine an und sagt auch, wenn es dabei eine
+  // andere verdrängt.
   await devFlowClient.updateFlow(newFlow.id, {
-    agentStatus: 'analyzing',
+    agentStatus: 'idle',
     agentMessage: 'Neuer Flow erstellt',
   });
 
-  // Create agent session
-  let sessionId = 'local-session';
-  try {
-    const sessionResult = await devFlowClient.createAgentSession({
-      flowId: newFlow.id,
-      type: 'enforcement-v3',
-    });
-    if (sessionResult.success && sessionResult.data) {
-      sessionId = sessionResult.data.id;
-    }
-  } catch {
-    // Continue with local tracking
-  }
+  const sessionId = 'local-session';
 
   // Fetch allowedActions from backend (sole source of truth)
   let allowedActions: string[] = [];
@@ -547,18 +555,40 @@ async function handleFlowCreate(args: Record<string, unknown>): Promise<string> 
     allowedActions = ['flow_update', 'flow_get'];
   }
 
-  sessionContext.init({
-    flow: newFlow,
-    sessionId,
-    startedAt: new Date().toISOString(),
-    feedback: null,
-    tasks: [],
-    allowedActions,
-    nextStep,
-  });
+  // Nur übernehmen, wenn gerade niemand arbeitet (DF-532).
+  //
+  // Der Wegfall der Backend-Sitzung allein hat den Schaden NICHT behoben —
+  // vom Prüfer im A/B gegen `main` gemessen: `sessionContext.init` überschrieb
+  // den aktiven Kontext weiterhin bedingungslos, und danach zeigte alles auf
+  // den neuen Ideen-Flow. Ein anschließendes `task_update` am eigenen Vorgang
+  // wurde abgewiesen („nicht erlaubt im State idea"), `auto-status` schrieb
+  // den Status dorthin, und Anlagen ohne ausdrückliche `flowId` landeten am
+  // falschen Flow.
+  //
+  // Die Bequemlichkeit, die das mal war — nach `flow_create` gleich
+  // weiterarbeiten können —, gilt nur für den sitzungslosen Fall. Läuft schon
+  // etwas, gehört der Kontext dem, der ihn hat. Wer am neuen Flow arbeiten
+  // will, ruft `devflow_init`.
+  const uebernehmen = !sessionContext.isActive();
+  if (uebernehmen) {
+    sessionContext.init({
+      flow: newFlow,
+      sessionId,
+      startedAt: new Date().toISOString(),
+      feedback: null,
+      tasks: [],
+      allowedActions,
+      nextStep,
+    });
+  }
 
   return [
-    'Flow erstellt und Session gestartet.',
+    // Sagt jetzt, was wirklich passiert ist (DF-532): angelegt, nicht
+    // begonnen. Der alte Satz behauptete eine Sitzung, die eine fremde
+    // verdrängt hatte — die Antwort log über ihre eigene Nebenwirkung.
+    uebernehmen
+      ? 'Flow erstellt und als aktiver Vorgang übernommen.'
+      : 'Flow erstellt. Der laufende Vorgang bleibt aktiv — zum Wechseln: devflow_init({ flowId }).',
     '',
     formatFlowDetail(newFlow),
     '',

@@ -8975,7 +8975,7 @@ var ToolRegistry = class {
     }
     if (name !== "devflow_init" && sessionContext.isActive()) {
       const ctx = sessionContext.get();
-      if (ctx?.sessionId) {
+      if (ctx?.sessionId && ctx.sessionId !== "local-session") {
         devFlowClient.touchSessionActivity(ctx.sessionId).catch(() => {
         });
       }
@@ -10039,20 +10039,10 @@ async function handleFlowCreate(args) {
   const newFlow = result.data;
   const nextStep = getGuidanceFor(newFlow.currentState) || "Beginne mit der Planung.";
   await devFlowClient.updateFlow(newFlow.id, {
-    agentStatus: "analyzing",
+    agentStatus: "idle",
     agentMessage: "Neuer Flow erstellt"
   });
-  let sessionId = "local-session";
-  try {
-    const sessionResult = await devFlowClient.createAgentSession({
-      flowId: newFlow.id,
-      type: "enforcement-v3"
-    });
-    if (sessionResult.success && sessionResult.data) {
-      sessionId = sessionResult.data.id;
-    }
-  } catch {
-  }
+  const sessionId = "local-session";
   let allowedActions = [];
   try {
     const nextStepResult = await devFlowClient.getNextStep(newFlow.id);
@@ -10064,17 +10054,23 @@ async function handleFlowCreate(args) {
   if (allowedActions.length === 0) {
     allowedActions = ["flow_update", "flow_get"];
   }
-  sessionContext.init({
-    flow: newFlow,
-    sessionId,
-    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    feedback: null,
-    tasks: [],
-    allowedActions,
-    nextStep
-  });
+  const uebernehmen = !sessionContext.isActive();
+  if (uebernehmen) {
+    sessionContext.init({
+      flow: newFlow,
+      sessionId,
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      feedback: null,
+      tasks: [],
+      allowedActions,
+      nextStep
+    });
+  }
   return [
-    "Flow erstellt und Session gestartet.",
+    // Sagt jetzt, was wirklich passiert ist (DF-532): angelegt, nicht
+    // begonnen. Der alte Satz behauptete eine Sitzung, die eine fremde
+    // verdrängt hatte — die Antwort log über ihre eigene Nebenwirkung.
+    uebernehmen ? "Flow erstellt und als aktiver Vorgang \xFCbernommen." : "Flow erstellt. Der laufende Vorgang bleibt aktiv \u2014 zum Wechseln: devflow_init({ flowId }).",
     "",
     formatFlowDetail(newFlow),
     "",

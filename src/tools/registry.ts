@@ -114,7 +114,14 @@ class ToolRegistry {
     // Auto-Activity: update last_activity_at on every tool call
     if (name !== 'devflow_init' && sessionContext.isActive()) {
       const ctx = sessionContext.get();
-      if (ctx?.sessionId) {
+      // `local-session` ist ein Platzhalter, keine Sitzung (DF-532). Der Ping
+      // dagegen ergibt einen 404 — und zwar lautlos, weil `parseResponse`
+      // bei HTTP-Fehlern `{success:false}` zurückgibt statt zu werfen, das
+      // `.catch()` also nie feuert. Ohne diesen Wächter friert
+      // `last_activity_at` der echten Sitzung ein, was ein plausibler Weg in
+      // genau den `abandoned`-Zustand ist, den DF-532 beseitigen soll.
+      // `auto-logger.ts` und `flow.ts` prüfen das längst; hier fehlte es.
+      if (ctx?.sessionId && ctx.sessionId !== 'local-session') {
         devFlowClient.touchSessionActivity(ctx.sessionId).catch(() => {});
       }
     }

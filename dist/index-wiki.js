@@ -8711,7 +8711,7 @@ var ToolRegistry = class {
     }
     if (name !== "devflow_init" && sessionContext.isActive()) {
       const ctx = sessionContext.get();
-      if (ctx?.sessionId) {
+      if (ctx?.sessionId && ctx.sessionId !== "local-session") {
         devFlowClient.touchSessionActivity(ctx.sessionId).catch(() => {
         });
       }
