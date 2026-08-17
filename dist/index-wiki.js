@@ -8286,6 +8286,251 @@ function buildStateBlockMessage(toolName, flowSummary, flowId, currentState, all
   ].join("\n");
 }
 
+// src/utils/errors.ts
+function withErrorHandling(toolName, handler) {
+  return async (args) => {
+    try {
+      return await handler(args);
+    } catch (error2) {
+      const message = error2 instanceof Error ? error2.message : String(error2);
+      if (message.includes("ECONNREFUSED") || message.includes("fetch failed")) {
+        const url2 = process.env.DEVFLOW_URL || "https://api.app.dev-flow.tech";
+        return `Error: Server unreachable (${url2}). Check your DEVFLOW_URL configuration.`;
+      }
+      if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
+        return `Error: Server timeout for ${toolName}. The server is not responding.`;
+      }
+      if (message.includes("ENOTFOUND")) {
+        return `Error: Server address not found. Check your DEVFLOW_URL configuration.`;
+      }
+      return `Error in ${toolName}: ${message}`;
+    }
+  };
+}
+
+// src/tools/agent-session.ts
+var PROTOKOLL_EBENEN = Object.freeze(["debug", "info", "warning", "error"]);
+function normalisiereEbene(wert) {
+  if (typeof wert !== "string") return "info";
+  const sauber = wert.trim().toLowerCase();
+  if (!sauber) return "info";
+  if (sauber === "warn") return "warning";
+  return PROTOKOLL_EBENEN.includes(sauber) ? sauber : "info";
+}
+var agentSessionCreateDef = {
+  name: "agent_session_create",
+  description: `Create a new agent session for a flow.
+An agent session tracks a unit of work performed by the AI agent.
+Use this at the start of a work session to log what you're doing.
+
+Returns the created session with its ID for subsequent log and complete calls.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      flowId: {
+        type: "string",
+        description: "The flow ID this session belongs to"
+      },
+      type: {
+        type: "string",
+        description: 'Type of session (e.g., "planning", "implementing", "reviewing"). Optional.'
+      }
+    },
+    required: ["flowId"]
+  }
+};
+var agentSessionLogDef = {
+  name: "agent_session_log",
+  description: `Log a message to an active agent session.
+Use this to record progress, decisions, or issues during a work session.
+
+Supports different log levels:
+- debug: Detailed tracing, rarely needed
+- info: General progress updates (default)
+- warning: Potential issues or concerns \u2014 a review verdict belongs here
+- error: Errors encountered during work
+
+"warn" is accepted as an alias and stored as "warning". Anything else falls
+back to "info" \u2014 a rejected level would cost the entry, and a logged entry at
+the wrong level beats no entry at all.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: {
+        type: "string",
+        description: "The agent session ID to log to"
+      },
+      message: {
+        type: "string",
+        description: "The log message to record"
+      },
+      level: {
+        type: "string",
+        enum: [...PROTOKOLL_EBENEN],
+        description: 'Log level (default: info). "warn" is accepted and stored as "warning".'
+      }
+    },
+    required: ["id", "message"]
+  }
+};
+var agentSessionCompleteDef = {
+  name: "agent_session_complete",
+  description: `Complete an active agent session.
+Use this when you're done with a unit of work to mark the session as finished.
+Optionally provide a summary of what was accomplished.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: {
+        type: "string",
+        description: "The agent session ID to complete"
+      },
+      summary: {
+        type: "string",
+        description: "Summary of what was accomplished during this session"
+      }
+    },
+    required: ["id"]
+  }
+};
+var agentSessionListDef = {
+  name: "agent_session_list",
+  description: `List agent sessions for a flow.
+Returns all sessions with their status, timing, and summary.
+Use this to review past work sessions on a flow.`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      flowId: {
+        type: "string",
+        description: "The flow ID to list sessions for"
+      }
+    },
+    required: ["flowId"]
+  }
+};
+async function handleAgentSessionCreate(args) {
+  const flowId = args.flowId;
+  const type = args.type;
+  const result = await devFlowClient.createAgentSession({ flowId, type });
+  if (!result.success || !result.data) {
+    return `Error: ${result.error || "Failed to create agent session"}`;
+  }
+  return `Agent session created successfully.
+
+${formatSessionDetail(result.data)}`;
+}
+async function handleAgentSessionLog(args) {
+  const id = args.id;
+  const message = args.message;
+  const level = normalisiereEbene(args.level);
+  const result = await devFlowClient.logAgentSession(id, { message, level });
+  if (!result.success || !result.data) {
+    return `Error: ${result.error || "Failed to log to agent session"}`;
+  }
+  const log = result.data;
+  return `Log entry added.
+
+**Level:** ${log.level}
+**Message:** ${log.message}
+**Time:** ${new Date(log.createdAt).toLocaleString()}`;
+}
+async function handleAgentSessionComplete(args) {
+  const id = args.id;
+  const summary = args.summary;
+  const result = await devFlowClient.completeAgentSession(id, summary ? { summary } : void 0);
+  if (!result.success || !result.data) {
+    return `Error: ${result.error || "Failed to complete agent session"}`;
+  }
+  return `Agent session completed.
+
+${formatSessionDetail(result.data)}`;
+}
+async function handleAgentSessionList(args) {
+  const flowId = args.flowId;
+  const result = await devFlowClient.listAgentSessions(flowId);
+  if (!result.success || !result.data) {
+    return `Error: ${result.error || "Failed to list agent sessions"}`;
+  }
+  const sessions = result.data;
+  if (sessions.length === 0) {
+    return "No agent sessions found for this flow.";
+  }
+  return formatSessionList(sessions);
+}
+function formatSessionList(sessions) {
+  const lines = ["# Agent Sessions\n"];
+  const active = sessions.filter((s) => !s.completedAt);
+  const completed = sessions.filter((s) => s.completedAt);
+  if (active.length > 0) {
+    lines.push(`## Active (${active.length})
+`);
+    for (const s of active) {
+      const type = s.type ? ` [${s.type}]` : "";
+      lines.push(`- **${s.id}**${type}`);
+      lines.push(`  Started: ${new Date(s.createdAt).toLocaleString()}`);
+    }
+    lines.push("");
+  }
+  if (completed.length > 0) {
+    lines.push(`## Completed (${completed.length})
+`);
+    for (const s of completed) {
+      const type = s.type ? ` [${s.type}]` : "";
+      lines.push(`- **${s.id}**${type}`);
+      lines.push(`  Started: ${new Date(s.createdAt).toLocaleString()}`);
+      if (s.completedAt) {
+        lines.push(`  Completed: ${new Date(s.completedAt).toLocaleString()}`);
+      }
+      if (s.summary) {
+        lines.push(`  Summary: ${s.summary.substring(0, 150)}${s.summary.length > 150 ? "..." : ""}`);
+      }
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+function formatSessionDetail(session) {
+  const lines = [
+    `## Agent Session`,
+    "",
+    `**ID:** ${session.id}`,
+    `**Flow:** ${session.flowId}`,
+    `**Status:** ${session.status}`
+  ];
+  if (session.type) {
+    lines.push(`**Type:** ${session.type}`);
+  }
+  lines.push(`**Started:** ${new Date(session.createdAt).toLocaleString()}`);
+  if (session.completedAt) {
+    lines.push(`**Completed:** ${new Date(session.completedAt).toLocaleString()}`);
+  }
+  if (session.summary) {
+    lines.push("");
+    lines.push("### Summary");
+    lines.push(session.summary);
+  }
+  return lines.join("\n");
+}
+var tools = {
+  agent_session_create: {
+    definition: agentSessionCreateDef,
+    handler: withErrorHandling("agent_session_create", handleAgentSessionCreate)
+  },
+  agent_session_log: {
+    definition: agentSessionLogDef,
+    handler: withErrorHandling("agent_session_log", handleAgentSessionLog)
+  },
+  agent_session_complete: {
+    definition: agentSessionCompleteDef,
+    handler: withErrorHandling("agent_session_complete", handleAgentSessionComplete)
+  },
+  agent_session_list: {
+    definition: agentSessionListDef,
+    handler: withErrorHandling("agent_session_list", handleAgentSessionList)
+  }
+};
+
 // src/context/auto-logger.ts
 function summarizeArgs(args) {
   const parts = [];
@@ -8339,7 +8584,7 @@ function logToolCall(log) {
   let level;
   if (log.blocked) {
     message = `BLOCKED: ${log.toolName}${argSummary} - ${log.blockReason || "nicht erlaubt"}`;
-    level = "warn";
+    level = normalisiereEbene("warn");
   } else {
     message = `${log.toolName}${argSummary} - Erfolg${duration3}`;
     level = "info";
@@ -8481,28 +8726,6 @@ var ToolRegistry = class {
   }
 };
 var registry = new ToolRegistry();
-
-// src/utils/errors.ts
-function withErrorHandling(toolName, handler) {
-  return async (args) => {
-    try {
-      return await handler(args);
-    } catch (error2) {
-      const message = error2 instanceof Error ? error2.message : String(error2);
-      if (message.includes("ECONNREFUSED") || message.includes("fetch failed")) {
-        const url2 = process.env.DEVFLOW_URL || "https://api.app.dev-flow.tech";
-        return `Error: Server unreachable (${url2}). Check your DEVFLOW_URL configuration.`;
-      }
-      if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
-        return `Error: Server timeout for ${toolName}. The server is not responding.`;
-      }
-      if (message.includes("ENOTFOUND")) {
-        return `Error: Server address not found. Check your DEVFLOW_URL configuration.`;
-      }
-      return `Error in ${toolName}: ${message}`;
-    }
-  };
-}
 
 // src/tools/docs.ts
 var docPageListDef = {
@@ -8713,7 +8936,7 @@ async function handleDocPageDelete(args) {
   }
   return `Doc page deleted successfully.`;
 }
-var tools = {
+var tools2 = {
   doc_page_list: {
     definition: docPageListDef,
     handler: withErrorHandling("doc_page_list", handleDocPageList)
@@ -8807,7 +9030,7 @@ function formatSearchResults(query, results) {
   }
   return lines.join("\n");
 }
-var tools2 = {
+var tools3 = {
   search: {
     definition: searchDef,
     handler: withErrorHandling("search", handleSearch)
@@ -9161,7 +9384,7 @@ async function handleIdeasGet(args) {
   if (!r.success || !r.data) return `Error: ${r.error || "failed"}`;
   return JSON.stringify(r.data, null, 2);
 }
-var tools3 = {
+var tools4 = {
   wiki_search: { definition: wikiSearchDef, handler: withErrorHandling("wiki_search", handleWikiSearch) },
   wiki_get_page: { definition: wikiGetPageDef, handler: withErrorHandling("wiki_get_page", handleWikiGetPage) },
   wiki_list_by_type: { definition: wikiListByTypeDef, handler: withErrorHandling("wiki_list_by_type", handleWikiListByType) },
@@ -9314,7 +9537,7 @@ async function handleAdrUpdateStatus(args) {
   const a = r.data;
   return `\u2713 ${a.displayId} \u2192 status: ${a.status}`;
 }
-var tools4 = {
+var tools5 = {
   adr_list: { definition: adrListDef, handler: withErrorHandling("adr_list", handleAdrList) },
   adr_get: { definition: adrGetDef, handler: withErrorHandling("adr_get", handleAdrGet) },
   adr_accept: { definition: adrAcceptDef, handler: withErrorHandling("adr_accept", handleAdrAccept) },
@@ -9552,7 +9775,7 @@ async function handleCheckFlow(args) {
   if (!r.success || !r.data) return `Error: ${r.error}`;
   return JSON.stringify(r.data, null, 2);
 }
-var tools5 = {
+var tools6 = {
   knowledge_backfill_request: { definition: backfillRequestDef, handler: withErrorHandling("knowledge_backfill_request", handleBackfillRequest) },
   knowledge_draft_create: { definition: draftCreateDef, handler: withErrorHandling("knowledge_draft_create", handleDraftCreate) },
   knowledge_draft_list: { definition: draftListDef, handler: withErrorHandling("knowledge_draft_list", handleDraftList) },
@@ -9593,7 +9816,7 @@ async function handlePlanningContext(args) {
 
 ${d.markdown || "_No context._"}`;
 }
-var tools6 = {
+var tools7 = {
   planning_context: {
     definition: planningContextDef,
     handler: withErrorHandling("planning_context", handlePlanningContext)
@@ -9632,7 +9855,7 @@ async function handle(args) {
   if (!r?.success || !r?.data) return `Error: ${r?.error || "prepare failed"}`;
   return r.data.instructions || "No instructions returned.";
 }
-var tools7 = {
+var tools8 = {
   project_bootstrap_audit: { definition: def, handler: withErrorHandling("project_bootstrap_audit", handle) }
 };
 
@@ -23802,13 +24025,13 @@ if (process.argv[2] === "setup" || process.argv[2] === "uninstall") {
   execFileSync("node", [combinedScript, ...process.argv.slice(2)], { stdio: "inherit" });
   process.exit(0);
 }
-registry.register(tools);
 registry.register(tools2);
 registry.register(tools3);
 registry.register(tools4);
 registry.register(tools5);
 registry.register(tools6);
 registry.register(tools7);
+registry.register(tools8);
 startMcpServer({ name: "devflow-wiki", banner: "Wiki MCP Server" }).catch((error2) => {
   console.error("Fatal error:", error2);
   process.exit(1);

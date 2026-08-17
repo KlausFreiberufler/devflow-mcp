@@ -7,6 +7,7 @@
  */
 
 import { devFlowClient } from '../api/client.js';
+import { normalisiereEbene } from '../tools/agent-session.js';
 import { sessionContext } from './session.js';
 
 /**
@@ -96,7 +97,14 @@ export function logToolCall(log: ToolCallLog): void {
 
   if (log.blocked) {
     message = `BLOCKED: ${log.toolName}${argSummary} - ${log.blockReason || 'nicht erlaubt'}`;
-    level = 'warn';
+    // `warning`, nicht `warn` (DF-531): Die Datenbank lehnt `warn` ab, und
+    // dieser Pfad verliert den Eintrag dabei SPURLOS — `logAgentSession`
+    // gibt bei HTTP-Fehlern `{success:false}` zurück, statt zu werfen, also
+    // feuert das `.catch()` unten nie und der Eintrag landet nicht einmal im
+    // Retry-Puffer. Betroffen wäre ausgerechnet jeder BLOCKED-Eintrag, also
+    // der Nachweis eines Regelverstoßes. Vom Prüfer mit gestubbtem fetch
+    // gegen das echte Bundle gemessen.
+    level = normalisiereEbene('warn');
   } else {
     message = `${log.toolName}${argSummary} - Erfolg${duration}`;
     level = 'info';
