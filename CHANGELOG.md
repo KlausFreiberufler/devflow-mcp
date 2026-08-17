@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.43.1] - 2026-08-17
+
+### Fixed (DF-531)
+
+- **`agent_session_log` verliert keine Einträge mehr an die Datenbank-Constraint.** Das Schema bot `warn` an, die Datenbank nimmt nur `debug/info/warning/error` — der laut Schema korrekte Aufruf scheiterte als gewöhnliche Werkzeugantwort, und wer sie nicht las, schloss die Sitzung ohne den Eintrag ab. Jetzt speist eine Konstante Schema **und** Normalisierung (`warn` → `warning`, Groß-/Kleinschreibung toleriert, Unbekanntes fällt auf `info` statt an die Constraint). Auch der Auto-Logger schickte bei jedem BLOCKED-Eintrag rohes `warn` und verlor ihn **spurlos** (das `.catch()` feuert bei `{success:false}` nie) — behoben.
+
+### Fixed (DF-532)
+
+- **`flow_create` verdrängt keine laufende Arbeit mehr.** Vorher startete es beim Anlegen eine Agent-Sitzung (das Backend räumt dabei die laufende ab — gemessen: eine fremde Prüf-Sitzung stand danach auf `abandoned` mit 0 Protokolleinträgen) und meldete „Session gestartet". Jetzt: Läuft ein Vorgang, bleiben Kontext und Sitzung unberührt, und die Antwort verweist auf `devflow_init`. Läuft keiner, wird übernommen **samt** Sitzung — sonst schriebe der Agent protokolllos weiter. Neu angelegte Flows stehen auf `idle` statt `analyzing` (kein falsches 🔒 in `flow_list`). Dazu: `registry.ts` pingt `touchSessionActivity` nicht mehr gegen den `local-session`-Platzhalter (lautloser 404, fror `last_activity_at` der echten Sitzung ein).
+
+### Anmerkung zu den Änderungen (4.43.1)
+
+Beide Fixes wurden von unabhängigen Prüf- und Abnahme-Läufen begleitet; die Verhaltenstests (`tests/tools/agent-session-level.test.ts`, `tests/tools/flow-create-ohne-sitzung.test.ts`) ersetzen bewusst Quelltext-Prüfungen, die sich als mutationsblind erwiesen hatten.
+
 ## [4.42.0] - 2026-07-09
 
 ### Fixed (DF-477)
