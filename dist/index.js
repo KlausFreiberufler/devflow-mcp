@@ -45,7 +45,10 @@ var init_working_dir = __esm({
 // src/auth/browser-auth.ts
 var browser_auth_exports = {};
 __export(browser_auth_exports, {
+  DEFAULT_TOKEN_LIFETIME_MS: () => DEFAULT_TOKEN_LIFETIME_MS,
   authenticateViaBrowser: () => authenticateViaBrowser,
+  clearCredentials: () => clearCredentials,
+  decideStoredTokenAction: () => decideStoredTokenAction,
   getToken: () => getToken,
   loadCredentials: () => loadCredentials,
   loadProjectConfig: () => loadProjectConfig,
@@ -53,7 +56,7 @@ __export(browser_auth_exports, {
 });
 import { createServer } from "http";
 import { exec } from "child_process";
-import { writeFile, readFile, mkdir, chmod, stat } from "fs/promises";
+import { writeFile, readFile, mkdir, chmod, stat, unlink } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 async function findAvailablePort(startPort = 9876) {
@@ -87,7 +90,8 @@ async function pollForToken(baseUrl, code, maxAttempts = 150, intervalMs = 2e3) 
           return {
             token: data.data.token,
             projectId: data.data.projectId,
-            projectName: data.data.projectName
+            projectName: data.data.projectName,
+            tokenExpiresAt: data.data.tokenExpiresAt ?? null
           };
         }
       }
@@ -97,14 +101,21 @@ async function pollForToken(baseUrl, code, maxAttempts = 150, intervalMs = 2e3) 
   }
   return null;
 }
-async function saveCredentials(token) {
+function decideStoredTokenAction(probe) {
+  if (!probe) return "keep-despite-error";
+  if (probe.ok) return "use";
+  if (probe.status === 401 || probe.status === 403) return "discard-and-relogin";
+  return "keep-despite-error";
+}
+async function saveCredentials(token, expiresAtIso) {
   const dir = join(homedir(), ".devflow");
   await mkdir(dir, { recursive: true, mode: 448 });
+  const parsed = expiresAtIso ? Date.parse(expiresAtIso) : NaN;
+  const expiresAt = Number.isFinite(parsed) ? parsed : Date.now() + DEFAULT_TOKEN_LIFETIME_MS;
   const credentials = {
     accessToken: token,
     refreshToken: "",
-    expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1e3
-    // 1 year
+    expiresAt
   };
   await writeFile(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2), { mode: 384 });
   await chmod(CREDENTIALS_PATH, 384);
@@ -149,6 +160,22 @@ async function loadCredentials() {
     return null;
   }
 }
+async function clearCredentials() {
+  try {
+    await unlink(CREDENTIALS_PATH);
+  } catch {
+  }
+}
+async function probeStoredToken(baseUrl, token) {
+  try {
+    const response = await fetch(`${baseUrl}/api/projects`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return { ok: response.ok, status: response.status };
+  } catch {
+    return { ok: false, status: null };
+  }
+}
 async function authenticateViaBrowser(baseUrl, workingDir) {
   console.error("Starting browser authentication...");
   const port = await findAvailablePort();
@@ -171,7 +198,7 @@ async function authenticateViaBrowser(baseUrl, workingDir) {
   if (!result) {
     throw new Error("Authentication timed out. Please try again.");
   }
-  await saveCredentials(result.token);
+  await saveCredentials(result.token, result.tokenExpiresAt);
   if (result.projectId && result.projectName) {
     await saveProjectConfig(dir, result.projectId, result.projectName);
   }
@@ -185,16 +212,26 @@ async function getToken(baseUrl, workingDir) {
   }
   const savedToken = await loadCredentials();
   if (savedToken) {
-    return savedToken;
+    const action = decideStoredTokenAction(await probeStoredToken(baseUrl, savedToken));
+    if (action === "use") {
+      return savedToken;
+    }
+    if (action === "keep-despite-error") {
+      console.error("Could not verify saved credentials \u2014 continuing with them.");
+      return savedToken;
+    }
+    console.error("Saved credentials were rejected by the server \u2014 signing in again.");
+    await clearCredentials();
   }
   return authenticateViaBrowser(baseUrl, workingDir);
 }
-var CREDENTIALS_PATH;
+var CREDENTIALS_PATH, DEFAULT_TOKEN_LIFETIME_MS;
 var init_browser_auth = __esm({
   "src/auth/browser-auth.ts"() {
     "use strict";
     init_working_dir();
     CREDENTIALS_PATH = join(homedir(), ".devflow", "credentials.json");
+    DEFAULT_TOKEN_LIFETIME_MS = 90 * 24 * 60 * 60 * 1e3;
   }
 });
 
