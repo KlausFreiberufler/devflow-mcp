@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.44.0] - 2026-08-29
+
+### Fixed (DF-543)
+
+- **Abgelehnte Zugangsdaten führen jetzt zum Neu-Login statt in eine Sackgasse.** Ein auf der Platte gefundener Token wurde ungeprüft zurückgegeben — und sein Ablaufdatum stammte aus dieser Datei selbst: geschrieben als „ein Jahr", während der Server API-Token seit DF-162 nach **90 Tagen** zurückzieht. Ab Tag 91 bürgte die Datei also für einen Token, den der Server längst verworfen hatte: jeder Aufruf scheiterte mit 401, und weil `loadCredentials` Erfolg meldete, erreichte `getToken` nie den Browser-Login. Die CLI hielt sich für verbunden und war nicht davon abzubringen. Das traf **jeden Nutzer 90 Tage nach seinem ersten Connect** (live aufgetreten 2026-08-29 auf einem zweiten Rechner, der Monate zuvor lief).
+- Ein gefundener Token wird jetzt gegen `GET /api/projects` geprüft (seit DF-459 für `api`- wie `mcp`-Scope erreichbar). Die Entscheidung liegt in der reinen `decideStoredTokenAction`: **nur eine ausdrückliche Ablehnung** (401/403) verwirft die Datei und startet den Browser-Login. Netzfehler und 5xx behalten den Token — der Server konnte nicht antworten, das heißt nicht, dass der Token schlecht ist; sonst erzwänge man ausgerechnet während eines Ausfalls einen Browser-Login.
+- `DEVFLOW_TOKEN` aus der Umgebung wird weder geprüft noch verworfen — der Nutzer hat ihn ausdrücklich gesetzt.
+- `saveCredentials` übernimmt das echte Ablaufdatum, das das Backend jetzt an `/api/auth/cli/token` mitliefert; fehlt es (ältere Backends), gilt `DEFAULT_TOKEN_LIFETIME_MS` = 90 Tage statt 365.
+
+Verhaltenstests: `tests/auth/expired-token-relogin.test.ts` (10), Suite gesamt 83. Das Backend-Gegenstück (Feld `tokenExpiresAt`) ist im devflow-Repo gemergt; ältere Server ohne das Feld funktionieren unverändert.
+
 ## [4.43.1] - 2026-08-17
 
 ### Fixed (DF-531)
