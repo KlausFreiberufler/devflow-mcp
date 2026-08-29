@@ -6,7 +6,7 @@
 
 import { createServer } from 'http';
 import { exec } from 'child_process';
-import { writeFile, readFile, mkdir, chmod, stat } from 'fs/promises';
+import { writeFile, readFile, mkdir, chmod, stat, unlink } from 'fs/promises';
 import { homedir } from 'os';
 import { getWorkingDir } from '../utils/working-dir.js';
 import { join } from 'path';
@@ -14,6 +14,8 @@ interface AuthResult {
   token: string;
   projectId?: string;
   projectName?: string;
+  /** DF-543 — the server's real expiry for this token (ISO). Older backends omit it. */
+  tokenExpiresAt?: string | null;
 }
 
 interface ProjectConfig {
@@ -78,7 +80,8 @@ async function pollForToken(
           return {
             token: data.data.token,
             projectId: data.data.projectId,
-            projectName: data.data.projectName
+            projectName: data.data.projectName,
+            tokenExpiresAt: data.data.tokenExpiresAt ?? null
           };
         }
         // Still pending, continue polling
@@ -94,16 +97,61 @@ async function pollForToken(
 }
 
 /**
- * Save credentials to file
+ * DF-543 — how long a CLI token really lives when the server does not say.
+ *
+ * The backend caps API tokens at 90 days (DF-162). This file used to write
+ * "one year" regardless, so from day 91 onward it vouched for a token the
+ * server had already retired — and because loadCredentials only ever checked
+ * that self-invented date, getToken never fell through to the browser login.
+ * The CLI reported itself as connected while every call failed with 401.
  */
-async function saveCredentials(token: string): Promise<void> {
+export const DEFAULT_TOKEN_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000;
+
+export type StoredTokenAction =
+  /** The server accepted it. */
+  | 'use'
+  /** The server refused it — drop the file and sign in again. */
+  | 'discard-and-relogin'
+  /** We could not tell (offline, 5xx). Keep it; do not lock the user out. */
+  | 'keep-despite-error';
+
+/**
+ * DF-543 — decide what to do with a token found on disk.
+ *
+ * Only an explicit refusal discards it. A network error or a 5xx means the
+ * server could not answer, not that the token is bad — discarding then would
+ * force a browser login during an outage, which is exactly when the user can
+ * least afford one.
+ */
+export function decideStoredTokenAction(
+  probe: { ok: boolean; status: number | null } | null | undefined
+): StoredTokenAction {
+  if (!probe) return 'keep-despite-error';
+  if (probe.ok) return 'use';
+  if (probe.status === 401 || probe.status === 403) return 'discard-and-relogin';
+  return 'keep-despite-error';
+}
+
+/**
+ * Save credentials to file.
+ *
+ * DF-543: `expiresAtIso` is the real expiry the server reports when handing
+ * out the token. Without it we assume the server's own 90-day cap rather than
+ * inventing a year.
+ */
+async function saveCredentials(token: string, expiresAtIso?: string | null): Promise<void> {
   const dir = join(homedir(), '.devflow');
   await mkdir(dir, { recursive: true, mode: 0o700 });
+
+  const parsed = expiresAtIso ? Date.parse(expiresAtIso) : NaN;
+  const expiresAt = Number.isFinite(parsed)
+    ? parsed
+    : Date.now() + DEFAULT_TOKEN_LIFETIME_MS;
 
   const credentials = {
     accessToken: token,
     refreshToken: '',
-    expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000 // 1 year
+    expiresAt
   };
 
   await writeFile(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2), { mode: 0o600 });
@@ -171,6 +219,39 @@ export async function loadCredentials(): Promise<string | null> {
 }
 
 /**
+ * DF-543 — drop the stored credentials so the next getToken falls through to
+ * the browser login. Missing file is success, not an error.
+ */
+export async function clearCredentials(): Promise<void> {
+  try {
+    await unlink(CREDENTIALS_PATH);
+  } catch {
+    // Already gone, or unreadable — either way there is nothing to keep.
+  }
+}
+
+/**
+ * DF-543 — ask the server whether a stored token is still good.
+ *
+ * `/api/projects` is reachable for both the `api` and the `mcp` token scope
+ * (DF-459 made the bare path match), so this works whichever kind is on disk.
+ * A thrown fetch means "no answer", which is deliberately not a refusal.
+ */
+async function probeStoredToken(
+  baseUrl: string,
+  token: string
+): Promise<{ ok: boolean; status: number | null }> {
+  try {
+    const response = await fetch(`${baseUrl}/api/projects`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return { ok: response.ok, status: response.status };
+  } catch {
+    return { ok: false, status: null };
+  }
+}
+
+/**
  * Perform browser-based authentication
  *
  * 1. Request auth code from server
@@ -214,8 +295,8 @@ export async function authenticateViaBrowser(baseUrl: string, workingDir?: strin
     throw new Error('Authentication timed out. Please try again.');
   }
 
-  // Save credentials
-  await saveCredentials(result.token);
+  // Save credentials — with the server's own expiry (DF-543), not a guess.
+  await saveCredentials(result.token, result.tokenExpiresAt);
 
   // Save project configuration if project was selected
   // DF-326: No longer writes CLAUDE.md — the plugin covers rules.
@@ -231,16 +312,35 @@ export async function authenticateViaBrowser(baseUrl: string, workingDir?: strin
  * Get token - from env, file, or browser auth
  */
 export async function getToken(baseUrl: string, workingDir?: string): Promise<string> {
-  // 1. Check environment variable
+  // 1. Check environment variable. Explicitly supplied by the user, so we
+  // neither probe nor discard it — that is their call, not ours.
   const envToken = process.env.DEVFLOW_TOKEN;
   if (envToken) {
     return envToken;
   }
 
-  // 2. Check saved credentials
+  // 2. Check saved credentials — and verify them.
+  // DF-543: a stored token used to be handed back unchecked, so an expired or
+  // revoked one made every later call fail with 401 while the browser login
+  // was never offered. The file's own expiry cannot be trusted: it is written
+  // by this client, not by the server.
   const savedToken = await loadCredentials();
   if (savedToken) {
-    return savedToken;
+    const action = decideStoredTokenAction(await probeStoredToken(baseUrl, savedToken));
+
+    if (action === 'use') {
+      return savedToken;
+    }
+
+    if (action === 'keep-despite-error') {
+      // Server unreachable or erroring. Keep going with what we have rather
+      // than demanding a browser login during an outage.
+      console.error('Could not verify saved credentials — continuing with them.');
+      return savedToken;
+    }
+
+    console.error('Saved credentials were rejected by the server — signing in again.');
+    await clearCredentials();
   }
 
   // 3. Perform browser authentication
