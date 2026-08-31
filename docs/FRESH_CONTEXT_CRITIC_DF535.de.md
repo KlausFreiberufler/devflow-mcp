@@ -24,7 +24,7 @@ Zwei Selbst-Prüfungen konnten das nicht sehen, weil die Begründung für den Va
 
 | Datei | Änderung |
 |---|---|
-| `packages/skills/skills/devflow-code-critic/SKILL.md` | Neuer Hauptmodus: Fresh-Context-Dispatch. Drei Linsen, Dispatch-Kontrakt mit ausdrücklicher Kontextgrenze, `review_mode` + `reviewers[]` im Verdict, Re-Dispatch-Regel, Self-Persona-Fallback, neue Anti-Patterns. Iron Laws 5 → 7. |
+| `packages/skills/skills/devflow-code-critic/SKILL.md` | Neuer Hauptmodus: Fresh-Context-Dispatch. Drei Linsen, Dispatch-Kontrakt mit ausdrücklicher Kontextgrenze, `review_mode` + `reviewers[]` im Verdict, Re-Dispatch-Regel, Self-Persona-Fallback, neue Anti-Patterns (4 → 8). Iron Laws 5 → 7. |
 | `scripts/pre-flow-update-code-critic.js` | Der Pre-Tool-Use-Hinweis führt jetzt mit dem Dispatch (Linsen, Kontextgrenze, „Subagenten melden, sie reparieren nie") und nennt den Fallback als Ausnahme, nicht als Normalfall. |
 | `packages/skills/skills/devflow-receiving-review/SKILL.md` | Gegenverweis: Der Kritiker ist jetzt die Hauptquelle der Befunde, und Subagenten-Befunde werden genau wie menschliche triagiert. |
 | `packages/skills/index.json` | Neu erzeugt (Beschreibung + Iron-Law-Zähler). |

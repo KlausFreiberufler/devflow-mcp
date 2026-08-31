@@ -24,7 +24,7 @@ Two self-reviews could not see it, because the justification for the validator w
 
 | File | Change |
 |---|---|
-| `packages/skills/skills/devflow-code-critic/SKILL.md` | New primary mode: fresh-context dispatch. Three lenses, dispatch contract with an explicit context boundary, `review_mode` + `reviewers[]` in the verdict, re-dispatch rule, self-persona fallback, new anti-patterns. Iron laws 5 → 7. |
+| `packages/skills/skills/devflow-code-critic/SKILL.md` | New primary mode: fresh-context dispatch. Three lenses, dispatch contract with an explicit context boundary, `review_mode` + `reviewers[]` in the verdict, re-dispatch rule, self-persona fallback, new anti-patterns (4 → 8). Iron laws 5 → 7. |
 | `scripts/pre-flow-update-code-critic.js` | The pre-tool-use reminder now leads with the dispatch (lenses, boundary, "subagents report, they never fix") and names the fallback as the exception, not the default. |
 | `packages/skills/skills/devflow-receiving-review/SKILL.md` | Counter-reference: the critic is now the main upstream source of findings, and subagent findings are triaged exactly like human ones. |
 | `packages/skills/index.json` | Regenerated (description + iron-law count). |
