@@ -1,32 +1,126 @@
 ---
 name: devflow-code-critic
-description: Use during in_progress state, before submitting flow_update({currentState: 'review'}), to deeply review the implementation against 7 quality dimensions. The skill enforces a critic-persona — the agent steps out of "implementer" mode and into "reviewer" mode. Outputs a structured verdict (approved | minor_issues | needs_changes) with severity-tagged findings. Iron Law: a verdict is only valid if all 7 dimensions were explicitly checked, and the diff plan-vs-reality was actually examined.
+description: Use during in_progress state, before submitting flow_update({currentState: 'review'}), to review the implementation against 7 quality dimensions. Primary mode (DF-535) is a fresh-context dispatch — 2-3 read-only reviewer subagents (correctness, security, does-it-reproduce) receive artifacts only (diff, acceptance criteria, plan excerpt, repo path) and never the author's assumptions. Clients without a subagent tool fall back to the critic-persona self-review (ADR-135), declared via review_mode. Outputs a structured verdict (approved | minor_issues | needs_changes) with severity-tagged findings. Iron Law: a verdict is only valid if all 7 dimensions were explicitly checked, and the diff plan-vs-reality was actually examined.
 flow_state: in_progress
 hooks: [3]
 discipline_token: devflow-code-critic
 optional: true
 ported_from: superpowers:critic-pattern (DevFlow-original, sister to devflow-plan-critic)
 iron_laws:
+  - Context boundary (DF-535) — the dispatch prompt carries artifacts only (git diff, acceptance criteria, plan excerpt, repo path). The author's assumptions, rationale, self-assessment or prior verdict must NEVER cross it. Evidence case DF-520 R3, anchoring effect.
+  - Critic subagents are read-only. They report, they never fix — the author fixes and re-dispatches.
   - All 7 dimensions must be checked before emitting a verdict.
   - Plan-vs-reality diff must be explicit — list what was added beyond plan and what was skipped.
   - High-severity findings must include a concrete fix-suggestion, not just a problem.
   - Loop max 3 iterations. If 2 consecutive iterations have 0 high-findings → exit. If same finding appears twice unchanged → escalate.
-  - Trivial flows (tasks ≤ 2 AND no schema-change) MAY skip critic via verdict='approved-trivial' with reasoning.
+  - Trivial flows (tasks ≤ 2 AND no schema-change) MAY skip critic via verdict='approved-trivial' with reasoning — no dispatch.
 ---
 
 # Skill: devflow-code-critic
 
-> **Purpose:** Deep self-critique of an implementation before transitioning `in_progress → review`. The agent puts on the reviewer-hat and challenges its own code against 7 quality dimensions.
+> **Purpose:** Deep review of an implementation before transitioning `in_progress → review`. Since **DF-535** the primary mode is not self-critique but a **fresh-context dispatch**: the code is judged by reviewers who never saw it being written.
 
 ## When to use
 
 Invoke this skill **before** calling `flow_update({currentState: 'review'})`. The pre-tool-use hook prints a reminder, but the responsibility is on the agent: code submitted without critique is code submitted blind.
 
+## Fresh-Context Dispatch (primary mode, DF-535)
+
+Dispatch **2-3 reviewer subagents** (Claude Code `Agent`/Task tool), each with exactly one lens, each **read-only**. Use an agent type without `Edit`/`Write` — e.g. `feature-dev:code-reviewer` or `Explore`. They read the repo themselves; they do not touch it.
+
+The three lenses run in parallel — one message, multiple tool calls.
+
+### Why the boundary exists — evidence case DF-520 R3
+
+A self-review shares a context window with the author, so it inherits the author's reasoning as a premise instead of testing it. That is the **anchoring effect**.
+
+**DF-520 (Ritual-Schedules)** is the paid-for proof: the self-review greenlit the flow, the human reviewer rejected it (R1), the self-review greenlit the fix, and it was rejected again (R2). Only in round 3 did anyone question the premise "`CronExpressionParser.parse()` validates the expression" — it does not. Malformed fields (a bare `'L'` in the weekday slot) parse fine and throw on the first `.next()`, so a single PUT persisted a broken cron and 500'd the ritual from then on. The author could not see it because the author's own justification was in the review context.
+
+A reviewer who receives only the diff and the ACs has no premise to inherit. They ask "does `parse()` actually reject every malformed field?" and run it.
+
+### The three lenses
+
+| Lens | Question the subagent answers | Feeds dimensions |
+|---|---|---|
+| `correctness` | Is every acceptance criterion really implemented (not just touched)? Are there bugs? Does the diff match the approved plan — anything added beyond it, anything planned and silently dropped? | 1 · 5 · 7 |
+| `security` | Walk the **Security Hygiene Checklist** from the project's CLAUDE.md against this diff: `requireAuth`, `requireProjectAccess`/`requireFlowAccess`, resource→project resolution before the first DB read, DB-layer `userId` filters, `dangerouslySetInnerHTML`, `iframe sandbox`, token storage, cross-access test entry. | 4 · 7 |
+| `does-it-reproduce` | Were the tests actually **executed**, or only written? Run them. Are the assertions strong enough to fail if the code regressed — or would they pass against a stub? Is every AC backed by a command whose output was really captured? | 2 |
+
+### Dispatch contract — what crosses the context boundary
+
+| Crosses | Stays on the author's side |
+|---|---|
+| The `git diff` (or diff range + repo path so the reviewer reads it) | The author's assumptions and rationale |
+| The flow's **acceptance criteria**, verbatim | "I already checked X", "this is safe because Y" |
+| The approved **plan** excerpt — scope and tasks | The author's verdict from a previous iteration |
+| Repo path + the command to run the tests | Findings the author already dismissed |
+
+**Never** paste the author's assumptions, rationale, self-assessment or prior verdict into the dispatch prompt — that anchor is exactly what let DF-520 R3 survive two self-reviews.
+
+Prompt skeleton per lens:
+
+```
+You are reviewing a change you have not seen before. Repo: <abs path>.
+Read the diff below (or run: git diff <base>...<head>).
+Lens: <correctness | security | does-it-reproduce> — only this lens.
+
+Acceptance criteria (verbatim):
+<AC list>
+
+Approved plan (scope + tasks):
+<plan excerpt>
+
+Report findings as JSON. Do not fix anything. Do not assume the author was right.
+```
+
+### What each reviewer returns
+
+```json
+{
+  "source_lens": "does-it-reproduce",
+  "findings": [
+    {
+      "severity": "high",
+      "location": "backend/src/services/ritualSchedules.js:42",
+      "observation": "validateCronExpression() parses but never iterates. '0 8 1 * L' is accepted here and throws on the first .next() in the caller.",
+      "repro": "node -e \"import('./src/services/ritualSchedules.js').then(m=>console.log(m.validateCronExpression('0 8 1 * L')))\"",
+      "suggestion": "Call .next() on the parsed result inside the validator and reject expressions that throw."
+    }
+  ]
+}
+```
+
+`severity` uses the same scale as the verdict table below. `observation` states what is, not what the author intended. A `high` finding without a `repro` command is a suspicion, not a finding — send the lens back for it.
+
+### What the author keeps
+
+The subagents cannot judge everything. These stay with the author, who has the flow, wiki and history in context:
+
+- **Dimension 3 · Iron-Laws** — was TDD really RED-first, was a pattern reused, extend > dismiss, collisions acknowledged.
+- **Dimension 6 · Knowledge-Drafts** — did this work surface a pattern, runbook or ADR-worthy decision.
+- **Triage** — collected findings go through **`devflow-receiving-review`**: every finding triaged Critical/Important/Minor, technically verified, accepted or rejected with a written reason. Never blind-accept a subagent, never blind-reject one.
+
+### Re-dispatch on iteration 2+
+
+Re-dispatch **only the lenses that produced high-findings** in the previous iteration. A lens that came back clean is not re-run — it would read the same code twice. Exception: if a fix touches a file that a clean lens owns (a security-relevant path, a test file), re-dispatch that lens too.
+
+## Fallback: self-persona critique for clients without a subagent tool
+
+Not every client can spawn a subagent. Per **ADR-135** (Multi-Client Plugin-Strategie, 3-Tier Support), Codex, Gemini, Cursor, Cline, Windsurf and Continue have no equivalent of the Claude Code Agent tool. There the fresh-context dispatch is impossible and the skill degrades to the original **critic-persona self-review**: the agent explicitly switches role — *"if this came from a junior dev, what would I flag?"* — and walks the 7 dimensions alone, applying the three lenses as checklists.
+
+This is a weaker review and must be **declared, not hidden**:
+
+```json
+{ "review_mode": "self-persona-fallback", "reviewers": [] }
+```
+
+Use `review_mode: "self-persona-fallback"` **only** when no subagent tool exists. Not having felt like dispatching is not a fallback reason. The slug `self-persona-fallback` is greppable on purpose — it makes the weaker mode auditable across flows.
+
 ## The 7 Dimensions
 
-For each dimension, the critic answers a focused question and reports findings.
+The dimension structure is unchanged — the dispatch changes *who* answers, not *what* is asked. For each dimension the critic answers a focused question and reports findings.
 
-### 1. AC-Implementation
+### 1. AC-Implementation → lens `correctness`
 
 > Was every Acceptance Criterion actually implemented? Not just touched — fully met?
 
@@ -35,7 +129,7 @@ For each dimension, the critic answers a focused question and reports findings.
 - AC says "validate Y" but only happy-path tested, edge-cases skipped
 - AC mentioned in plan but never made it into code (drift)
 
-### 2. Test-Coverage
+### 2. Test-Coverage → lens `does-it-reproduce`
 
 > Were tests added for every behavior change? Do they actually exercise the AC?
 
@@ -43,9 +137,10 @@ For each dimension, the critic answers a focused question and reports findings.
 - New function but no test
 - Test added but doesn't assert the AC's specific behavior
 - Test passes but only because the assertion is too weak (`.toBeTruthy()` on anything truthy)
+- Test written but never executed — the suite was never run on the final state
 - Critical-path code without integration/e2e test
 
-### 3. Iron-Laws (skill-specific)
+### 3. Iron-Laws (skill-specific) → author
 
 > Were the relevant DevFlow iron-laws followed?
 
@@ -55,7 +150,7 @@ Check at minimum:
 - `devflow-knowledge-completer` — extend > create > defer > NEVER dismiss
 - `devflow-collision-acknowledged` — checked for parallel flows in this area?
 
-### 4. ADR-Compliance
+### 4. ADR-Compliance → lens `security` (+ author)
 
 > Are there ADRs that govern this area? Does the code follow them?
 
@@ -64,7 +159,7 @@ Check at minimum:
 - New decision implicit in code that contradicts an existing ADR
 - Code introduces a pattern that should be promoted to ADR but wasn't
 
-### 5. Plan-Reconciliation (DF-310 alignment)
+### 5. Plan-Reconciliation (DF-310 alignment) → lens `correctness`
 
 > What did the code do that wasn't in the plan? What was planned but never implemented?
 
@@ -84,7 +179,7 @@ Justification for deviations: [explanation]
 - A planned task was silently dropped
 - Plan mentions a refactor that wasn't done — should've been deferred explicitly
 
-### 6. Knowledge-Drafts
+### 6. Knowledge-Drafts → author
 
 > Did this work surface a new pattern, runbook, or ADR-worthy decision?
 
@@ -95,7 +190,7 @@ Justification for deviations: [explanation]
 
 Use `knowledge_draft_create` when surfacing.
 
-### 7. Code-Quality
+### 7. Code-Quality → lenses `correctness` + `security`
 
 > Are there obvious bugs, security issues, anti-patterns?
 
@@ -114,18 +209,30 @@ Use `knowledge_draft_create` when surfacing.
 {
   "skill": "devflow-code-critic",
   "iteration": 1,
+  "review_mode": "fresh-context",
+  "reviewers": [
+    { "lens": "correctness", "agent_type": "feature-dev:code-reviewer", "status": "returned", "findings_count": 1 },
+    { "lens": "security", "agent_type": "feature-dev:code-reviewer", "status": "returned", "findings_count": 0 },
+    { "lens": "does-it-reproduce", "agent_type": "Explore", "status": "returned", "findings_count": 1 }
+  ],
   "verdict": "needs_changes",
   "findings": [
     {
       "severity": "high",
       "dimension": "ac-implementation",
+      "source_lens": "correctness",
+      "location": "frontend/src/components/flow/FlowDetailPage.tsx",
       "issue": "AC-3 says 'flow shows token usage' but no UI element added",
+      "repro": "grep -r 'tokenUsage' frontend/src/components/flow/ → no hit",
       "suggestion": "Add token-card to FlowDetailPage, see DF-233 brainstorm for layout"
     },
     {
       "severity": "medium",
       "dimension": "code-quality",
+      "source_lens": "correctness",
+      "location": "backend/src/services/budget.js:88",
       "issue": "Function `calculateBudget` swallows DB errors silently",
+      "repro": "node --test tests/api/budget-enforcement.test.js (passes even with a throwing stub)",
       "suggestion": "Throw to caller; let route-handler decide 500 vs 422"
     }
   ],
@@ -139,6 +246,12 @@ Use `knowledge_draft_create` when surfacing.
   "tokens_used_estimate": 18000
 }
 ```
+
+| Field | Values | Meaning |
+|---|---|---|
+| `review_mode` | `fresh-context` \| `self-persona-fallback` | How the review was produced. `fresh-context` = dispatched across the context boundary. `self-persona-fallback` = no subagent tool available (ADR-135). |
+| `reviewers[]` | one entry per dispatched lens | Empty array in fallback mode. `status`: `returned` \| `failed` \| `skipped` (with the skip reason in the finding-free iteration note). |
+| `findings[].source_lens` | `correctness` \| `security` \| `does-it-reproduce` \| `author` | Which lens produced the finding. `author` for dimensions 3 and 6. |
 
 ### Verdict Semantics
 
@@ -161,9 +274,9 @@ Use `knowledge_draft_create` when surfacing.
 
 The critic is **iterative**:
 
-1. Iteration 1: full pass on all 7 dimensions
+1. Iteration 1: dispatch all three lenses, full pass on all 7 dimensions
 2. If verdict ≠ `approved` → agent fixes → iteration 2
-3. Iteration 2: re-check (may shortcut for unchanged dimensions)
+3. Iteration 2: re-dispatch **only the lenses with high-findings** from iteration 1
 4. If verdict ≠ `approved` → iteration 3 (final)
 5. **Hard cap:** max 3 iterations
 6. **Early exit:** 2 consecutive iterations with 0 high-findings → exit
@@ -173,7 +286,7 @@ If max-iter reached and findings remain: emit `verdict: needs_changes`, set `rea
 
 ## Skip-Rules (Phase 5)
 
-For trivial flows, the critic MAY emit `approved-trivial` early:
+For trivial flows, the critic MAY emit `approved-trivial` early — **no dispatch at all**, three subagents for a typo fix is waste:
 
 - `tasks_count ≤ 2` AND
 - No schema migration in changed files AND
@@ -184,6 +297,8 @@ Output:
 ```json
 {
   "verdict": "approved-trivial",
+  "review_mode": "fresh-context",
+  "reviewers": [],
   "skip_reason": "1 task, no schema change, no new endpoint",
   "dimensions_checked": ["ac-implementation", "test-coverage"],
   "ready_to_proceed": true
@@ -202,7 +317,7 @@ flow_update({
 })
 ```
 
-This makes findings visible in the FlowDetailPage right pane.
+This makes findings visible in the FlowDetailPage right pane. Include `review_mode` in the summary so the reader knows whether this was a fresh-context review or the weaker self-persona one.
 
 ## Auto-Approve Gate (Phase 5)
 
@@ -215,15 +330,21 @@ After loop completes:
 
 ## Anti-Patterns
 
+- **Leaking the anchor** — pasting "I already verified X" or the previous verdict into the dispatch prompt. That re-creates the DF-520 R3 failure inside a fresh context.
+- **Dispatching a writer** — giving the critic subagent `Edit`/`Write`. The critic reports; the author fixes. Otherwise nobody reviews the fix.
+- **Fake fresh-context** — claiming `review_mode: "fresh-context"` for a review the author did alone.
 - **Rubber-stamping** — emitting `approved` without actually checking each dimension
+- **Blind acceptance** — taking every subagent finding at face value. Triage via `devflow-receiving-review`; a fresh reviewer lacks flow history and will sometimes flag intended behavior.
 - **Plan-Reconciliation skipped** — dimension 5 is mandatory; explicit list of additions/omissions
 - **Loop forever** — same finding 2× without progress → escalate, don't iterate
-- **Stockholm-syndrome** — being too lenient on your own code. Switch persona explicitly: "if this came from a junior dev, what would I flag?"
+- **Stockholm-syndrome** — being too lenient on your own code (the failure mode the dispatch is designed to remove)
 
 ## Related
 
 - `devflow-plan-critic` — sister skill for `planning → approval`
-- `devflow-receiving-review` — handles human reviewer feedback
+- `devflow-receiving-review` — triages the findings this skill produces
 - `devflow-tdd`, `devflow-pattern-reuse`, `devflow-knowledge-completer` — checked under dimension 3
+- ADR-135 — Multi-Client Plugin-Strategie (3-Tier Support), the reason the fallback mode exists
 - DF-339 — flow that introduced this skill family
-- Brainstorm: see flow attachment `df-339-brainstorm.html`
+- DF-535 — flow that made fresh-context dispatch the primary mode
+- DF-520 — the evidence case, R3 (see above)
