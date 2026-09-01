@@ -27,7 +27,7 @@ Zwei Selbst-Prüfungen konnten das nicht sehen, weil die Begründung für den Va
 | `packages/skills/skills/devflow-code-critic/SKILL.md` | Neuer Hauptmodus: Fresh-Context-Dispatch. Drei Linsen, Dispatch-Kontrakt mit ausdrücklicher Kontextgrenze, `review_mode` + `reviewers[]` im Verdict, Re-Dispatch-Regel, Self-Persona-Fallback, neue Anti-Patterns (4 → 8). Iron Laws 5 → 7. |
 | `scripts/pre-flow-update-code-critic.js` | Der Pre-Tool-Use-Hinweis führt jetzt mit dem Dispatch (Linsen, Kontextgrenze, „Subagenten melden, sie reparieren nie") und nennt den Fallback als Ausnahme, nicht als Normalfall. |
 | `packages/skills/skills/devflow-receiving-review/SKILL.md` | Gegenverweis: Der Kritiker ist jetzt die Hauptquelle der Befunde, und Subagenten-Befunde werden genau wie menschliche triagiert. |
-| `packages/skills/index.json` | Neu erzeugt (Beschreibung + Iron-Law-Zähler). |
+| `packages/skills/index.json` | Neu erzeugt: neue Beschreibung + Iron-Law-Zähler 5 → 7 für `devflow-code-critic`. Der Rebuild korrigiert nebenbei einen **vorbestehenden** veralteten Eintrag für `devflow-subagent-driven-dev` (5 → 8) — dieser Skill wird von DF-535 nicht angefasst, seine Index-Zeile war nur von ihrem Frontmatter abgedriftet. |
 | `scripts/tests/df535-fresh-context-critic.test.js` | 7 pinnende Tests, in `npm test` verdrahtet. |
 
 ## Der Dispatch-Kontrakt

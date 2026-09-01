@@ -25,6 +25,8 @@ Der Dispatch ersetzt **nicht** die Engine-Gates der Factory-App (QA + Faktenchec
 
 - `docs/FRESH_CONTEXT_CRITIC_DF535.md` + `docs/FRESH_CONTEXT_CRITIC_DF535.de.md` — Motivation samt Belegfall DF-520 R3, Dispatch-Kontrakt, die drei Linsen, Fallback-Matrix nach ADR-135-Tiers und die Abgrenzung zu Engine-Gates und `devflow-subagent-driven-dev`. Die Docs liegen bewusst **hier** und nicht im devflow-Repo: Die Änderung liegt vollständig in diesem Repo (Skill, Hook, Tests, `index.json`) und geht als ein PR raus; das devflow-Repo behält seine CLAUDE.md-Steckbrief-Konvention (DF-307).
 
+Nebenbefund beim Regenerieren von `packages/skills/index.json`: Der Iron-Law-Zähler für `devflow-subagent-driven-dev` stand auf 5, sein Frontmatter auf 8. Der Rebuild zieht das auf 8 nach — der Skill selbst (weiterhin `status: draft`) wird von DF-535 nicht angefasst, nur seine abgedriftete Index-Zeile.
+
 Verhaltenstests: `scripts/tests/df535-fresh-context-critic.test.js` (7 — Linsen, Kontextgrenze, Fallback-Sektion mit ADR-135, Triage-Übergabe, Hook-stdout, Gegenverweis, Verdrahtung in `npm test`). Suite gesamt: 166 `node --test`-Tests (vorher 159) und 83 vitest-Tests, alles grün.
 
 ## [4.44.0] - 2026-08-29

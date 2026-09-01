@@ -27,7 +27,7 @@ Two self-reviews could not see it, because the justification for the validator w
 | `packages/skills/skills/devflow-code-critic/SKILL.md` | New primary mode: fresh-context dispatch. Three lenses, dispatch contract with an explicit context boundary, `review_mode` + `reviewers[]` in the verdict, re-dispatch rule, self-persona fallback, new anti-patterns (4 → 8). Iron laws 5 → 7. |
 | `scripts/pre-flow-update-code-critic.js` | The pre-tool-use reminder now leads with the dispatch (lenses, boundary, "subagents report, they never fix") and names the fallback as the exception, not the default. |
 | `packages/skills/skills/devflow-receiving-review/SKILL.md` | Counter-reference: the critic is now the main upstream source of findings, and subagent findings are triaged exactly like human ones. |
-| `packages/skills/index.json` | Regenerated (description + iron-law count). |
+| `packages/skills/index.json` | Regenerated: new description + iron-law count 5 → 7 for `devflow-code-critic`. The rebuild also corrects a **pre-existing** stale entry for `devflow-subagent-driven-dev` (5 → 8) — that skill's body is untouched by DF-535; its index row had simply drifted from its frontmatter. |
 | `scripts/tests/df535-fresh-context-critic.test.js` | 7 pinning tests, wired into `npm test`. |
 
 ## The dispatch contract
