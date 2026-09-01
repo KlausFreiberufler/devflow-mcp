@@ -71,7 +71,7 @@ The subagents cannot judge everything; these need the flow, wiki and history in 
 
 Iteration 1 dispatches all three lenses. On iteration 2+ only the lenses that produced high-findings are re-dispatched — a clean lens would read the same code twice. Exception: if a fix touches a file a clean lens owns (a security-relevant path, a test file), that lens is re-dispatched too. Hard cap stays at 3 iterations.
 
-Trivial flows (≤ 2 tasks, no schema change, no new endpoint) still exit via `approved-trivial` with **no dispatch at all** — three subagents for a typo fix is waste.
+Trivial flows still exit via `approved-trivial` with **no dispatch at all** — three subagents for a typo fix is waste. All four skip conditions have to hold: ≤ 2 tasks, no schema change, no new endpoint, **and** no tag in `force_critic_tags` (project config, `['security','breaking']` by default). A one-task flow tagged `security` is dispatched like any other — the shortcut is for small work, not for risky work that happens to be small.
 
 ## Fallback matrix (ADR-135 tiers)
 

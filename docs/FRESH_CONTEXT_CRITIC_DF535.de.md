@@ -71,7 +71,7 @@ Die Subagenten können nicht alles beurteilen; dafür braucht es Flow, Wiki und 
 
 Iteration 1 startet alle drei Linsen. Ab Iteration 2 werden **nur die Linsen** neu gestartet, die High-Findings geliefert haben — eine saubere Linse würde denselben Code zweimal lesen. Ausnahme: berührt ein Fix eine Datei, die einer sauberen Linse gehört (ein sicherheitsrelevanter Pfad, eine Testdatei), läuft diese Linse ebenfalls neu. Die harte Grenze bleibt bei 3 Iterationen.
 
-Triviale Flows (≤ 2 Tasks, keine Schema-Änderung, kein neuer Endpoint) gehen weiterhin über `approved-trivial` raus — **ganz ohne Dispatch**, drei Subagenten für einen Tippfehler sind Verschwendung.
+Triviale Flows gehen weiterhin über `approved-trivial` raus — **ganz ohne Dispatch**, drei Subagenten für einen Tippfehler sind Verschwendung. Es müssen alle vier Bedingungen gelten: ≤ 2 Tasks, keine Schema-Änderung, kein neuer Endpoint **und** kein Tag aus `force_critic_tags` (Projekt-Config, standardmäßig `['security','breaking']`). Ein Ein-Task-Flow mit `security`-Tag geht ganz normal in den Dispatch — die Abkürzung gilt kleiner Arbeit, nicht riskanter Arbeit, die zufällig klein ist.
 
 ## Fallback-Matrix (ADR-135-Tiers)
 
