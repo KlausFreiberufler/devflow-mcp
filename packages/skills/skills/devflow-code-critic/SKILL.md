@@ -250,7 +250,7 @@ Use `knowledge_draft_create` when surfacing.
 | Field | Values | Meaning |
 |---|---|---|
 | `review_mode` | `fresh-context` \| `self-persona-fallback` | How the review was produced. `fresh-context` = dispatched across the context boundary. `self-persona-fallback` = no subagent tool available (ADR-135). |
-| `reviewers[]` | one entry per dispatched lens | Empty array in fallback mode. `status`: `returned` \| `failed` \| `skipped` (with the skip reason in the finding-free iteration note). |
+| `reviewers[]` | one entry per dispatched lens | Empty whenever nothing was dispatched — either fallback mode or an `approved-trivial` skip; read it together with `review_mode`, not alone. `status`: `returned` \| `failed` \| `skipped` (with the skip reason in the finding-free iteration note). |
 | `findings[].source_lens` | `correctness` \| `security` \| `does-it-reproduce` \| `author` | Which lens produced the finding. `author` for dimensions 3 and 6. |
 
 ### Verdict Semantics
