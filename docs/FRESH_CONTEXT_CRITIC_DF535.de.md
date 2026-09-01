@@ -71,7 +71,7 @@ Triviale Flows (≤ 2 Tasks, keine Schema-Änderung, kein neuer Endpoint) gehen 
 
 ## Fallback-Matrix (ADR-135-Tiers)
 
-Nicht jeder Client kann einen Subagenten starten. **ADR-135 — Multi-Client Plugin-Strategie: 3-Tier Support** (accepted 2026-05-06) regelt, wer was bekommt; Stand DF-535 hat nur Claude Code ein Gegenstück zum `Agent`-Tool.
+Nicht jeder Client kann einen Subagenten starten. **ADR-135 — Multi-Client Plugin-Strategie: 3-Tier Support** (Ursprungs-Flow DF-327, accepted 2026-05-06) regelt, wer was bekommt; Stand DF-535 hat nur Claude Code ein Gegenstück zum `Agent`-Tool.
 
 | Client | ADR-135-Tier | Subagenten-Tool | Review-Modus |
 |---|---|---|---|
@@ -146,7 +146,7 @@ Die gesamte Änderung liegt in `devflow-mcp` — Skill-Body, Hook, Tests, `index
 - Hook: `scripts/pre-flow-update-code-critic.js`
 - `devflow-receiving-review` — triagiert, was die Linsen liefern
 - `devflow-plan-critic` — Schwester-Skill für `planning → approval`
-- ADR-135 — Multi-Client Plugin-Strategie (3-Tier Support), der Grund für den Fallback
+- ADR-135 — Multi-Client Plugin-Strategie (3-Tier Support), aus DF-327 — der Grund für den Fallback
 - DF-339 — hat die Kritiker-Skill-Familie eingeführt
 - DF-520 — der Belegfall (R3)
 - DF-424 / DF-427 — RFC und Abschluss zu `devflow-subagent-driven-dev`

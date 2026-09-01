@@ -71,7 +71,7 @@ Trivial flows (≤ 2 tasks, no schema change, no new endpoint) still exit via `a
 
 ## Fallback matrix (ADR-135 tiers)
 
-Not every client can spawn a subagent. **ADR-135 — Multi-Client Plugin-Strategie: 3-Tier Support** (accepted 2026-05-06) defines who receives what; as of DF-535 only Claude Code has an equivalent of the `Agent` tool.
+Not every client can spawn a subagent. **ADR-135 — Multi-Client Plugin-Strategie: 3-Tier Support** (originating flow DF-327, accepted 2026-05-06) defines who receives what; as of DF-535 only Claude Code has an equivalent of the `Agent` tool.
 
 | Client | ADR-135 tier | Subagent tool | Review mode |
 |---|---|---|---|
@@ -146,7 +146,7 @@ The whole change is in `devflow-mcp` — skill body, hook, tests, `index.json` �
 - Hook: `scripts/pre-flow-update-code-critic.js`
 - `devflow-receiving-review` — triages what the lenses produce
 - `devflow-plan-critic` — sister skill for `planning → approval`
-- ADR-135 — Multi-Client Plugin-Strategie (3-Tier Support), the reason the fallback exists
+- ADR-135 — Multi-Client Plugin-Strategie (3-Tier Support), from DF-327 — the reason the fallback exists
 - DF-339 — introduced the critic skill family
 - DF-520 — the evidence case (R3)
 - DF-424 / DF-427 — `devflow-subagent-driven-dev` RFC and closure
