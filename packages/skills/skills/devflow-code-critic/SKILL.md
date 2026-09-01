@@ -94,6 +94,8 @@ Report findings as JSON. Do not fix anything. Do not assume the author was right
 
 `severity` uses the same scale as the verdict table below. `observation` states what is, not what the author intended. A `high` finding without a `repro` command is a suspicion, not a finding — send the lens back for it.
 
+A lens that errors out or returns nothing usable is `status: "failed"` — re-dispatch it once. If it fails again, the author covers that lens' dimensions themselves and the entry stays in `reviewers[]` with `failed`, so the gap is visible. `review_mode` remains `fresh-context` as long as at least one lens actually crossed the boundary; the field says how the review was produced, not how completely.
+
 ### What the author keeps
 
 The subagents cannot judge everything. These stay with the author, who has the flow, wiki and history in context:
@@ -350,3 +352,4 @@ After loop completes:
 - DF-339 — flow that introduced this skill family
 - DF-535 — flow that made fresh-context dispatch the primary mode
 - DF-520 — the evidence case, R3 (see above)
+- Brainstorm of the original critic design: flow attachment `df-339-brainstorm.html`
