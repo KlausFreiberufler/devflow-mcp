@@ -34,6 +34,8 @@ Two self-reviews could not see it, because the justification for the validator w
 
 Dispatch **2–3 reviewer subagents** (Claude Code `Agent`/Task tool), one lens each, in parallel — one message, multiple tool calls. Use an agent type **without** `Edit`/`Write` (e.g. `feature-dev:code-reviewer`, `Explore`). They read the repo themselves; they never touch it.
 
+**Pick the agent type per lens, not once for all three.** `correctness` and `security` only read — `feature-dev:code-reviewer` fits. `does-it-reproduce` has to *execute* the suite, so it needs a type that can start a command (e.g. `Explore`): `feature-dev:code-reviewer` ships without `Bash` — only `KillShell`/`BashOutput`, which attach to an already-running shell. Dispatched to that type, the lens would review the tests by reading them and report as if it had run them — exactly the failure mode it exists to catch.
+
 ### Context boundary
 
 | Crosses into the dispatch prompt | Stays on the author's side |
@@ -54,6 +56,8 @@ The right-hand column is the whole point. Pasting "I already verified X" into th
 | `does-it-reproduce` | Were the tests actually **executed**, or only written? Run them. Would the assertions fail if the code regressed, or would they pass against a stub? Is every AC backed by a command whose output was really captured? | 2 |
 
 Each finding carries `severity`, `location`, `observation`, `repro` and `suggestion`. A `high` finding without a `repro` command is a suspicion, not a finding — the lens gets sent back for it.
+
+A lens that errors out or returns nothing usable is `status: "failed"` — re-dispatch it once. If it fails again, the author covers that lens' dimensions themselves and the entry stays in `reviewers[]` marked `failed`, so the gap remains visible. `review_mode` stays `fresh-context` as long as at least one lens actually crossed the boundary: the field says how the review was produced, not how completely.
 
 ### What stays with the author
 
@@ -91,7 +95,7 @@ The fallback is the original critic-persona self-review — *"if this came from 
 { "review_mode": "self-persona-fallback", "reviewers": [] }
 ```
 
-The slug `self-persona-fallback` is greppable on purpose: it makes the weaker mode auditable across flows. Not having felt like dispatching is not a fallback reason, and claiming `review_mode: "fresh-context"` for a solo review is an anti-pattern the skill names explicitly ("fake fresh-context").
+An empty `reviewers[]` on its own is not the fallback signal — an `approved-trivial` skip is empty too; read it together with `review_mode`. The slug `self-persona-fallback` is greppable on purpose: it makes the weaker mode auditable across flows. Not having felt like dispatching is not a fallback reason, and claiming `review_mode: "fresh-context"` for a solo review is an anti-pattern the skill names explicitly ("fake fresh-context").
 
 ## Boundaries — what this is *not*
 

@@ -34,6 +34,8 @@ Zwei Selbst-Prüfungen konnten das nicht sehen, weil die Begründung für den Va
 
 **2–3 Prüfer-Subagenten** starten (Claude-Code-`Agent`/Task-Tool), je eine Linse, parallel — eine Nachricht, mehrere Tool-Calls. Ein Agent-Typ **ohne** `Edit`/`Write` (z. B. `feature-dev:code-reviewer`, `Explore`). Sie lesen das Repo selbst; sie fassen es nie an.
 
+**Den Agent-Typ pro Linse wählen, nicht einmal für alle drei.** `correctness` und `security` lesen nur — dafür passt `feature-dev:code-reviewer`. `does-it-reproduce` muss die Suite *ausführen* und braucht deshalb einen Typ, der einen Befehl starten kann (z. B. `Explore`): `feature-dev:code-reviewer` kommt ohne `Bash` — nur `KillShell`/`BashOutput`, die sich an eine bereits laufende Shell hängen. An diesen Typ vergeben, würde die Linse die Tests durch Lesen prüfen und berichten, als hätte sie sie ausgeführt — genau der Fehler, den sie fangen soll.
+
 ### Kontextgrenze
 
 | Darf in den Dispatch-Prompt | Bleibt beim Autor |
@@ -54,6 +56,8 @@ Die rechte Spalte ist der ganze Punkt. Wer „X habe ich schon verifiziert" in d
 | `does-it-reproduce` | Wurden die Tests wirklich **ausgeführt** oder nur geschrieben? Ausführen. Würden die Assertions bei einer Regression scheitern, oder liefen sie auch gegen einen Stub durch? Steht hinter jedem AC ein Befehl, dessen Ausgabe tatsächlich erfasst wurde? | 2 |
 
 Jeder Befund trägt `severity`, `location`, `observation`, `repro` und `suggestion`. Ein `high`-Befund ohne `repro`-Befehl ist ein Verdacht, kein Befund — die Linse wird dafür zurückgeschickt.
+
+Eine Linse, die abbricht oder nichts Brauchbares liefert, bekommt `status: "failed"` — einmal neu starten. Scheitert sie erneut, deckt der Autor die Dimensionen dieser Linse selbst ab, und der Eintrag bleibt als `failed` in `reviewers[]` stehen, damit die Lücke sichtbar bleibt. `review_mode` bleibt `fresh-context`, solange mindestens eine Linse die Grenze wirklich überquert hat: Das Feld sagt, *wie* die Prüfung entstanden ist, nicht *wie vollständig*.
 
 ### Was beim Autor bleibt
 
@@ -91,7 +95,7 @@ Der Fallback ist die ursprüngliche Kritiker-Persona-Selbstprüfung — *„wenn
 { "review_mode": "self-persona-fallback", "reviewers": [] }
 ```
 
-Der Slug `self-persona-fallback` ist mit Absicht greppbar: Er macht den schwächeren Modus über Flows hinweg auditierbar. Keine Lust auf den Dispatch ist kein Fallback-Grund, und `review_mode: "fresh-context"` für eine Alleinprüfung zu behaupten, führt der Skill ausdrücklich als Anti-Pattern („fake fresh-context").
+Ein leeres `reviewers[]` allein ist noch kein Fallback-Signal — ein `approved-trivial`-Skip ist ebenfalls leer; es ist zusammen mit `review_mode` zu lesen. Der Slug `self-persona-fallback` ist mit Absicht greppbar: Er macht den schwächeren Modus über Flows hinweg auditierbar. Keine Lust auf den Dispatch ist kein Fallback-Grund, und `review_mode: "fresh-context"` für eine Alleinprüfung zu behaupten, führt der Skill ausdrücklich als Anti-Pattern („fake fresh-context").
 
 ## Abgrenzung — was das *nicht* ist
 
