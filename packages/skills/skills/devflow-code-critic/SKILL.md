@@ -110,7 +110,7 @@ Re-dispatch **only the lenses that produced high-findings** in the previous iter
 
 ## Fallback: self-persona critique for clients without a subagent tool
 
-Not every client can spawn a subagent. Per **ADR-135** (Multi-Client Plugin-Strategie, 3-Tier Support), Codex, Gemini, Cursor, Cline, Windsurf and Continue have no equivalent of the Claude Code Agent tool. There the fresh-context dispatch is impossible and the skill degrades to the original **critic-persona self-review**: the agent explicitly switches role — *"if this came from a junior dev, what would I flag?"* — and walks the 7 dimensions alone, applying the three lenses as checklists.
+Not every client can spawn a subagent. Per **ADR-135** (Multi-Client Plugin-Strategie, 3-Tier Support — originating flow DF-327), Codex, Gemini, Cursor, Cline, Windsurf and Continue have no equivalent of the Claude Code Agent tool. There the fresh-context dispatch is impossible and the skill degrades to the original **critic-persona self-review**: the agent explicitly switches role — *"if this came from a junior dev, what would I flag?"* — and walks the 7 dimensions alone, applying the three lenses as checklists.
 
 This is a weaker review and must be **declared, not hidden**:
 
@@ -348,7 +348,7 @@ After loop completes:
 - `devflow-plan-critic` — sister skill for `planning → approval`
 - `devflow-receiving-review` — triages the findings this skill produces
 - `devflow-tdd`, `devflow-pattern-reuse`, `devflow-knowledge-completer` — checked under dimension 3
-- ADR-135 — Multi-Client Plugin-Strategie (3-Tier Support), the reason the fallback mode exists
+- ADR-135 — Multi-Client Plugin-Strategie (3-Tier Support), from DF-327 — the reason the fallback mode exists. The number is not greppable in the app repo; the local mirror is `docs/decisions/df-327-multi-client-plugin-strategie.md`.
 - DF-339 — flow that introduced this skill family
 - DF-535 — flow that made fresh-context dispatch the primary mode
 - DF-520 — the evidence case, R3 (see above)
