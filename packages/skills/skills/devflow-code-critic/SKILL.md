@@ -13,7 +13,7 @@ iron_laws:
   - Plan-vs-reality diff must be explicit — list what was added beyond plan and what was skipped.
   - High-severity findings must include a concrete fix-suggestion, not just a problem.
   - Loop max 3 iterations. If 2 consecutive iterations have 0 high-findings → exit. If same finding appears twice unchanged → escalate.
-  - Trivial flows (tasks ≤ 2 AND no schema-change) MAY skip critic via verdict='approved-trivial' with reasoning — no dispatch.
+  - Trivial flows MAY skip the critic via verdict='approved-trivial' with reasoning — no dispatch. All four Skip-Rules conditions must hold; tasks ≤ 2 alone is not enough.
 ---
 
 # Skill: devflow-code-critic
@@ -308,6 +308,8 @@ Output:
   "ready_to_proceed": true
 }
 ```
+
+`review_mode` stays `fresh-context` here: it names the mode that was available, not a review that happened. The **`approved-trivial` verdict** is the marker for "nothing was dispatched" — so the *Fake fresh-context* anti-pattern below does not apply to a skip. When auditing how flows were reviewed, filter on the verdict first, then on `review_mode`.
 
 ## Posting Findings as Discussion (Phase 4)
 
