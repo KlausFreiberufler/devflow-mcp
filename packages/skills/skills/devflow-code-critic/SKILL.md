@@ -262,7 +262,7 @@ Use `knowledge_draft_create` when surfacing.
 | Verdict | When | Next |
 |---|---|---|
 | `approved` | 0 high + 0 medium findings | Code is ready, proceed to review |
-| `approved-trivial` | Tasks ≤ 2 AND no schema-change AND no AC of severity-relevant kind | Skip-shortcut for tiny flows |
+| `approved-trivial` | All four Skip-Rules conditions hold (see [Skip-Rules](#skip-rules-phase-5)) — tasks ≤ 2 alone is not enough | Skip-shortcut for tiny flows; nothing dispatched |
 | `minor_issues` | 0 high + ≥1 medium findings | Acceptable; user reviewer may accept |
 | `needs_changes` | ≥1 high finding | Code must be revised. Fix high-findings, re-critique. |
 
