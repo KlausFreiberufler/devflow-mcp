@@ -348,7 +348,7 @@ After loop completes:
 - `devflow-plan-critic` — sister skill for `planning → approval`
 - `devflow-receiving-review` — triages the findings this skill produces
 - `devflow-tdd`, `devflow-pattern-reuse`, `devflow-knowledge-completer` — checked under dimension 3
-- ADR-135 — Multi-Client Plugin-Strategie (3-Tier Support), from DF-327 — the reason the fallback mode exists. The number is not greppable in the app repo; the local mirror is `docs/decisions/df-327-multi-client-plugin-strategie.md`.
+- ADR-135 — "Multi-Client Plugin-Strategie: 3-Tier Support" (accepted 2026-05-06, from DF-327) — the reason the fallback mode exists. It lives in the DevFlow wiki, not as a file in either repo, so it is not greppable: look it up with `adr_get({ number: 135 })`.
 - DF-339 — flow that introduced this skill family
 - DF-535 — flow that made fresh-context dispatch the primary mode
 - DF-520 — the evidence case, R3 (see above)
