@@ -108,6 +108,8 @@ The subagents cannot judge everything. These stay with the author, who has the f
 
 Re-dispatch **only the lenses that produced high-findings** in the previous iteration. A lens that came back clean is not re-run — it would read the same code twice. Exception: if a fix touches a file that a clean lens owns (a security-relevant path, a test file), re-dispatch that lens too.
 
+A lens that is not re-run still gets an entry in that iteration's `reviewers[]`, with `status: "skipped"` and the reason ("clean in iteration 1"). Every iteration therefore lists all three lenses — a deliberate clean-skip stays distinguishable from a lens that was never dispatched at all.
+
 ## Fallback: self-persona critique for clients without a subagent tool
 
 Not every client can spawn a subagent. Per **ADR-135** (Multi-Client Plugin-Strategie, 3-Tier Support — originating flow DF-327), Codex, Gemini, Cursor, Cline, Windsurf and Continue have no equivalent of the Claude Code Agent tool. There the fresh-context dispatch is impossible and the skill degrades to the original **critic-persona self-review**: the agent explicitly switches role — *"if this came from a junior dev, what would I flag?"* — and walks the 7 dimensions alone, applying the three lenses as checklists.
@@ -254,7 +256,7 @@ Use `knowledge_draft_create` when surfacing.
 | Field | Values | Meaning |
 |---|---|---|
 | `review_mode` | `fresh-context` \| `self-persona-fallback` | How the review was produced. `fresh-context` = dispatched across the context boundary. `self-persona-fallback` = no subagent tool available (ADR-135). |
-| `reviewers[]` | one entry per dispatched lens | Empty whenever nothing was dispatched — either fallback mode or an `approved-trivial` skip; read it together with `review_mode`, not alone. `status`: `returned` \| `failed` \| `skipped` (with the skip reason in the finding-free iteration note). |
+| `reviewers[]` | one entry per dispatched lens | Empty whenever nothing was dispatched — either fallback mode or an `approved-trivial` skip; read it together with `review_mode`, not alone. `status`: `returned` (crossed the boundary and reported) \| `failed` (errored twice, dimensions fell back to the author) \| `skipped` (clean in the previous iteration, not re-run — see [Re-dispatch on iteration 2+](#re-dispatch-on-iteration-2)). |
 | `findings[].source_lens` | `correctness` \| `security` \| `does-it-reproduce` \| `author` | Which lens produced the finding. `author` for dimensions 3 and 6. |
 
 ### Verdict Semantics
