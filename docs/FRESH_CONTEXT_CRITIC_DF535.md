@@ -55,9 +55,9 @@ The right-hand column is the whole point. Pasting "I already verified X" into th
 | `security` | Walk the project's **Security Hygiene Checklist** (CLAUDE.md) against this diff: `requireAuth`, `requireProjectAccess`/`requireFlowAccess`, resource→project resolution before the first DB read, DB-layer `userId` filters, `dangerouslySetInnerHTML`, `iframe sandbox`, token storage, cross-access test entry. | 4 · 7 |
 | `does-it-reproduce` | Were the tests actually **executed**, or only written? Run them. Would the assertions fail if the code regressed, or would they pass against a stub? Is every AC backed by a command whose output was really captured? | 2 |
 
-Each finding carries `severity`, `location`, `observation`, `repro` and `suggestion`. A `high` finding without a `repro` command is a suspicion, not a finding — the lens gets sent back for it.
+Each finding carries `severity`, `source_lens`, `location`, `observation`, `repro` and `suggestion`. `source_lens` names the lens that produced it — or `author` for the two dimensions no subagent ever sees (3 and 6), so a verdict stays traceable to who found what. A `high` finding without a `repro` command is a suspicion, not a finding — the lens gets sent back for it.
 
-A lens that errors out or returns nothing usable is `status: "failed"` — re-dispatch it once. If it fails again, the author covers that lens' dimensions themselves and the entry stays in `reviewers[]` marked `failed`, so the gap remains visible. `review_mode` stays `fresh-context` as long as at least one lens actually crossed the boundary: the field says how the review was produced, not how completely.
+Every dispatched lens gets an entry in `reviewers[]` carrying its `agent_type` and a `status`: `returned` once it crossed the boundary and reported. A lens that errors out or returns nothing usable is `status: "failed"` — re-dispatch it once. If it fails again, the author covers that lens' dimensions themselves and the entry stays in `reviewers[]` marked `failed`, so the gap remains visible. `review_mode` stays `fresh-context` as long as at least one lens actually crossed the boundary: the field says how the review was produced, not how completely.
 
 ### What stays with the author
 
@@ -70,6 +70,8 @@ The subagents cannot judge everything; these need the flow, wiki and history in 
 ### Iteration
 
 Iteration 1 dispatches all three lenses. On iteration 2+ only the lenses that produced high-findings are re-dispatched — a clean lens would read the same code twice. Exception: if a fix touches a file a clean lens owns (a security-relevant path, a test file), that lens is re-dispatched too. Hard cap stays at 3 iterations.
+
+A lens that is *not* re-run still appears in that iteration's `reviewers[]` as `status: "skipped"`, with the reason ("clean in iteration 1"). Every iteration therefore lists all three lenses — a deliberate clean-skip stays distinguishable from a lens that was never dispatched at all.
 
 Trivial flows still exit via `approved-trivial` with **no dispatch at all** — three subagents for a typo fix is waste. All four skip conditions have to hold: ≤ 2 tasks, no schema change, no new endpoint, **and** no tag in `force_critic_tags` (project config, `['security','breaking']` by default). A one-task flow tagged `security` is dispatched like any other — the shortcut is for small work, not for risky work that happens to be small.
 

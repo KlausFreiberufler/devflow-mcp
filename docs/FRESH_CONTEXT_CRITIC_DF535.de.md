@@ -55,9 +55,9 @@ Die rechte Spalte ist der ganze Punkt. Wer „X habe ich schon verifiziert" in d
 | `security` | Die **Security-Hygiene-Checkliste** des Projekts (CLAUDE.md) gegen diesen Diff durchgehen: `requireAuth`, `requireProjectAccess`/`requireFlowAccess`, Resource→Project-Auflösung vor dem ersten DB-Read, `userId`-Filter im DB-Layer, `dangerouslySetInnerHTML`, `iframe sandbox`, Token-Ablage, Cross-Access-Test-Eintrag. | 4 · 7 |
 | `does-it-reproduce` | Wurden die Tests wirklich **ausgeführt** oder nur geschrieben? Ausführen. Würden die Assertions bei einer Regression scheitern, oder liefen sie auch gegen einen Stub durch? Steht hinter jedem AC ein Befehl, dessen Ausgabe tatsächlich erfasst wurde? | 2 |
 
-Jeder Befund trägt `severity`, `location`, `observation`, `repro` und `suggestion`. Ein `high`-Befund ohne `repro`-Befehl ist ein Verdacht, kein Befund — die Linse wird dafür zurückgeschickt.
+Jeder Befund trägt `severity`, `source_lens`, `location`, `observation`, `repro` und `suggestion`. `source_lens` nennt die Linse, die ihn gefunden hat — oder `author` für die beiden Dimensionen, die kein Subagent je sieht (3 und 6); so bleibt nachvollziehbar, wer was gefunden hat. Ein `high`-Befund ohne `repro`-Befehl ist ein Verdacht, kein Befund — die Linse wird dafür zurückgeschickt.
 
-Eine Linse, die abbricht oder nichts Brauchbares liefert, bekommt `status: "failed"` — einmal neu starten. Scheitert sie erneut, deckt der Autor die Dimensionen dieser Linse selbst ab, und der Eintrag bleibt als `failed` in `reviewers[]` stehen, damit die Lücke sichtbar bleibt. `review_mode` bleibt `fresh-context`, solange mindestens eine Linse die Grenze wirklich überquert hat: Das Feld sagt, *wie* die Prüfung entstanden ist, nicht *wie vollständig*.
+Jede gestartete Linse bekommt einen Eintrag in `reviewers[]` mit ihrem `agent_type` und einem `status`: `returned`, sobald sie die Grenze überquert und berichtet hat. Eine Linse, die abbricht oder nichts Brauchbares liefert, bekommt `status: "failed"` — einmal neu starten. Scheitert sie erneut, deckt der Autor die Dimensionen dieser Linse selbst ab, und der Eintrag bleibt als `failed` in `reviewers[]` stehen, damit die Lücke sichtbar bleibt. `review_mode` bleibt `fresh-context`, solange mindestens eine Linse die Grenze wirklich überquert hat: Das Feld sagt, *wie* die Prüfung entstanden ist, nicht *wie vollständig*.
 
 ### Was beim Autor bleibt
 
@@ -70,6 +70,8 @@ Die Subagenten können nicht alles beurteilen; dafür braucht es Flow, Wiki und 
 ### Iteration
 
 Iteration 1 startet alle drei Linsen. Ab Iteration 2 werden **nur die Linsen** neu gestartet, die High-Findings geliefert haben — eine saubere Linse würde denselben Code zweimal lesen. Ausnahme: berührt ein Fix eine Datei, die einer sauberen Linse gehört (ein sicherheitsrelevanter Pfad, eine Testdatei), läuft diese Linse ebenfalls neu. Die harte Grenze bleibt bei 3 Iterationen.
+
+Eine Linse, die *nicht* neu läuft, steht trotzdem im `reviewers[]` dieser Iteration — mit `status: "skipped"` und der Begründung („sauber in Iteration 1"). Jede Iteration führt damit alle drei Linsen auf: Ein bewusst übersprungener Lauf bleibt unterscheidbar von einer Linse, die nie gestartet wurde.
 
 Triviale Flows gehen weiterhin über `approved-trivial` raus — **ganz ohne Dispatch**, drei Subagenten für einen Tippfehler sind Verschwendung. Es müssen alle vier Bedingungen gelten: ≤ 2 Tasks, keine Schema-Änderung, kein neuer Endpoint **und** kein Tag aus `force_critic_tags` (Projekt-Config, standardmäßig `['security','breaking']`). Ein Ein-Task-Flow mit `security`-Tag geht ganz normal in den Dispatch — die Abkürzung gilt kleiner Arbeit, nicht riskanter Arbeit, die zufällig klein ist.
 
