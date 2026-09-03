@@ -32,7 +32,7 @@ Zwei Selbst-Prüfungen konnten das nicht sehen, weil die Begründung für den Va
 
 ## Der Dispatch-Kontrakt
 
-**2–3 Prüfer-Subagenten** starten (Claude-Code-`Agent`/Task-Tool), je eine Linse, parallel — eine Nachricht, mehrere Tool-Calls. Nie einen Agent-Typ wählen, der `Edit`/`Write` mitbringt (z. B. `feature-dev:code-reviewer`, `Explore`). Sie lesen das Repo selbst; sie melden, sie reparieren nie.
+**2–3 Prüfer-Subagenten** starten (Claude-Code-`Agent`/Task-Tool), je eine Linse, parallel — eine Nachricht, mehrere Tool-Calls. Nie einen Agent-Typ wählen, der `Edit`/`Write` mitbringt — `feature-dev:code-reviewer` und `Explore` bringen beides nicht mit und kommen deshalb in Frage. Sie lesen das Repo selbst; sie melden, sie reparieren nie.
 
 Nur-Lesen ist *werkzeugseitig erzwungen* allein bei einem Typ ohne Shell-Zugriff. `Explore` kann Befehle starten und darüber schreiben — bei dieser Linse steht die Schranke deshalb im Prompt (`Do not fix anything`) statt in der Werkzeugliste. Sie muss dort bleiben; und meldet ein Prüfer, er habe eine Datei geändert, wird die Änderung zurückgenommen und die Linse neu vergeben.
 
