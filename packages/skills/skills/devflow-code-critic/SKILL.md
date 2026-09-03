@@ -32,7 +32,7 @@ Read-only is only tool-enforced for a type without shell access. `Explore` can s
 
 **Pick the agent type per lens, not once for all three.** `correctness` and `security` only read — `feature-dev:code-reviewer` fits. `does-it-reproduce` has to *execute* the suite, so it needs a type that can run commands (e.g. `Explore`). `feature-dev:code-reviewer` ships without `Bash` — it has only `KillShell`/`BashOutput`, which attach to an already-running shell and cannot start one. Dispatched to that type, the lens would review the tests by reading them and report as if it had run them: exactly the failure mode the lens exists to catch.
 
-The three lenses run in parallel — one message, multiple tool calls.
+The three lenses run in parallel — one message, multiple tool calls. Iteration 1 always dispatches all three; a smaller dispatch only happens on [re-dispatch](#re-dispatch-on-iteration-2), where just the lenses with prior high-findings run again. That is where the lower end of "2-3" comes from — never a free choice in iteration 1.
 
 ### Why the boundary exists — evidence case DF-520 R3
 
