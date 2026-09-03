@@ -32,7 +32,7 @@ Two self-reviews could not see it, because the justification for the validator w
 
 ## The dispatch contract
 
-Dispatch **2–3 reviewer subagents** (Claude Code `Agent`/Task tool), one lens each, in parallel — one message, multiple tool calls. Never pick an agent type that carries `Edit`/`Write` — neither `feature-dev:code-reviewer` nor `Explore` does, so both are eligible. They read the repo themselves; they report, they never fix.
+Dispatch **2–3 reviewer subagents** (Claude Code `Agent`/Task tool), one lens each, in parallel — one message, multiple tool calls. Iteration 1 always dispatches all three; a smaller dispatch only happens on [re-dispatch](#iteration), where just the lenses with prior high-findings run again. That is where the lower end of “2–3” comes from — never a free choice in iteration 1. Never pick an agent type that carries `Edit`/`Write` — neither `feature-dev:code-reviewer` nor `Explore` does, so both are eligible. They read the repo themselves; they report, they never fix.
 
 Read-only is only *tool-enforced* for a type without shell access. `Explore` can start commands and could write through them, so for that lens the constraint lives in the prompt (`Do not fix anything`) rather than in the tool list. Keep it there — and if a reviewer reports having changed a file, revert the change and re-dispatch.
 
