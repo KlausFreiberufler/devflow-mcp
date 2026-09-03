@@ -4,10 +4,20 @@
  *
  * When the agent submits a state-transition to `review` (in_progress → review),
  * this hook reminds the agent to invoke the `devflow-code-critic` skill BEFORE
- * the transition. The implementation must be deeply reviewed against 7 dimensions:
+ * the transition.
+ *
+ * DF-535 — the reminder now leads with the **fresh-context dispatch**: the
+ * implementation is judged by 2-3 read-only reviewer subagents that never saw
+ * it being written (lenses: correctness / security / does-it-reproduce). The
+ * critic-persona self-review is only the fallback for clients without a
+ * subagent tool (ADR-135). A self-review shares a context window with the
+ * author and inherits the author's reasoning as a premise — evidence case
+ * DF-520 R3, where two self-reviews greenlit a validator that never validated.
+ *
+ * The 7 quality dimensions are unchanged; the dispatch changes *who* answers:
  *
  *   1. AC-Implementation   — every AC actually implemented in code
- *   2. Test-Coverage       — tests added for every behavior change
+ *   2. Test-Coverage       — tests added AND executed for every behavior change
  *   3. Iron-Laws           — TDD/pattern-reuse/knowledge-completer respected
  *   4. ADR-Compliance      — code follows applicable ADRs
  *   5. Plan-Reconciliation — diff plan vs reality, flag deviations
@@ -46,18 +56,52 @@ process.stdin.on('end', () => {
     if (args.codeCriticVerdict !== undefined) return
 
     const lines = [
-      '🔍 devflow-code-critic — deep review reminder',
+      '🔍 devflow-code-critic — fresh-context review reminder (DF-535)',
       '',
-      'Before submitting to review, run the `devflow-code-critic` skill against',
-      'these 7 dimensions and address all high-severity findings:',
+      'Before submitting to review, do NOT review your own code from inside your',
+      'own context. Run the `devflow-code-critic` skill in its primary mode:',
       '',
-      '   1. AC-Implementation   — every AC actually implemented in code',
-      '   2. Test-Coverage       — tests added for every behavior change',
-      '   3. Iron-Laws           — TDD / pattern-reuse / knowledge-completer respected',
-      '   4. ADR-Compliance      — code follows applicable ADRs',
-      '   5. Plan-Reconciliation — diff plan vs reality, flag deviations',
-      '   6. Knowledge-Drafts    — new patterns/ADRs surfaced as drafts',
-      '   7. Code-Quality        — obvious bugs, security, anti-patterns',
+      'PRIMARY — fresh-context dispatch:',
+      '   Dispatch 2-3 reviewer subagents (Agent/Task tool, an agent type without',
+      '   Edit/Write — they report, they never fix), one lens each, in parallel',
+      '   (one message, multiple tool calls). Pick the agent type PER LENS, not',
+      '   once for all three:',
+      '',
+      '     · correctness        — every AC really implemented? bugs? diff vs plan?  (dim 1·5·7)',
+      '                            reads only → feature-dev:code-reviewer',
+      '     · security           — CLAUDE.md Security Hygiene Checklist vs the diff  (dim 4·7)',
+      '                            reads only → feature-dev:code-reviewer',
+      '     · does-it-reproduce  — were the tests RUN, not just written? assertions   (dim 2)',
+      '                            strong enough to fail on a regression?',
+      '                            MUST execute the suite → needs a type that can run',
+      '                            commands (e.g. Explore). feature-dev:code-reviewer',
+      '                            ships without Bash — dispatched there, the lens',
+      '                            would read the tests and report as if it had run',
+      '                            them: the exact failure mode it exists to catch.',
+      '',
+      '   Context boundary — what may cross into the dispatch prompt:',
+      '     ✓ the git diff (or diff range + repo path), the acceptance criteria',
+      '       verbatim, the approved plan excerpt, the command to run the tests',
+      '     ✗ NEVER your assumptions, rationale, self-assessment, prior verdict or',
+      '       findings you already dismissed — that anchor is exactly what let',
+      '       DF-520 R3 survive two self-reviews.',
+      '',
+      '   Subagents report, they never fix. You fix and re-dispatch — on iteration',
+      '   2+ only the lenses that produced high-findings.',
+      '',
+      'YOU keep (the subagents cannot judge these):',
+      '   · dimension 3 Iron-Laws       — TDD RED-first, pattern-reuse, extend > dismiss',
+      '   · dimension 6 Knowledge-Drafts — new pattern/runbook/ADR surfaced as draft',
+      '   · triage — run every finding through `devflow-receiving-review`:',
+      '     Critical/Important/Minor, technically verified, accepted or rejected with',
+      '     a reason. Never blind-accept a subagent, never blind-reject one.',
+      '',
+      'FALLBACK — critic-persona self-review:',
+      '   ONLY when the client has no subagent tool (ADR-135: Codex, Gemini, Cursor,',
+      '   Cline, Windsurf, Continue). Then walk the 7 dimensions alone, using the',
+      '   three lenses as checklists, and DECLARE the weaker mode:',
+      '     { "review_mode": "self-persona-fallback", "reviewers": [] }',
+      '   Not having felt like dispatching is not a fallback reason.',
       '',
       'Skill location: ~/.claude/plugins/cache/.../skills/devflow-code-critic/SKILL.md',
       'Iron Law: emit verdict only after all 7 dimensions are checked.',

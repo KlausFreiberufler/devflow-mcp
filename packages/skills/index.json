@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-21T19:26:42.812Z",
+  "generated_at": "2026-08-31T19:41:31.676Z",
   "count": 24,
   "skills": [
     {
@@ -26,13 +26,13 @@
     {
       "name": "devflow-code-critic",
       "slug": "devflow-code-critic",
-      "description": "Use during in_progress state, before submitting flow_update({currentState: 'review'}), to deeply review the implementation against 7 quality dimensions. The skill enforces a critic-persona — the agent steps out of \"implementer\" mode and into \"reviewer\" mode. Outputs a structured verdict (approved | minor_issues | needs_changes) with severity-tagged findings. Iron Law: a verdict is only valid if all 7 dimensions were explicitly checked, and the diff plan-vs-reality was actually examined.",
+      "description": "Use during in_progress state, before submitting flow_update({currentState: 'review'}), to review the implementation against 7 quality dimensions. Primary mode (DF-535) is a fresh-context dispatch — 2-3 read-only reviewer subagents (correctness, security, does-it-reproduce) receive artifacts only (diff, acceptance criteria, plan excerpt, repo path) and never the author's assumptions. Clients without a subagent tool fall back to the critic-persona self-review (ADR-135), declared via review_mode. Outputs a structured verdict (approved | minor_issues | needs_changes) with severity-tagged findings. Iron Law: a verdict is only valid if all 7 dimensions were explicitly checked, and the diff plan-vs-reality was actually examined.",
       "flow_state": "in_progress",
       "hooks": [
         3
       ],
       "discipline_token": "devflow-code-critic",
-      "iron_laws_count": 5
+      "iron_laws_count": 7
     },
     {
       "name": "devflow-collision-acknowledged",
@@ -198,11 +198,11 @@
     {
       "name": "devflow-subagent-driven-dev",
       "slug": "devflow-subagent-driven-dev",
-      "description": "DRAFT-SKELETON. Tier-2 Pilot. Future skill for delegating in_progress tasks to per-task sub-agents in isolated worktrees. NOT YET ACTIVE — see docs/RFC_SUBAGENT_DF424.md for the architecture-decision discussion that must complete before this skill is enabled.",
+      "description": "DRAFT-SKELETON. Tier-2 Pilot. Future skill for delegating in_progress tasks to per-task sub-agents in isolated worktrees. NOT YET ACTIVE — RFC sign-off via DF-427 closed Q1-Q7. Skill remains status:draft until the implementation roadmap (8 sub-flows, 3-4 weeks) lands.",
       "flow_state": "in_progress",
       "hooks": [],
       "discipline_token": null,
-      "iron_laws_count": 5
+      "iron_laws_count": 8
     },
     {
       "name": "devflow-tdd",
