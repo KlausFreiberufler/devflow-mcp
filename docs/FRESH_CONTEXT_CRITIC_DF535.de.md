@@ -32,7 +32,9 @@ Zwei Selbst-Prüfungen konnten das nicht sehen, weil die Begründung für den Va
 
 ## Der Dispatch-Kontrakt
 
-**2–3 Prüfer-Subagenten** starten (Claude-Code-`Agent`/Task-Tool), je eine Linse, parallel — eine Nachricht, mehrere Tool-Calls. Ein Agent-Typ **ohne** `Edit`/`Write` (z. B. `feature-dev:code-reviewer`, `Explore`). Sie lesen das Repo selbst; sie fassen es nie an.
+**2–3 Prüfer-Subagenten** starten (Claude-Code-`Agent`/Task-Tool), je eine Linse, parallel — eine Nachricht, mehrere Tool-Calls. Nie einen Agent-Typ wählen, der `Edit`/`Write` mitbringt (z. B. `feature-dev:code-reviewer`, `Explore`). Sie lesen das Repo selbst; sie melden, sie reparieren nie.
+
+Nur-Lesen ist *werkzeugseitig erzwungen* allein bei einem Typ ohne Shell-Zugriff. `Explore` kann Befehle starten und darüber schreiben — bei dieser Linse steht die Schranke deshalb im Prompt (`Do not fix anything`) statt in der Werkzeugliste. Sie muss dort bleiben; und meldet ein Prüfer, er habe eine Datei geändert, wird die Änderung zurückgenommen und die Linse neu vergeben.
 
 **Den Agent-Typ pro Linse wählen, nicht einmal für alle drei.** `correctness` und `security` lesen nur — dafür passt `feature-dev:code-reviewer`. `does-it-reproduce` muss die Suite *ausführen* und braucht deshalb einen Typ, der einen Befehl starten kann (z. B. `Explore`): `feature-dev:code-reviewer` kommt ohne `Bash` — nur `KillShell`/`BashOutput`, die sich an eine bereits laufende Shell hängen. An diesen Typ vergeben, würde die Linse die Tests durch Lesen prüfen und berichten, als hätte sie sie ausgeführt — genau der Fehler, den sie fangen soll.
 

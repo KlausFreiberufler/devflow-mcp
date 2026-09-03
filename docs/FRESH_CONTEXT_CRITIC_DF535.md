@@ -32,7 +32,9 @@ Two self-reviews could not see it, because the justification for the validator w
 
 ## The dispatch contract
 
-Dispatch **2–3 reviewer subagents** (Claude Code `Agent`/Task tool), one lens each, in parallel — one message, multiple tool calls. Use an agent type **without** `Edit`/`Write` (e.g. `feature-dev:code-reviewer`, `Explore`). They read the repo themselves; they never touch it.
+Dispatch **2–3 reviewer subagents** (Claude Code `Agent`/Task tool), one lens each, in parallel — one message, multiple tool calls. Never pick an agent type that carries `Edit`/`Write` (e.g. `feature-dev:code-reviewer`, `Explore`). They read the repo themselves; they report, they never fix.
+
+Read-only is only *tool-enforced* for a type without shell access. `Explore` can start commands and could write through them, so for that lens the constraint lives in the prompt (`Do not fix anything`) rather than in the tool list. Keep it there — and if a reviewer reports having changed a file, revert the change and re-dispatch.
 
 **Pick the agent type per lens, not once for all three.** `correctness` and `security` only read — `feature-dev:code-reviewer` fits. `does-it-reproduce` has to *execute* the suite, so it needs a type that can start a command (e.g. `Explore`): `feature-dev:code-reviewer` ships without `Bash` — only `KillShell`/`BashOutput`, which attach to an already-running shell. Dispatched to that type, the lens would review the tests by reading them and report as if it had run them — exactly the failure mode it exists to catch.
 
