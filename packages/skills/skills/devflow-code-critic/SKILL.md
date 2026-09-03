@@ -258,7 +258,7 @@ Use `knowledge_draft_create` when surfacing.
 | Field | Values | Meaning |
 |---|---|---|
 | `review_mode` | `fresh-context` \| `self-persona-fallback` | How the review was produced. `fresh-context` = dispatched across the context boundary. `self-persona-fallback` = no subagent tool available (ADR-135). |
-| `reviewers[]` | one entry per dispatched lens | Empty whenever nothing was dispatched — either fallback mode or an `approved-trivial` skip; read it together with `review_mode`, not alone. `status`: `returned` (crossed the boundary and reported) \| `failed` (errored twice, dimensions fell back to the author) \| `skipped` (clean in the previous iteration, not re-run — see [Re-dispatch on iteration 2+](#re-dispatch-on-iteration-2)). |
+| `reviewers[]` | one entry per lens, every dispatched iteration | Empty whenever nothing was dispatched — either fallback mode or an `approved-trivial` skip; read it together with `review_mode`, not alone. `status`: `returned` (crossed the boundary and reported) \| `failed` (errored twice, dimensions fell back to the author) \| `skipped` (clean in the previous iteration, not re-run — see [Re-dispatch on iteration 2+](#re-dispatch-on-iteration-2)). Entry keys: `lens`, `agent_type`, `status`, `findings_count` — plus `reason` (free text), required when `status` is `failed` or `skipped`, so the gap in that iteration is readable from the JSON alone. |
 | `findings[].source_lens` | `correctness` \| `security` \| `does-it-reproduce` \| `author` | Which lens produced the finding. `author` for dimensions 3 and 6. |
 
 ### Verdict Semantics
