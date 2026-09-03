@@ -238,12 +238,12 @@ Use `knowledge_draft_create` when surfacing.
     },
     {
       "severity": "medium",
-      "dimension": "code-quality",
-      "source_lens": "correctness",
-      "location": "backend/src/services/budget.js:88",
-      "issue": "Function `calculateBudget` swallows DB errors silently",
-      "repro": "node --test tests/api/budget-enforcement.test.js (passes even with a throwing stub)",
-      "suggestion": "Throw to caller; let route-handler decide 500 vs 422"
+      "dimension": "test-coverage",
+      "source_lens": "does-it-reproduce",
+      "location": "tests/api/budget-enforcement.test.js:120",
+      "issue": "Assertion too weak — the suite stays green against a stub that throws, so it would not catch `calculateBudget` swallowing DB errors",
+      "repro": "node --test tests/api/budget-enforcement.test.js (still passes with a throwing stub injected)",
+      "suggestion": "Assert the error path: the route must surface 500 instead of a silent default"
     }
   ],
   "plan_reconciliation": {
