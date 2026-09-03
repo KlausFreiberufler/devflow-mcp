@@ -94,7 +94,7 @@ Report findings as JSON. Do not fix anything. Do not assume the author was right
 
 `severity` uses the same scale as the verdict table below. `observation` states what is, not what the author intended. A `high` finding without a `repro` command is a suspicion, not a finding — send the lens back for it.
 
-When the author folds a reviewer's findings into this skill's own output, `observation` maps onto the pre-existing `issue` field and the author adds `dimension` + `source_lens`. The aggregated `findings[]` shape (see [Output Format](#output-format)) is unchanged from before DF-535 — never emit `observation` at the top level.
+When the author folds a reviewer's findings into this skill's own output, `observation` maps onto the pre-existing `issue` field and the author adds `dimension`. The keys that existed before DF-535 — `severity`, `dimension`, `issue`, `suggestion` — keep their names and meaning, so never emit `observation` at the top level. DF-535 only *adds* keys to `findings[]`: `source_lens`, plus `location` and `repro` carried over from the reviewer (see [Output Format](#output-format)).
 
 A lens that errors out or returns nothing usable is `status: "failed"` — re-dispatch it once. If it fails again, the author covers that lens' dimensions themselves and the entry stays in `reviewers[]` with `failed`, so the gap is visible. `review_mode` remains `fresh-context` as long as at least one lens actually crossed the boundary; the field says how the review was produced, not how completely.
 
