@@ -102,7 +102,7 @@ Today not required for any pipeline-step; future projects may add `'devflow-rece
 
 ## Related
 
-- `devflow-code-critic` — the main upstream source of findings. Since **DF-535** its primary mode is a fresh-context dispatch: 2-3 read-only reviewer subagents (`correctness`, `security`, `does-it-reproduce`) receive artifacts only — diff, acceptance criteria, plan excerpt, repo path — and never the author's assumptions. Their findings land here. **Nothing in the process above changes**: a subagent finding is collected, triaged and verified exactly like a human one. Two directions of caution apply — a fresh reviewer has no flow history and will sometimes flag intended behaviour (so never blind-accept), and it also has no stake in the code (so never blind-reject).
+- `devflow-code-critic` — the main upstream source of findings. Since **DF-535** its primary mode is a fresh-context dispatch: 2-3 reviewer subagents (`correctness` and `security` read-only, `does-it-reproduce` actually running the suite) receive artifacts only — diff, acceptance criteria, plan excerpt, repo path — and never the author's assumptions. Their findings land here. **Nothing in the process above changes**: a subagent finding is collected, triaged and verified exactly like a human one. Two directions of caution apply — a fresh reviewer has no flow history and will sometimes flag intended behaviour (so never blind-accept), and it also has no stake in the code (so never blind-reject).
 - [[migration-test-strategy]] — Säule A
 - [[knowledge-gated-workflow]] — Stage 11 in the visual diagram
 - DF-294 — port flow (this implementation)
